@@ -7,6 +7,7 @@ import {
   getTrimSizeById,
 } from "../modules/canvasEngine.js";
 import { computeCanvasDimensions, needsRiskWarning } from "../modules/bleedEngine.js";
+import { computeSafeZone } from "../modules/safeZoneEngine.js";
 import { drawPreview } from "./preview.js";
 
 const el = {
@@ -127,6 +128,7 @@ function bindRiskDialog() {
 function render(current) {
   const trimSize = getTrimSizeById(current.trimSizeId);
   const canvasDims = computeCanvasDimensions(trimSize, current.dpi, current.bleedEnabled);
+  const safeZone = computeSafeZone(trimSize, current.pageSide);
   const showRisk = needsRiskWarning(current.bleedEnabled, current.edgeToEdgeAsset);
 
   syncTrimButtons(current.trimSizeId);
@@ -141,9 +143,11 @@ function render(current) {
     dpi: current.dpi,
     bleedEnabled: current.bleedEnabled,
     canvasDims,
+    safeZone,
+    pageSide: current.pageSide,
   });
 
-  renderReadout(trimSize, current, canvasDims);
+  renderReadout(trimSize, current, canvasDims, safeZone);
 }
 
 function syncTrimButtons(activeId) {
@@ -157,7 +161,7 @@ function syncDpiControls(dpi) {
   if (Number(el.dpiInput.value) !== dpi) el.dpiInput.value = String(dpi);
 }
 
-function renderReadout(trimSize, current, canvasDims) {
+function renderReadout(trimSize, current, canvasDims, safeZone) {
   const rows = [
     ["Trim Size", `${trimSize.widthIn}" × ${trimSize.heightIn}"`],
     ["DPI", `${current.dpi}`],
@@ -168,6 +172,7 @@ function renderReadout(trimSize, current, canvasDims) {
     ["Bleed", current.bleedEnabled ? `0.125" (outer + top/bottom)` : "None (override)"],
     ["Final Canvas", `${canvasDims.widthIn.toFixed(3)}" × ${canvasDims.heightIn.toFixed(3)}"`],
     ["Final Canvas Pixels", `${canvasDims.widthPx} × ${canvasDims.heightPx} px`],
+    ["Safe Zone", `${safeZone.widthIn.toFixed(2)}" × ${safeZone.heightIn.toFixed(2)}" (0.5" gutter)`],
   ];
 
   el.readout.innerHTML = rows
