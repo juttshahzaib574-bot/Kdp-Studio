@@ -18,6 +18,7 @@ export const state = {
   borderWeightPt: 0.9,
   gridTintPercent: 35,
   cornerRadiusPercent: 0,
+  gridCornerTrim: false,
 
   // Dual-Page Layout & Key Migration + Adaptive Resolution & Cell Scaling
   layoutMode: "unified", // mirror of globalComposition.colorKey placement (grid=unified/blank=expanded)
@@ -42,7 +43,8 @@ export const state = {
 
   // Front & Back Matter Asset Gallery + Custom Asset Upload
   assetGallery: {},
-  activeAssetCategory: "back-page-background",
+  activeAssetByCategory: {}, // bucketId -> assetId ("in use" pick when a bucket holds several)
+  customAlbums: [], // [{id, name}] — user-created organizational folders, no PDF role
 
   // 3-Second Looping Interface / Stacked Live Preview Gallery
   previewLoopEnabled: false,

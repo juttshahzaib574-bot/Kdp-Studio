@@ -8,6 +8,7 @@ export const GRID_PATTERNS = [
   { id: "hexagon", label: "Hexagon (Honeycomb)", note: "Smooth, interlocking cells that eliminate sharp corners and hide grid rigidity." },
   { id: "diamond", label: "Diamond", note: "Creates an argyle / isometric visual effect for a stylized final image." },
   { id: "dot-matrix", label: "Dot Matrix", note: "Corner dots instead of hard borders — minimalist, trace-friendly, blends seamlessly." },
+  { id: "circle", label: "Circle", note: "Solid punched-circle cells, like a classic dot-art color-by-number sheet." },
 ];
 
 export function getGridPatternById(id) {
@@ -43,7 +44,7 @@ export function computeGridDimensions(safeZoneWidthIn, safeZoneHeightIn, cellSiz
     return { cols, rows, cellSizeIn };
   }
 
-  // "square" and "dot-matrix" share the same underlying grid.
+  // "square", "dot-matrix" and "circle" share the same underlying grid.
   const cols = Math.max(1, Math.floor(safeZoneWidthIn / cellSizeIn));
   const rows = Math.max(1, Math.floor(safeZoneHeightIn / cellSizeIn));
   return { cols, rows, cellSizeIn };
@@ -64,6 +65,25 @@ export function cellCenterIn(patternId, col, row, cellSizeIn) {
   }
 
   return { x: col * cellSizeIn + cellSizeIn / 2, y: row * cellSizeIn + cellSizeIn / 2 };
+}
+
+// Grid Silhouette Trim: cuts a quarter-circle of cells from each of the four grid
+// corners (a rounded-rectangle mask over the cell grid) so a dense grid reads as a
+// deliberately shaped sheet instead of one continuous, perfectly-repeating rectangle —
+// the same visual trick that makes Amazon's own reference sheets feel less monotonous
+// than a raw uniform array of boxes. Off by default; opt-in per Section 3's grid setup.
+export function cornerTrimRadiusCells(cols, rows) {
+  return Math.max(2, Math.round(Math.min(cols, rows) * 0.12));
+}
+
+export function isCellInGridSilhouette(col, row, cols, rows) {
+  const r = cornerTrimRadiusCells(cols, rows);
+  const cx = col < r ? r : col >= cols - r ? cols - r - 1 : null;
+  const cy = row < r ? r : row >= rows - r ? rows - r - 1 : null;
+  if (cx === null || cy === null) return true; // not inside a corner box — always kept
+  const dx = col - cx;
+  const dy = row - cy;
+  return dx * dx + dy * dy <= r * r;
 }
 
 // Polygon points (relative to the cell center, in inches) used to draw/clip a cell.

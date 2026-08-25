@@ -16,6 +16,7 @@ import { migratedKeyStyle } from "../modules/layoutEngine.js";
 import { resolveEffectiveGrid } from "../modules/resolutionScalingEngine.js";
 import { computeKeyGridLayout } from "../modules/colorKeyLayoutEngine.js";
 import { normalizeComposition, computeLayout } from "../modules/layoutCompositionEngine.js";
+import { resolveActiveAsset } from "../modules/assetGalleryEngine.js";
 import { renderFullMosaicGrid, getPlaceholderSource, loadImageSource, drawSourceToCanvas } from "./mosaicRenderer.js";
 
 const PT_PER_IN = 72;
@@ -476,11 +477,16 @@ function centerTextInBox(page, text, font, size, boxX, boxW, y) {
   page.drawText(text, { x: boxX + (boxW - width) / 2, y, size, font, color: rgb(0.3, 0.3, 0.3) });
 }
 
+// Every generated front/back-matter page can be swapped for a gallery image assigned to
+// its role — whichever asset is marked "active" for that category (or the first one
+// uploaded, if none has been explicitly picked yet). Clearing the category's assets
+// reverts the page to its generated version automatically.
 async function addGeneratedOrCustomPage(doc, state, categoryId, pageWidthPt, pageHeightPt, generatorFn) {
   const assets = state.assetGallery[categoryId] ?? [];
+  const chosen = resolveActiveAsset(assets, state.activeAssetByCategory, categoryId);
   const page = doc.addPage([pageWidthPt, pageHeightPt]);
-  if (assets.length > 0) {
-    const image = await embedImageAuto(doc, assets[0].dataUrl);
+  if (chosen) {
+    const image = await embedImageAuto(doc, chosen.dataUrl);
     page.drawImage(image, { x: 0, y: 0, width: pageWidthPt, height: pageHeightPt });
     return page;
   }
@@ -539,10 +545,13 @@ export async function exportInteriorPdf(state, { onProgress } = {}) {
   for (const asset of backgroundAssets) {
     backImagesByAssetId.set(asset.id, await embedImageAuto(doc, asset.dataUrl));
   }
-  const globalBackImage = backgroundAssets.length > 0 ? backImagesByAssetId.get(backgroundAssets[0].id) : null;
+  const activeBackground = resolveActiveAsset(backgroundAssets, state.activeAssetByCategory, "back-page-background");
+  const globalBackImage = activeBackground ? backImagesByAssetId.get(activeBackground.id) : null;
 
-  const hasAboutArtist = Boolean(state.authorBio.trim());
-  const hasSeriesPromo = Boolean(state.seriesPromoText.trim());
+  // An assigned gallery image counts as content on its own — a creator who picked an
+  // image for "About the Artist" wants that page to appear even with no bio text typed.
+  const hasAboutArtist = Boolean(state.authorBio.trim()) || (state.assetGallery["about-artist-page"] ?? []).length > 0;
+  const hasSeriesPromo = Boolean(state.seriesPromoText.trim()) || (state.assetGallery["series-promo-page"] ?? []).length > 0;
   const solutionTicks = Math.max(1, Math.ceil(state.batchItems.length / state.solutionThumbsPerPage));
   const totalSteps = 6 + state.batchItems.length + solutionTicks + 1 + 1 + (hasAboutArtist ? 1 : 0) + (hasSeriesPromo ? 1 : 0);
   let completed = 0;
@@ -568,10 +577,7 @@ export async function exportInteriorPdf(state, { onProgress } = {}) {
   doc.addPage([pageWidthPt, pageHeightPt]).drawRectangle({ x: 0, y: 0, width: pageWidthPt, height: pageHeightPt, color: rgb(1, 1, 1) });
   reportProgress("Color Test Page");
 
-  {
-    const page = doc.addPage([pageWidthPt, pageHeightPt]);
-    drawInstructionsPage(page, bold, regular, pageWidthPt, pageHeightPt);
-  }
+  await addGeneratedOrCustomPage(doc, state, "instructions-page", pageWidthPt, pageHeightPt, (page) => drawInstructionsPage(page, bold, regular, pageWidthPt, pageHeightPt));
   doc.addPage([pageWidthPt, pageHeightPt]).drawRectangle({ x: 0, y: 0, width: pageWidthPt, height: pageHeightPt, color: rgb(1, 1, 1) });
   reportProgress("Instructions Page");
 
@@ -603,6 +609,7 @@ export async function exportInteriorPdf(state, { onProgress } = {}) {
       cornerRadiusPercent: effective.cornerRadiusPercent,
       palette: effective.palette,
       sourceCanvas,
+      gridCornerTrim: state.gridCornerTrim,
     };
 
     const printCanvas = document.createElement("canvas");
@@ -662,8 +669,7 @@ export async function exportInteriorPdf(state, { onProgress } = {}) {
   reportProgress("Extra Color Test Pages");
 
   if (hasAboutArtist) {
-    const page = doc.addPage([pageWidthPt, pageHeightPt]);
-    drawAboutArtistPage(page, state, bold, regular, pageWidthPt, pageHeightPt);
+    await addGeneratedOrCustomPage(doc, state, "about-artist-page", pageWidthPt, pageHeightPt, (page) => drawAboutArtistPage(page, state, bold, regular, pageWidthPt, pageHeightPt));
     doc.addPage([pageWidthPt, pageHeightPt]).drawRectangle({ x: 0, y: 0, width: pageWidthPt, height: pageHeightPt, color: rgb(1, 1, 1) });
     reportProgress("About the Artist Page");
   }
@@ -671,16 +677,12 @@ export async function exportInteriorPdf(state, { onProgress } = {}) {
   // Every content page pairs with a blank facing page (Section 2's single-sided-
   // printing rule) — including these last two, so the interior page count always
   // lands even, which KDP's print pipeline requires.
-  {
-    const page = doc.addPage([pageWidthPt, pageHeightPt]);
-    drawReviewRequestPage(page, bold, regular, pageWidthPt, pageHeightPt);
-    doc.addPage([pageWidthPt, pageHeightPt]).drawRectangle({ x: 0, y: 0, width: pageWidthPt, height: pageHeightPt, color: rgb(1, 1, 1) });
-  }
+  await addGeneratedOrCustomPage(doc, state, "review-request-page", pageWidthPt, pageHeightPt, (page) => drawReviewRequestPage(page, bold, regular, pageWidthPt, pageHeightPt));
+  doc.addPage([pageWidthPt, pageHeightPt]).drawRectangle({ x: 0, y: 0, width: pageWidthPt, height: pageHeightPt, color: rgb(1, 1, 1) });
   reportProgress("Review Request Page");
 
   if (hasSeriesPromo) {
-    const page = doc.addPage([pageWidthPt, pageHeightPt]);
-    drawSeriesPromoPage(page, state, bold, regular, pageWidthPt, pageHeightPt);
+    await addGeneratedOrCustomPage(doc, state, "series-promo-page", pageWidthPt, pageHeightPt, (page) => drawSeriesPromoPage(page, state, bold, regular, pageWidthPt, pageHeightPt));
     doc.addPage([pageWidthPt, pageHeightPt]).drawRectangle({ x: 0, y: 0, width: pageWidthPt, height: pageHeightPt, color: rgb(1, 1, 1) });
     reportProgress("Series Promo Page");
   }
@@ -757,6 +759,7 @@ async function renderActiveItemFullPage(state, mode) {
     palette: effective.palette,
     sourceCanvas,
     mode,
+    gridCornerTrim: state.gridCornerTrim,
   });
 
   const geom = { canvasDims, safeZone, pageSide: state.pageSide, pageHeightPt };

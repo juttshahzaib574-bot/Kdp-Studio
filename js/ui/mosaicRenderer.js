@@ -7,7 +7,7 @@
 //     used to generate the actual page image embedded into the exported PDF.
 
 import { computeFrameGeometry, drawFrame } from "./preview.js";
-import { computeGridDimensions, cellCenterIn, cellPolygonIn, mmToIn } from "../modules/gridPatternEngine.js";
+import { computeGridDimensions, cellCenterIn, cellPolygonIn, mmToIn, isCellInGridSilhouette } from "../modules/gridPatternEngine.js";
 import { recommendFont, recommendTextTint, adjustForBorderWeight, centerOffsetIn, letterSpacingForLabel } from "../modules/typographyEngine.js";
 import { gridColorFromTint } from "../modules/borderStyleEngine.js";
 import { cornerRadiusIn, isFullCircle } from "../modules/cornerRadiusEngine.js";
@@ -50,19 +50,73 @@ export function loadImageSource(url) {
   });
 }
 
-export function drawSourceToCanvas(source, size = 256) {
+// Draws the source at its OWN aspect ratio (capped to maxSize on the long edge) — never
+// force-stretched to a square. Force-stretching here used to warp every photo before it
+// even reached the grid (a portrait dog squashed into a square, then re-stretched onto a
+// wide grid), which is a real cause of "wrong-looking" color-by-number results. The real
+// aspect-ratio fit against the grid's own shape happens later, in sampleGridColors.
+export function drawSourceToCanvas(source, maxSize = 512) {
+  const naturalW = source.naturalWidth || source.width;
+  const naturalH = source.naturalHeight || source.height;
+  const aspect = naturalW / naturalH || 1;
+  const w = aspect >= 1 ? maxSize : Math.round(maxSize * aspect);
+  const h = aspect >= 1 ? Math.round(maxSize / aspect) : maxSize;
   const c = document.createElement("canvas");
-  c.width = size;
-  c.height = size;
-  c.getContext("2d").drawImage(source, 0, 0, size, size);
+  c.width = Math.max(1, w);
+  c.height = Math.max(1, h);
+  c.getContext("2d").drawImage(source, 0, 0, c.width, c.height);
   return c;
 }
 
-function sampleFromImageData(imageData, u, v) {
-  const x = Math.max(0, Math.min(imageData.width - 1, Math.floor(u * imageData.width)));
-  const y = Math.max(0, Math.min(imageData.height - 1, Math.floor(v * imageData.height)));
-  const i = (y * imageData.width + x) * 4;
-  return { r: imageData.data[i], g: imageData.data[i + 1], b: imageData.data[i + 2] };
+// Granular Shade Separation starts here, not in the quantizer: this is a cover-crop
+// (center-crop to the grid's own aspect ratio, never a stretch) plus a small per-cell
+// supersampled average — so a single outline-stroke or anti-aliased edge pixel can no
+// longer hijack an entire cell's color, and each cell reads as the region's true average.
+function sampleGridColors(sourceCanvas, cols, rows, targetAspect) {
+  const sw = sourceCanvas.width;
+  const sh = sourceCanvas.height;
+  const sourceAspect = sw / sh;
+
+  let cropW, cropH, cropX, cropY;
+  if (sourceAspect > targetAspect) {
+    cropH = sh;
+    cropW = sh * targetAspect;
+    cropX = (sw - cropW) / 2;
+    cropY = 0;
+  } else {
+    cropW = sw;
+    cropH = sw / targetAspect;
+    cropX = 0;
+    cropY = (sh - cropH) / 2;
+  }
+
+  const imageData = sourceCanvas.getContext("2d").getImageData(0, 0, sw, sh).data;
+  const SUPERSAMPLE = 4; // 4x4 sub-samples averaged per cell
+  const colors = [];
+
+  for (let row = 0; row < rows; row += 1) {
+    for (let col = 0; col < cols; col += 1) {
+      let rSum = 0;
+      let gSum = 0;
+      let bSum = 0;
+      for (let sy = 0; sy < SUPERSAMPLE; sy += 1) {
+        for (let sx = 0; sx < SUPERSAMPLE; sx += 1) {
+          const u = (col + (sx + 0.5) / SUPERSAMPLE) / cols;
+          const v = (row + (sy + 0.5) / SUPERSAMPLE) / rows;
+          const x = Math.max(0, Math.min(sw - 1, Math.round(cropX + u * cropW)));
+          const y = Math.max(0, Math.min(sh - 1, Math.round(cropY + v * cropH)));
+          const i = (y * sw + x) * 4;
+          rSum += imageData[i];
+          gSum += imageData[i + 1];
+          bSum += imageData[i + 2];
+        }
+      }
+      const n = SUPERSAMPLE * SUPERSAMPLE;
+      colors.push({ r: Math.round(rSum / n), g: Math.round(gSum / n), b: Math.round(bSum / n) });
+    }
+  }
+
+  return colors;
 }
 
 function polygonToPx(points, centerPx, scalePxPerIn) {
@@ -150,7 +204,9 @@ function drawCell(ctx, { centerPx, cellSizeIn, cellSizePx, ppi, gridPattern, mod
   const points = cellPolygonIn(gridPattern, cellSizeIn);
   const pxPoints = polygonToPx(points, centerPx, ppi);
 
-  if (isFullCircle(cornerRadiusPercent)) {
+  // The "Circle" grid pattern always punches a full circle per cell, independent of the
+  // Corner Radius slider (which still governs rounding for square/diamond/hexagon).
+  if (gridPattern === "circle" || isFullCircle(cornerRadiusPercent)) {
     ctx.beginPath();
     ctx.arc(centerPx.x, centerPx.y, cellSizePx / 2, 0, Math.PI * 2);
   } else {
@@ -234,7 +290,7 @@ export function renderMosaicPreview(canvas, opts) {
     mode, // 'print' | 'solved'
     trimSize, dpi, bleedEnabled, canvasDims, safeZone, pageSide, composition,
     gridPattern, cellSizeMm, gridOverride = null, borderWeightPt, gridTintPercent, cornerRadiusPercent,
-    palette, sourceCanvas,
+    palette, sourceCanvas, gridCornerTrim = false,
   } = opts;
 
   const ctx = canvas.getContext("2d");
@@ -268,17 +324,7 @@ export function renderMosaicPreview(canvas, opts) {
   const regionWpx = gridZone.widthIn * ppi;
   const regionHpx = gridZone.heightIn * ppi;
 
-  const sourceCtx = sourceCanvas.getContext("2d");
-  const sourceImageData = sourceCtx.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height);
-
-  const colors = [];
-  for (let row = 0; row < fullGrid.rows; row += 1) {
-    for (let col = 0; col < fullGrid.cols; col += 1) {
-      const u = fullGrid.cols > 1 ? col / (fullGrid.cols - 1) : 0.5;
-      const v = fullGrid.rows > 1 ? row / (fullGrid.rows - 1) : 0.5;
-      colors.push(sampleFromImageData(sourceImageData, u, v));
-    }
-  }
+  const colors = sampleGridColors(sourceCanvas, fullGrid.cols, fullGrid.rows, gridZone.widthIn / gridZone.heightIn);
   const assignments = assignDistinctShades(colors, palette);
 
   // Below this cell size a number is unreadable anyway, so cells fall back to a flat
@@ -299,6 +345,10 @@ export function renderMosaicPreview(canvas, opts) {
   let index = 0;
   for (let row = 0; row < fullGrid.rows; row += 1) {
     for (let col = 0; col < fullGrid.cols; col += 1) {
+      if (gridCornerTrim && !isCellInGridSilhouette(col, row, fullGrid.cols, fullGrid.rows)) {
+        index += 1;
+        continue;
+      }
       const localCenterIn = cellCenterIn(gridPattern, col, row, fullGrid.cellSizeIn);
       const centerPx = { x: originX + localCenterIn.x * ppi, y: originY + localCenterIn.y * ppi };
       drawCell(ctx, {
@@ -327,7 +377,7 @@ export function renderFullMosaicGrid(canvas, opts) {
     mode, // 'print' | 'solved'
     dpi, canvasDims, safeZone, pageSide, composition,
     gridPattern, cellSizeMm, gridOverride = null, borderWeightPt, gridTintPercent, cornerRadiusPercent,
-    palette, sourceCanvas,
+    palette, sourceCanvas, gridCornerTrim = false,
   } = opts;
 
   const ctx = canvas.getContext("2d");
@@ -351,23 +401,17 @@ export function renderFullMosaicGrid(canvas, opts) {
   const originXPx = safeXIn * dpi;
   const originYPx = safeYIn * dpi;
 
-  const sourceCtx = sourceCanvas.getContext("2d");
-  const sourceImageData = sourceCtx.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height);
-
   const cellSizePx = fullGrid.cellSizeIn * dpi;
-  const colors = [];
-  for (let row = 0; row < fullGrid.rows; row += 1) {
-    for (let col = 0; col < fullGrid.cols; col += 1) {
-      const u = fullGrid.cols > 1 ? col / (fullGrid.cols - 1) : 0.5;
-      const v = fullGrid.rows > 1 ? row / (fullGrid.rows - 1) : 0.5;
-      colors.push(sampleFromImageData(sourceImageData, u, v));
-    }
-  }
+  const colors = sampleGridColors(sourceCanvas, fullGrid.cols, fullGrid.rows, gridZone.widthIn / gridZone.heightIn);
   const assignments = assignDistinctShades(colors, palette);
 
   let index = 0;
   for (let row = 0; row < fullGrid.rows; row += 1) {
     for (let col = 0; col < fullGrid.cols; col += 1) {
+      if (gridCornerTrim && !isCellInGridSilhouette(col, row, fullGrid.cols, fullGrid.rows)) {
+        index += 1;
+        continue;
+      }
       const localCenterIn = cellCenterIn(gridPattern, col, row, fullGrid.cellSizeIn);
       const centerPx = { x: originXPx + localCenterIn.x * dpi, y: originYPx + localCenterIn.y * dpi };
       drawCell(ctx, {

@@ -36,14 +36,19 @@ export const KEY_SIDE_WIDTH_RATIO = 0.28;
 const TEXT_BAND_HEIGHT_IN = { title: 0.55, subtitle: 0.35, instruction: 0.7 };
 const TEXT_SIDE_WIDTH_IN = 1.6;
 
+// Blank-page fine positioning for text elements: `anchor` picks which edge `offsetIn`
+// measures from (top edge, page vertical center, or bottom edge), so "a little above
+// center" is just anchor: "center", offsetIn: -0.4. Only meaningful for target: "blank" —
+// on-grid placement stays the existing top/bottom/left/right zone-band system, since
+// that page has too little spare room for free positioning to make sense.
 export function defaultComposition() {
   return {
     // Backward-compatible default === the old "Unified" layout: only the color key is
     // shown, embedded in a bottom strip on the puzzle page. Text elements are off, so a
     // book that never touches the composer exports exactly as it did before this module.
-    title: { enabled: false, target: "grid", zone: "top", align: "center", text: "" },
-    subtitle: { enabled: false, target: "grid", zone: "top", align: "center", text: "" },
-    instruction: { enabled: false, target: "grid", zone: "bottom", align: "start", text: LAYOUT_ELEMENTS[2].defaultText },
+    title: { enabled: false, target: "grid", zone: "top", align: "center", text: "", anchor: "top", offsetIn: 0 },
+    subtitle: { enabled: false, target: "grid", zone: "top", align: "center", text: "", anchor: "top", offsetIn: 0 },
+    instruction: { enabled: false, target: "grid", zone: "bottom", align: "start", text: LAYOUT_ELEMENTS[2].defaultText, anchor: "top", offsetIn: 0 },
     colorKey: { enabled: true, target: "grid", zone: "bottom", align: "center" },
   };
 }
@@ -145,16 +150,27 @@ export function computeLayout(safeZone, composition) {
     gridPlacements.push({ id, target: "grid", rect: { xIn: safeZone.widthIn - rightBand, yIn: midTop + i * per, wIn: rightBand, hIn: per } });
   });
 
-  // Blank facing page: stack text top-down, color key fills whatever remains.
+  // Blank facing page: text elements position independently via anchor + offsetIn (top
+  // edge / page center / bottom edge, plus a fine nudge) instead of an automatic stack —
+  // a creator places title, then nudges subtitle to sit just under it, entirely by hand.
+  // The color key is the exception: it still auto-fills whatever vertical room is left
+  // below the lowest-reaching text element, since its size depends on the palette.
   const blankPlacements = [];
-  let bTop = 0;
+  let lowestTextBottomIn = 0;
   onBlank.filter((id) => id !== "colorKey").forEach((id) => {
     const hIn = bandThicknessIn(id, "top", safeZone);
-    blankPlacements.push({ id, target: "blank", rect: { xIn: 0, yIn: bTop, wIn: safeZone.widthIn, hIn: hIn } });
-    bTop += hIn;
+    const anchor = comp[id].anchor ?? "top";
+    const offsetIn = comp[id].offsetIn ?? 0;
+    let yIn;
+    if (anchor === "center") yIn = safeZone.heightIn / 2 + offsetIn - hIn / 2;
+    else if (anchor === "bottom") yIn = safeZone.heightIn - offsetIn - hIn;
+    else yIn = offsetIn;
+    yIn = Math.max(0, Math.min(safeZone.heightIn - hIn, yIn));
+    blankPlacements.push({ id, target: "blank", rect: { xIn: 0, yIn, wIn: safeZone.widthIn, hIn } });
+    lowestTextBottomIn = Math.max(lowestTextBottomIn, yIn + hIn);
   });
   if (onBlank.includes("colorKey")) {
-    blankPlacements.push({ id: "colorKey", target: "blank", rect: { xIn: 0, yIn: bTop, wIn: safeZone.widthIn, hIn: Math.max(0.5, safeZone.heightIn - bTop) } });
+    blankPlacements.push({ id: "colorKey", target: "blank", rect: { xIn: 0, yIn: lowestTextBottomIn, wIn: safeZone.widthIn, hIn: Math.max(0.5, safeZone.heightIn - lowestTextBottomIn) } });
   }
 
   return { gridZone, gridPlacements, blankPlacements };
