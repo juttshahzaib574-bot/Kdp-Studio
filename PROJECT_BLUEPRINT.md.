@@ -348,3 +348,7 @@ Every structural component—including book titles, page subtitles, instruction 
 When managing complex compositions where preserving a large, highly legible grid is top priority, the tool automates the separation of metadata onto the even-numbered (left) blank pages.
 ​One-Click Migration: Creators can instantly route headers, subheaders, and color keys off the active puzzle page and onto the facing blank page.
 ​Background Asset Integration: When metadata is offloaded to a blank page, it automatically layers on top of the selected background asset (such as a blackout design or custom user upload), maintaining high contrast and complete readability without cluttering the primary coloring field.
+
+Edition-Specific Palette Design Rules:
+​Midnight / Black & White Edition: The palette key boxes must display the corresponding number instead of a color fill, with the official color name printed directly below each box for user reference.
+​Full-Color Edition: The palette key boxes must be filled with their respective solid colors, with the official color name printed directly below each box
