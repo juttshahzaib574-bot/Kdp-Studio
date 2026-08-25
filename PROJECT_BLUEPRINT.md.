@@ -322,5 +322,29 @@ Professional Formatting Tip for Color Key Pages
 When arranging the color key in your KDP interior layout, do not simply list text-only color names. Place small, neatly rendered 0.75pt vector color squares next to each corresponding color name, so customers can directly visualize the exact appearance of colors such as Jade Green or Naples Yellow for clearer reference.
 ---
 
+New Update:
 
+Addition: The Midnight / Blackout Cell & Background Standard
 
+To maintain strict alignment with top-selling adult coloring book aesthetics (as demonstrated in our master visual references), the generator must support the following definitive style rule for Midnight editions:
+
+1. **The Canvas Background:** The outer framework and background surrounding the puzzle grid must be rendered in 100% solid Rich Black (K:100%) to completely block light and prevent marker bleed-through on even pages.
+2. **The Puzzle Cells:** The individual cells within the puzzle grid must render as clean, distinct light or white shapes against the black background.
+3. **The Cell Numbers & Text:** The numbers and labels inside the cells must use a clean, high-contrast dark gray or standard tint to remain perfectly legible against the light cell interiors, creating the classic "stained glass" or dark-mode mosaic tile effect.
+
+Blueprint Continued: Universal Layout Control & Element Positioning
+​To ensure complete creative freedom without sacrificing publication-grade organization, the tool will feature a comprehensive layout positioning engine. This module gives the creator granular, drag-and-drop control over every structural element on the page, allowing them to switch effortlessly between a unified standard layout or a completely customized, page-by-page composition.
+​Module : Global vs. Page-Specific Layout Rules
+Creators are no longer locked into a rigid, one-size-fits-all template. The tool includes a master toggle to dictate how headers, subheaders, and color keys behave across the 120-page batch.
+​Standard Global Mode: Applies a uniform layout template instantly across all pages in the project. If a creator wants every single page to feature the title at the top, a 24-color key on the right, and identical margins, a single click propagates those rules to all 120 images.
+​Granular Page-Specific Mode: Allows creators to unlock individual pages in the storyboard. A creator can customize Page 1 to feature a unique subtitle and a split-side color key, while keeping Page 2 locked to the standard global template.
+​Module : Dynamic Element Positioning & Collision Control
+Every structural component—including book titles, page subtitles, instruction snippets, and the color key block—acts as an independent, movable layer.
+​Free-Form Positioning: Creators can shift elements anywhere within the safe zones of the canvas. You can drag the color key from the side to the bottom, move the title from the top center to the upper-left, or anchor subheaders directly above the grid.
+​Real-Time Cell Recalculation: Because moving elements (like an expanded 36-color key) onto the primary grid page consumes precious printable real estate, the engine dynamically recalculates the page matrix in real time.
+​If a color key is dragged onto the grid page, the tool automatically scales down the overall cell count or reduces the physical cell dimensions (e.g., dropping from a dense 50x65 grid down to a roomier 40x50 grid) to prevent overlap.
+​Conversely, if elements are cleared from the grid page and pushed to an adjacent blank page, the engine instantly expands the grid, reclaiming the full vertical space to maximize cell size and clarity.
+​Module : Smart Offloading to Blank Pages
+When managing complex compositions where preserving a large, highly legible grid is top priority, the tool automates the separation of metadata onto the even-numbered (left) blank pages.
+​One-Click Migration: Creators can instantly route headers, subheaders, and color keys off the active puzzle page and onto the facing blank page.
+​Background Asset Integration: When metadata is offloaded to a blank page, it automatically layers on top of the selected background asset (such as a blackout design or custom user upload), maintaining high contrast and complete readability without cluttering the primary coloring field.
