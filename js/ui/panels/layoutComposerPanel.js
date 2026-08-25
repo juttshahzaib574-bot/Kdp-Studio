@@ -25,6 +25,15 @@ const ALIGNS = [
   { id: "end", label: "Right" },
 ];
 
+// Which edge the fine offset slider measures from when a text element sits on the
+// blank facing page — "Center" + a small negative offset is exactly "a little above
+// the page's vertical center."
+const ANCHORS = [
+  { id: "top", label: "Anchor: Top Edge" },
+  { id: "center", label: "Anchor: Page Center" },
+  { id: "bottom", label: "Anchor: Bottom Edge" },
+];
+
 const el = {
   scopeOptions: document.getElementById("layout-scope-options"),
   scopeHint: document.getElementById("layout-scope-hint"),
@@ -207,6 +216,10 @@ function renderControls(comp, current) {
     const alignOpts = ALIGNS.map((a) => `<option value="${a.id}">${a.label}</option>`).join("");
 
     const effectiveTarget = cfg.enabled ? cfg.target : "off";
+    // Anchor + fine offset only matter once text sits on the blank facing page — the
+    // grid page stays on the existing zone-band system since it has far less spare room.
+    const showBlankPosition = element.isText && effectiveTarget === "blank";
+    const anchorOpts = ANCHORS.map((a) => `<option value="${a.id}">${a.label}</option>`).join("");
     row.innerHTML = `
       <div class="element-row-head">
         <label class="element-toggle"><input type="checkbox" class="el-enabled" ${cfg.enabled ? "checked" : ""}/> ${element.label}</label>
@@ -217,6 +230,13 @@ function renderControls(comp, current) {
         ${element.isText ? `<select class="el-align">${alignOpts}</select>` : ""}
       </div>
       ${element.isText ? `<input type="text" class="el-text text-input" data-text-element="${element.id}" placeholder="${textPlaceholder(element.id, current)}" />` : ""}
+      ${element.isText ? `
+        <div class="element-row-opts blank-position-row" ${showBlankPosition ? "" : "hidden"}>
+          <select class="el-anchor">${anchorOpts}</select>
+          <input type="range" class="el-offset" min="-3" max="3" step="0.1" />
+          <span class="el-offset-readout"></span>
+        </div>
+      ` : ""}
     `;
 
     const targetSel = row.querySelector(".el-target");
@@ -227,6 +247,12 @@ function renderControls(comp, current) {
     if (alignSel) alignSel.value = cfg.align;
     const textInput = row.querySelector(".el-text");
     if (textInput) textInput.value = cfg.text ?? "";
+    const anchorSel = row.querySelector(".el-anchor");
+    const offsetSlider = row.querySelector(".el-offset");
+    const offsetReadout = row.querySelector(".el-offset-readout");
+    if (anchorSel) anchorSel.value = cfg.anchor ?? "top";
+    if (offsetSlider) offsetSlider.value = String(cfg.offsetIn ?? 0);
+    if (offsetReadout) offsetReadout.textContent = `${(cfg.offsetIn ?? 0).toFixed(1)}"`;
 
     row.querySelector(".el-enabled").addEventListener("change", (e) => setElement(element.id, { enabled: e.target.checked }));
     targetSel.addEventListener("change", (e) => {
@@ -237,6 +263,13 @@ function renderControls(comp, current) {
     if (zoneSel) zoneSel.addEventListener("change", (e) => setElement(element.id, { zone: e.target.value }));
     if (alignSel) alignSel.addEventListener("change", (e) => setElement(element.id, { align: e.target.value }));
     if (textInput) textInput.addEventListener("change", (e) => setElement(element.id, { text: e.target.value }));
+    if (anchorSel) anchorSel.addEventListener("change", (e) => setElement(element.id, { anchor: e.target.value }));
+    if (offsetSlider) {
+      offsetSlider.addEventListener("input", (e) => {
+        offsetReadout.textContent = `${Number(e.target.value).toFixed(1)}"`;
+        setElement(element.id, { offsetIn: Number(e.target.value) });
+      });
+    }
 
     el.controls.appendChild(row);
   });

@@ -145,6 +145,23 @@
           <div class="pattern-grid" id="grid-pattern-options"></div>
         </div>
 
+        <div class="stats-row" id="grid-stats-row">
+          <div class="stat"><div class="stat-value" id="stat-grid-dims">—</div><div class="stat-label">Grid (cols×rows)</div></div>
+          <div class="stat"><div class="stat-value" id="stat-cell-count">—</div><div class="stat-label">Total Cells</div></div>
+          <div class="stat"><div class="stat-value" id="stat-out-px">—</div><div class="stat-label">Output PX</div></div>
+        </div>
+
+        <div class="toggle-row">
+          <label class="switch">
+            <input type="checkbox" id="grid-corner-trim-toggle" />
+            <span class="slider-track"></span>
+          </label>
+          <div>
+            <strong>Trim Grid Corners</strong>
+            <p class="hint">Cuts a rounded notch of cells from each of the four grid corners so the sheet reads as a deliberately shaped mosaic instead of one uniform rectangle of boxes.</p>
+          </div>
+        </div>
+
         <div class="field-group">
           <label for="cell-size-slider">Cell Size (mm)</label>
           <div class="dpi-control">
@@ -176,7 +193,7 @@
             <input type="range" id="grid-tint-slider" min="0" max="100" step="1" value="35" />
             <input type="number" id="grid-tint-input" min="0" max="100" step="1" value="35" />
           </div>
-          <p class="hint">100% activates Blackout / Midnight mode — dark cell fill with white numbers.</p>
+          <p class="hint">100% activates Blackout / Midnight mode — the canvas background goes rich black; cells stay white and numbers stay dark.</p>
         </div>
 
         <div class="field-group">
@@ -250,28 +267,8 @@
         </div>
       </section>
 
-      <section class="panel-section" id="asset-gallery-setup">
-        <h2><span class="step-badge">8</span> Front &amp; Back Matter Asset Gallery</h2>
-
-        <div class="field-group">
-          <label for="asset-category-select">Category</label>
-          <select id="asset-category-select"></select>
-        </div>
-
-        <div class="field-group">
-          <label for="asset-file-input">Upload Custom Page</label>
-          <input type="file" id="asset-file-input" accept="image/*" />
-          <p class="hint" id="asset-format-hint"></p>
-        </div>
-
-        <div class="field-group">
-          <label>Saved Assets (this browser)</label>
-          <div class="asset-list" id="asset-list"></div>
-        </div>
-      </section>
-
       <section class="panel-section" id="export-setup">
-        <h2><span class="step-badge">9</span> Unified Export Pipeline</h2>
+        <h2><span class="step-badge">8</span> Unified Export Pipeline</h2>
 
         <div class="field-group">
           <label for="book-title-input">Book Title</label>
@@ -317,6 +314,45 @@
       <dl class="dimension-readout" id="dimension-readout"></dl>
     </section>
   </main>
+
+  <section class="workspace-top" id="gallery-workspace">
+    <div class="panel-section" id="asset-gallery-setup">
+      <h2>Front &amp; Back Matter Asset Gallery</h2>
+      <p class="hint">Assign an image to a KDP page role (Title, Instructions, About the Artist…) to replace its generated content in the exported PDF — swap or clear it anytime. Custom albums are just for organizing your own reference images.</p>
+
+      <div class="gallery-layout">
+        <aside class="gallery-sidebar">
+          <div class="gallery-sidebar-group">
+            <label>KDP Page Roles</label>
+            <div id="gallery-role-list" class="gallery-bucket-list"></div>
+          </div>
+          <div class="gallery-sidebar-group">
+            <label>Your Albums</label>
+            <div id="gallery-album-list" class="gallery-bucket-list"></div>
+            <div class="new-album-row" id="new-album-row" hidden>
+              <input type="text" id="new-album-input" class="text-input" placeholder="Album name" />
+              <button type="button" class="btn btn-secondary btn-small" id="new-album-confirm-btn">Add</button>
+            </div>
+            <button type="button" class="btn btn-secondary btn-small" id="new-album-btn">+ New Album</button>
+          </div>
+        </aside>
+
+        <div class="gallery-main">
+          <div class="gallery-main-header">
+            <h3 id="gallery-active-bucket-name">—</h3>
+            <div class="gallery-main-actions">
+              <button type="button" class="btn btn-secondary btn-small" id="asset-upload-btn">Upload Image</button>
+              <input type="file" id="asset-file-input" accept="image/*" hidden />
+              <button type="button" class="btn btn-secondary btn-small" id="rename-album-btn" hidden>Rename</button>
+              <button type="button" class="btn btn-danger btn-small" id="delete-album-btn" hidden>Delete Album</button>
+            </div>
+          </div>
+          <p class="hint" id="asset-format-hint"></p>
+          <div class="gallery-grid" id="asset-list"></div>
+        </div>
+      </div>
+    </div>
+  </section>
 
   <dialog id="risk-dialog">
     <h3>⚠️ Bleed Safety Warning</h3>

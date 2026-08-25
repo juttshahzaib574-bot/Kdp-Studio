@@ -1,9 +1,14 @@
 import { state, setState, subscribe } from "../../state.js";
-import { GRID_PATTERNS } from "../../modules/gridPatternEngine.js";
+import { GRID_PATTERNS, computeGridDimensions, isCellInGridSilhouette } from "../../modules/gridPatternEngine.js";
 import { recommendFont, recommendTextTint } from "../../modules/typographyEngine.js";
 import { applyPreset, clampBorderWeight } from "../../modules/borderStyleEngine.js";
 import { CORNER_RADIUS_MIN_PERCENT, CORNER_RADIUS_MAX_PERCENT } from "../../modules/cornerRadiusEngine.js";
 import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js";
+import { getTrimSizeById } from "../../modules/canvasEngine.js";
+import { computeCanvasDimensions } from "../../modules/bleedEngine.js";
+import { computeSafeZone } from "../../modules/safeZoneEngine.js";
+import { normalizeComposition, computeLayout } from "../../modules/layoutCompositionEngine.js";
+import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js";
 
 const el = {
   patternGrid: document.getElementById("grid-pattern-options"),
@@ -18,6 +23,10 @@ const el = {
   tintInput: document.getElementById("grid-tint-input"),
   radiusSlider: document.getElementById("corner-radius-slider"),
   radiusInput: document.getElementById("corner-radius-input"),
+  cornerTrimToggle: document.getElementById("grid-corner-trim-toggle"),
+  statGridDims: document.getElementById("stat-grid-dims"),
+  statCellCount: document.getElementById("stat-cell-count"),
+  statOutPx: document.getElementById("stat-out-px"),
 };
 
 export function initGridBorderPanel() {
@@ -27,6 +36,7 @@ export function initGridBorderPanel() {
   bindBorderWeight();
   bindGridTint();
   bindCornerRadius();
+  el.cornerTrimToggle.addEventListener("change", () => setState({ gridCornerTrim: el.cornerTrimToggle.checked }));
 
   subscribe(render);
   render(state);
@@ -96,6 +106,9 @@ function render(current) {
   syncPair(el.borderSlider, el.borderInput, current.borderWeightPt);
   syncPair(el.tintSlider, el.tintInput, current.gridTintPercent);
   syncPair(el.radiusSlider, el.radiusInput, current.cornerRadiusPercent);
+  el.cornerTrimToggle.checked = current.gridCornerTrim;
+
+  renderLiveStats(current);
 
   const sizes = getSizesForSelection(current.colorSetOptionId, current.colorSetCustomPair);
   const colorCount = buildCombinedPalette(sizes, current.colorBrand).length;
@@ -107,6 +120,36 @@ function render(current) {
   }. Number tint: ${tint.percentBlack}% black (cells stay white; ${
     current.gridTintPercent >= 100 ? "the canvas background goes rich black in Midnight/Blackout mode" : "background stays paper"
   }).`;
+}
+
+// Cheap, arithmetic-only stat readout (no quantization pass) — safe to recompute on
+// every slider tick, unlike the Live Preview Gallery's actual render.
+function renderLiveStats(current) {
+  const trimSize = getTrimSizeById(current.trimSizeId);
+  const canvasDims = computeCanvasDimensions(trimSize, current.dpi, current.bleedEnabled);
+  const safeZone = computeSafeZone(trimSize, current.pageSide);
+  const composition = normalizeComposition(current.globalComposition);
+  const layout = computeLayout(safeZone, composition);
+  const { cellSizeMm: effCellSizeMm, gridOverride } = resolveEffectiveGrid(safeZone, current.cellSizeMm, current.gridPattern, composition, current.resolutionPriority);
+  const grid = gridOverride
+    ? { cols: gridOverride.cols, rows: gridOverride.rows }
+    : computeGridDimensions(layout.gridZone.widthIn, layout.gridZone.heightIn, effCellSizeMm, current.gridPattern);
+
+  const trimmed = current.gridCornerTrim ? countTrimmedCells(grid.cols, grid.rows) : grid.cols * grid.rows;
+
+  el.statGridDims.textContent = `${grid.cols} × ${grid.rows}`;
+  el.statCellCount.textContent = trimmed.toLocaleString();
+  el.statOutPx.textContent = `${canvasDims.widthPx} × ${canvasDims.heightPx}`;
+}
+
+function countTrimmedCells(cols, rows) {
+  let count = 0;
+  for (let row = 0; row < rows; row += 1) {
+    for (let col = 0; col < cols; col += 1) {
+      if (isCellInGridSilhouette(col, row, cols, rows)) count += 1;
+    }
+  }
+  return count;
 }
 
 function syncPair(slider, input, value) {

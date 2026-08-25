@@ -172,6 +172,7 @@ async function runGenerate(current) {
       cornerRadiusPercent: effective.cornerRadiusPercent,
       palette: effective.palette,
       sourceCanvas,
+      gridCornerTrim: current.gridCornerTrim,
     };
 
     // Yield a frame so the "Generating…" label actually paints before the (possibly
