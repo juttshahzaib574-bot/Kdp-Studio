@@ -982,3 +982,49 @@ input[type="file"] {
   font-size: 0.78rem;
   text-align: center;
 }
+
+#generate-preview-btn {
+  margin-bottom: 8px;
+}
+
+#live-preview-setup > .hint:nth-of-type(1) {
+  margin-bottom: 16px;
+}
+
+.preview-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 360px;
+  width: 100%;
+  color: var(--text-dim);
+  text-align: center;
+  padding: 20px;
+}
+
+/* The [hidden] attribute is normally lower priority than any same-specificity author
+   rule, so the unconditional `display: flex` above would otherwise win and keep this
+   showing even while hidden — this restores the expected hide-on-[hidden] behavior. */
+.preview-placeholder[hidden] {
+  display: none;
+}
+
+.preview-placeholder-icon {
+  font-size: 2rem;
+  opacity: 0.6;
+  margin-bottom: 4px;
+}
+
+.preview-placeholder p {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.preview-placeholder-sub {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}

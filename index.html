@@ -42,6 +42,10 @@
 
       <div class="panel-section" id="live-preview-setup">
         <h2>Live Preview — Generated Result</h2>
+
+        <button type="button" class="btn btn-primary" id="generate-preview-btn" disabled>✨ Generate Preview</button>
+        <p class="hint">Renders the selected storyboard image at your current grid, border, color and layout settings. Adjust settings freely, then click again to refresh — switching images regenerates automatically.</p>
+
         <div class="preview-toolbar">
           <label class="loop-toggle">
             <input type="checkbox" id="preview-loop-toggle" />
@@ -51,7 +55,12 @@
         </div>
         <div class="dual-canvas-row">
           <div class="canvas-stage">
-            <canvas id="preview-canvas-print" width="440" height="440"></canvas>
+            <canvas id="preview-canvas-print" width="440" height="440" hidden></canvas>
+            <div class="preview-placeholder" id="preview-placeholder-print">
+              <span class="preview-placeholder-icon">🧩</span>
+              <p>Upload artwork, then click Generate Preview</p>
+              <span class="preview-placeholder-sub">Numbered grid, sharp outlines</span>
+            </div>
             <p class="canvas-caption">Print Asset — numbered grid</p>
             <div class="preview-download-row">
               <button type="button" class="btn btn-secondary btn-small" id="download-print-png">Download PNG</button>
@@ -59,7 +68,12 @@
             </div>
           </div>
           <div class="canvas-stage">
-            <canvas id="preview-canvas-solved" width="440" height="440"></canvas>
+            <canvas id="preview-canvas-solved" width="440" height="440" hidden></canvas>
+            <div class="preview-placeholder" id="preview-placeholder-solved">
+              <span class="preview-placeholder-icon">🎨</span>
+              <p>Upload artwork, then click Generate Preview</p>
+              <span class="preview-placeholder-sub">Vibrant exact hues, quantized to your palette</span>
+            </div>
             <p class="canvas-caption">Solved State — quantized colors</p>
             <div class="preview-download-row">
               <button type="button" class="btn btn-secondary btn-small" id="download-solved-png">Download PNG</button>
