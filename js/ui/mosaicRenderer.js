@@ -120,7 +120,7 @@ function computeCellStyle({ cellSizeMm, cellSizeIn, borderWeightPt, gridTintPerc
   // the font half a point so the glyph never clips into the line.
   const sizePt = adjustForBorderWeight(baseFont.sizePt, borderWeightPt, cellSizeMm);
   const font = { ...baseFont, sizePt };
-  const textTint = recommendTextTint(cellSizeMm, blackoutMode);
+  const textTint = recommendTextTint(cellSizeMm, gridTintPercent);
 
   return {
     blackoutMode,
@@ -156,7 +156,10 @@ function drawCell(ctx, { centerPx, cellSizeIn, cellSizePx, ppi, gridPattern, mod
     return;
   }
 
-  ctx.fillStyle = style.blackoutMode ? "#141414" : "#fdfcf9";
+  // Midnight/Blackout Cell & Background Standard: cells are always clean white/light
+  // shapes — the 100% black lives in the canvas background behind them (see the
+  // background fill in renderMosaicPreview/renderFullMosaicGrid), never in the cell fill.
+  ctx.fillStyle = "#fdfcf9";
   ctx.fill();
 
   if (gridPattern !== "dot-matrix") {
@@ -181,7 +184,9 @@ function drawCell(ctx, { centerPx, cellSizeIn, cellSizePx, ppi, gridPattern, mod
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.letterSpacing = `${letterSpacingForLabel(label)}px`;
-  ctx.fillStyle = style.textTint.color === "white" ? "#f5f5f5" : `rgba(0,0,0,${style.textTint.percentBlack / 100})`;
+  // Numbers stay dark against the white cell at every tint level — including
+  // Midnight/Blackout, where the black is the background, not the number color.
+  ctx.fillStyle = `rgba(0,0,0,${style.textTint.percentBlack / 100})`;
   ctx.fillText(label, labelX, labelY);
   ctx.letterSpacing = "0px";
 }
@@ -236,7 +241,9 @@ export function renderMosaicPreview(canvas, opts) {
   ctx.rect(originX, originY, cropWidthPx, cropHeightPx);
   ctx.clip();
 
-  ctx.fillStyle = mode === "solved" ? "#111318" : style.blackoutMode ? "#141414" : "#f5f3ee";
+  // Canvas background only — cells always render white regardless of this (see drawCell).
+  // True K:100% rich black, per the Midnight/Blackout Cell & Background Standard.
+  ctx.fillStyle = mode === "solved" ? "#111318" : style.blackoutMode ? "#000000" : "#f5f3ee";
   ctx.fillRect(originX, originY, cropWidthPx, cropHeightPx);
 
   cells.forEach((cell, index) => {
@@ -278,7 +285,10 @@ export function renderFullMosaicGrid(canvas, opts) {
   const fullGrid = resolveGrid(gridZone, cellSizeMm, gridPattern, gridOverride);
   const style = computeCellStyle({ cellSizeMm, cellSizeIn: fullGrid.cellSizeIn, borderWeightPt, gridTintPercent, cornerRadiusPercent, palette, ppi: dpi });
 
-  ctx.fillStyle = mode === "solved" ? "#ffffff" : style.blackoutMode ? "#141414" : "#ffffff";
+  // True K:100% solid Rich Black canvas background per the Midnight/Blackout standard —
+  // cells always render white regardless of this (see drawCell); this is the "outer
+  // framework," not the puzzle panes.
+  ctx.fillStyle = mode === "solved" ? "#ffffff" : style.blackoutMode ? "#000000" : "#ffffff";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   // Trim sits flush to whichever edge is the spine; bleed is only added to the

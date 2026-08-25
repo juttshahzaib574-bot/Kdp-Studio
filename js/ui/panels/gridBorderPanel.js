@@ -100,11 +100,13 @@ function render(current) {
   const sizes = getSizesForSelection(current.colorSetOptionId, current.colorSetCustomPair);
   const colorCount = buildCombinedPalette(sizes, current.colorBrand).length;
   const font = recommendFont(current.cellSizeMm, colorCount);
-  const tint = recommendTextTint(current.cellSizeMm, current.gridTintPercent >= 100);
+  const tint = recommendTextTint(current.cellSizeMm, current.gridTintPercent);
 
   el.typographyHint.textContent = `${current.cellSizeMm.toFixed(1)}mm cell → ${font.sizePt}pt ${font.weight}${
     font.isDoubleDigitRisk ? " — extreme risk zone, double-digit numbers may collide" : ""
-  }. Text tint: ${tint.color}.`;
+  }. Number tint: ${tint.percentBlack}% black (cells stay white; ${
+    current.gridTintPercent >= 100 ? "the canvas background goes rich black in Midnight/Blackout mode" : "background stays paper"
+  }).`;
 }
 
 function syncPair(slider, input, value) {

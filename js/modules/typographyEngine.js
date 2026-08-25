@@ -25,13 +25,18 @@ export function recommendFont(cellSizeMm, colorCount) {
   };
 }
 
-// Grid-line/number ink tint: 20-30% standard, bumped to 60% black in the microscopic
-// 3mm/Light-font risk zone so the KDP printer lays enough ink dots to stay legible.
-// Blackout mode inverts to stark white for visibility against a 100% black background.
-export function recommendTextTint(cellSizeMm, blackoutMode) {
-  if (blackoutMode) return { percentBlack: 0, color: "white" };
-  if (cellSizeMm < 3.5) return { percentBlack: 60, color: "dark-gray-60" };
-  return { percentBlack: 30, color: "gray-30" };
+// Grid-line/number ink tint. Section 3: "the grid lines should match your numbers at
+// a 30-40% gray tint" — numbers follow the same ink value as the grid line tint slider,
+// bumped up to a 60% legibility floor in the microscopic 3mm risk zone so the KDP
+// printer lays down enough ink dots to stay visible (or 20% otherwise, matching
+// Section 3's "20-30% standard"). Numbers stay dark at every tint level, including
+// 100% (Midnight/Blackout): per the blueprint's Midnight/Blackout Cell & Background
+// Standard, the black in that edition is the canvas background behind white cells —
+// never an inversion of the number color to white.
+export function recommendTextTint(cellSizeMm, gridTintPercent) {
+  const legibilityFloorPercent = cellSizeMm < 3.5 ? 60 : 20;
+  const percentBlack = Math.max(gridTintPercent, legibilityFloorPercent);
+  return { percentBlack, color: `gray-${percentBlack}` };
 }
 
 // Dynamic Typography Syncing: as border weight grows and encroaches on the interior

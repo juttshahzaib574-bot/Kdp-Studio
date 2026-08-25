@@ -47,6 +47,7 @@ export const state = {
   bookTitle: "Untitled Mystery Mosaic Book",
   bookSubtitle: "A Mosaic Color-by-Number Puzzle Book",
   bookAuthor: "",
+  bookIsbn: "", // optional — KDP assigns a free one automatically if left blank
 
   // Back matter: "About the Artist" + "Series Promo" (blank = page is skipped)
   authorBio: "",

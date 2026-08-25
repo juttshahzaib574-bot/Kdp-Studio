@@ -147,7 +147,10 @@ function drawKeyEntries(page, rect, palette, regular, textColor, entryHeightMaxI
       width: swatchSize,
       height: swatchSize,
       color: rgb(r / 255, g / 255, b / 255),
-      borderColor: rgb(0, 0, 0),
+      // Outline in the same color as the entry text — stays visible whether this key
+      // sits on a white puzzle-page strip or a Midnight/Blackout black background,
+      // instead of a hardcoded black outline that would vanish on a black page.
+      borderColor: textColor,
       borderWidth: 0.3,
     });
     page.drawText(`${i + 1} ${swatch.name}`, {
@@ -177,15 +180,19 @@ function computeKeyStripPdfRect({ canvasDims, safeZone, pageSide, gridZone, keyS
   };
 }
 
-function drawMigratedKeyPage(page, { palette, bold, regular, w, h, backImage }) {
+function drawMigratedKeyPage(page, { palette, bold, regular, w, h, backImage, blackoutDefault }) {
   const hasBackground = Boolean(backImage);
   if (hasBackground) {
     page.drawImage(backImage, { x: 0, y: 0, width: w, height: h });
+  } else if (blackoutDefault) {
+    // No custom asset selected, but Midnight/Blackout is active — default this page to
+    // the same rich-black background rather than a jarring white page mid-blackout book.
+    page.drawRectangle({ x: 0, y: 0, width: w, height: h, color: rgb(0, 0, 0) });
   } else {
     page.drawRectangle({ x: 0, y: 0, width: w, height: h, color: rgb(1, 1, 1) });
   }
 
-  const style = migratedKeyStyle(hasBackground);
+  const style = migratedKeyStyle(hasBackground || blackoutDefault);
   const textColor = style.textColor === "white" ? rgb(0.97, 0.97, 0.97) : rgb(0.18, 0.18, 0.18);
   const dimColor = style.textColor === "white" ? rgb(0.85, 0.85, 0.85) : rgb(0.4, 0.4, 0.4);
 
@@ -208,9 +215,13 @@ function drawTitlePage(page, state, bold, regular, w, h) {
 function drawCopyrightPage(page, state, regular, w, h) {
   page.drawRectangle({ x: 0, y: 0, width: w, height: h, color: rgb(1, 1, 1) });
   const year = new Date().getFullYear();
+  const isbn = state.bookIsbn.trim();
   const lines = [
     `Copyright © ${year} ${state.bookAuthor || state.bookTitle}`,
     "All rights reserved.",
+    // ISBN is optional — KDP assigns a free one automatically for print books that
+    // don't supply their own, so this line is only printed when one is actually set.
+    ...(isbn ? [`ISBN: ${isbn}`] : []),
     "No part of this publication may be reproduced, distributed, or transmitted in any",
     "form or by any means without the prior written permission of the copyright owner,",
     "except for brief quotations used in a review.",
@@ -224,8 +235,36 @@ function drawCopyrightPage(page, state, regular, w, h) {
   });
 }
 
-function drawBelongsToPage(page, bold, w, h) {
+// A row of small, unnumbered mosaic tiles cycling through the book's own active
+// palette — decorative only, never touching the safe-zone content area.
+function drawMosaicBorderRow(page, { y, w, palette, tileSize = 10, gap = 4 }) {
+  if (palette.length === 0) return;
+  const marginPt = 40;
+  const usableWidth = w - marginPt * 2;
+  const tileCount = Math.max(1, Math.floor(usableWidth / (tileSize + gap)));
+  const rowWidth = tileCount * (tileSize + gap) - gap;
+  const startX = (w - rowWidth) / 2;
+
+  for (let i = 0; i < tileCount; i += 1) {
+    const { r, g, b } = palette[i % palette.length].rgb;
+    page.drawRectangle({
+      x: startX + i * (tileSize + gap),
+      y,
+      width: tileSize,
+      height: tileSize,
+      color: rgb(r / 255, g / 255, b / 255),
+    });
+  }
+}
+
+function drawBelongsToPage(page, bold, w, h, palette) {
   page.drawRectangle({ x: 0, y: 0, width: w, height: h, color: rgb(1, 1, 1) });
+
+  // "A small, unnumbered mosaic border... around the edges to match the theme of your
+  // book" (Section 2) — built from the book's own active color key, top and bottom.
+  drawMosaicBorderRow(page, { y: h - 54, w, palette });
+  drawMosaicBorderRow(page, { y: 40, w, palette });
+
   centerText(page, "This Mystery Mosaic Book", bold, 20, h * 0.62);
   centerText(page, "Belongs To:", bold, 20, h * 0.62 - 26);
   const lineWidth = w * 0.55;
@@ -408,15 +447,19 @@ async function addGeneratedOrCustomPage(doc, state, categoryId, pageWidthPt, pag
 // Blank back page: a selected background (or plain white), plus — per Section 2's
 // spec for "Blank Backs" — a bleed-through hint and a small color-test strip near the
 // bottom center, so the page stays functionally useful rather than pure filler.
-function drawBlankBackPage(page, { backImage, palette, regular, w, h }) {
+function drawBlankBackPage(page, { backImage, palette, regular, w, h, blackoutDefault }) {
   const hasBackground = Boolean(backImage);
   if (hasBackground) {
     page.drawImage(backImage, { x: 0, y: 0, width: w, height: h });
+  } else if (blackoutDefault) {
+    // No custom asset selected, but Midnight/Blackout is active — default this page to
+    // the same rich-black background rather than a jarring white page mid-blackout book.
+    page.drawRectangle({ x: 0, y: 0, width: w, height: h, color: rgb(0, 0, 0) });
   } else {
     page.drawRectangle({ x: 0, y: 0, width: w, height: h, color: rgb(1, 1, 1) });
   }
 
-  const textColor = hasBackground ? rgb(0.95, 0.95, 0.95) : rgb(0.5, 0.5, 0.5);
+  const textColor = hasBackground || blackoutDefault ? rgb(0.95, 0.95, 0.95) : rgb(0.5, 0.5, 0.5);
   centerText(page, "Tip: Slip a scrap sheet of paper behind this page to protect against marker bleed-through.", regular, 7.5, 32, textColor);
 
   const boxSize = 12;
@@ -473,7 +516,7 @@ export async function exportInteriorPdf(state, { onProgress } = {}) {
   doc.addPage([pageWidthPt, pageHeightPt]).drawRectangle({ x: 0, y: 0, width: pageWidthPt, height: pageHeightPt, color: rgb(1, 1, 1) });
   reportProgress("Copyright Page");
 
-  await addGeneratedOrCustomPage(doc, state, "belongs-to-page", pageWidthPt, pageHeightPt, (page) => drawBelongsToPage(page, bold, pageWidthPt, pageHeightPt));
+  await addGeneratedOrCustomPage(doc, state, "belongs-to-page", pageWidthPt, pageHeightPt, (page) => drawBelongsToPage(page, bold, pageWidthPt, pageHeightPt, globalPalette));
   doc.addPage([pageWidthPt, pageHeightPt]).drawRectangle({ x: 0, y: 0, width: pageWidthPt, height: pageHeightPt, color: rgb(1, 1, 1) });
   reportProgress('"Belongs To" Page');
 
@@ -529,7 +572,11 @@ export async function exportInteriorPdf(state, { onProgress } = {}) {
         canvasDims, safeZone, pageSide: state.pageSide,
         gridZone: renderResult.gridZone, keyStripHeightIn: renderResult.keyStripHeightIn, pageHeightPt,
       });
-      drawKeyEntries(puzzlePage, rect, effective.palette, regular, rgb(0.18, 0.18, 0.18), 0.2);
+      // The strip sits on renderFullMosaicGrid's canvas background — black in
+      // Midnight/Blackout mode (see the Midnight/Blackout Cell & Background Standard) —
+      // so the key text needs to flip light there or it's invisible.
+      const keyStripTextColor = effective.gridTintPercent >= 100 ? rgb(0.95, 0.95, 0.95) : rgb(0.18, 0.18, 0.18);
+      drawKeyEntries(puzzlePage, rect, effective.palette, regular, keyStripTextColor, 0.2);
     }
 
     const solvedCanvas = document.createElement("canvas");
@@ -557,10 +604,11 @@ export async function exportInteriorPdf(state, { onProgress } = {}) {
     // being blank. Unified (or any other) mode gets the standard hint+swatch blank back.
     const backPage = doc.addPage([pageWidthPt, pageHeightPt]);
     const itemBackImage = resolveItemBackImage(item, backImagesByAssetId, globalBackImage);
+    const blackoutDefault = effective.gridTintPercent >= 100;
     if (state.layoutMode === "expanded") {
-      drawMigratedKeyPage(backPage, { palette: effective.palette, bold, regular, w: pageWidthPt, h: pageHeightPt, backImage: itemBackImage });
+      drawMigratedKeyPage(backPage, { palette: effective.palette, bold, regular, w: pageWidthPt, h: pageHeightPt, backImage: itemBackImage, blackoutDefault });
     } else {
-      drawBlankBackPage(backPage, { backImage: itemBackImage, palette: effective.palette, regular, w: pageWidthPt, h: pageHeightPt });
+      drawBlankBackPage(backPage, { backImage: itemBackImage, palette: effective.palette, regular, w: pageWidthPt, h: pageHeightPt, blackoutDefault });
     }
 
     reportProgress(`Puzzle: ${item.name}`);

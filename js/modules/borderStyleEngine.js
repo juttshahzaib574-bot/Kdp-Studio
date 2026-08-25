@@ -15,8 +15,10 @@ export const BORDER_PRESETS = {
     label: "Midnight Marker",
     borderPt: 4.0,
     gridTintPercent: 100,
-    textTint: "white",
-    note: "Thick black borders for a high-contrast, forgiving 'stained glass' marker-bleed buffer.",
+    // Per the Midnight/Blackout Cell & Background Standard: cells stay white and
+    // numbers stay dark — the 100% black is the canvas background, not the text.
+    textTint: "dark-gray",
+    note: "100% black canvas background with crisp white cells — a high-contrast, forgiving 'stained glass' marker-bleed buffer.",
   },
 };
 
@@ -36,8 +38,9 @@ export function gridColorFromTint(gridTintPercent) {
   return `rgba(0,0,0,${(gridTintPercent / 100).toFixed(2)})`;
 }
 
-// Heavy borders (Midnight Marker range) signal the Blackout aesthetic where text
-// should invert to light for legibility (Smart Contrast & Color Switching).
+// Heavy borders (Midnight Marker range) signal the Blackout aesthetic — a 100% black
+// canvas background behind crisp white cells, per the Midnight/Blackout Cell &
+// Background Standard. Numbers stay dark; only the page background inverts.
 export function isHeavyBorder(borderPt) {
   return borderPt >= 2.5;
 }
