@@ -41,6 +41,11 @@ export const state = {
 
   // 3-Second Looping Interface / Stacked Live Preview Gallery
   previewLoopEnabled: false,
+
+  // Unified Export Pipeline (book metadata for the generated front matter)
+  bookTitle: "Untitled Mystery Mosaic Book",
+  bookSubtitle: "A Mosaic Color-by-Number Puzzle Book",
+  bookAuthor: "",
 };
 
 export function setState(patch) {

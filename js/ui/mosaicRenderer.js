@@ -1,9 +1,10 @@
 // Draws the actual mosaic grid content — shape, typography, border, corner radius,
-// and quantized color — into the safe zone of a page frame. Renders a zoomed detail
-// crop (not the whole page) at a fixed 300 "detail PPI" so real point sizes/line
-// weights stay proportionally accurate while remaining legible on screen — exactly the
-// close-up view described by the blueprint's live preview modules for "dialing in
-// dense grids... ensuring microscopic numbers and thin borders remain crisp."
+// and quantized color. Two entry points share the same per-cell drawing code:
+//   - renderMosaicPreview: a zoomed on-screen detail crop at a fixed 300 "detail PPI"
+//     so real point sizes/line weights stay proportionally accurate while remaining
+//     legible on screen (used by the Stacked Live Preview Gallery).
+//   - renderFullMosaicGrid: the entire safe-zone grid at the real chosen print DPI,
+//     used to generate the actual page image embedded into the exported PDF.
 
 import { computeFrameGeometry, drawFrame } from "./preview.js";
 import { computeGridDimensions, cellCenterIn, cellPolygonIn } from "../modules/gridPatternEngine.js";
@@ -98,6 +99,77 @@ function roundedPolygonPath(ctx, points, radiusPx) {
   ctx.closePath();
 }
 
+// Shared typography/border/radius derivation used by both renderers, so the on-screen
+// preview and the exported PDF page always agree on point sizes and weights.
+function computeCellStyle({ cellSizeMm, cellSizeIn, borderWeightPt, gridTintPercent, cornerRadiusPercent, palette, ppi }) {
+  const blackoutMode = gridTintPercent >= 100;
+  const font = recommendFont(cellSizeMm, palette.length);
+  const textTint = recommendTextTint(cellSizeMm, blackoutMode);
+
+  return {
+    blackoutMode,
+    font,
+    textTint,
+    fontPx: Math.max(6, font.sizePt * PT_TO_IN * ppi),
+    fontWeight: font.weight.includes("Thin") ? 200 : font.weight.includes("Light") ? 300 : 500,
+    borderPx: Math.max(0.5, borderWeightPt * PT_TO_IN * ppi),
+    strokeColor: gridColorFromTint(gridTintPercent),
+    radiusPx: cornerRadiusIn(cornerRadiusPercent, cellSizeIn) * ppi,
+  };
+}
+
+// Draws one cell (shape + fill + border/dots + number label) at centerPx, ppi px/inch.
+function drawCell(ctx, { centerPx, cellSizeIn, cellSizePx, ppi, gridPattern, mode, paletteIndex, palette, style, cornerRadiusPercent }) {
+  const points = cellPolygonIn(gridPattern, cellSizeIn);
+  const pxPoints = polygonToPx(points, centerPx, ppi);
+  const swatch = palette[paletteIndex];
+
+  if (isFullCircle(cornerRadiusPercent)) {
+    ctx.beginPath();
+    ctx.arc(centerPx.x, centerPx.y, cellSizePx / 2, 0, Math.PI * 2);
+  } else {
+    roundedPolygonPath(ctx, pxPoints, style.radiusPx);
+  }
+
+  if (mode === "solved") {
+    ctx.fillStyle = swatch.hex;
+    ctx.fill();
+    ctx.strokeStyle = "rgba(0,0,0,0.15)";
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+    return;
+  }
+
+  ctx.fillStyle = style.blackoutMode ? "#141414" : "#fdfcf9";
+  ctx.fill();
+
+  if (gridPattern !== "dot-matrix") {
+    ctx.strokeStyle = style.strokeColor;
+    ctx.lineWidth = style.borderPx;
+    ctx.stroke();
+  } else {
+    pxPoints.forEach((pt) => {
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, Math.max(0.8, style.borderPx * 0.6), 0, Math.PI * 2);
+      ctx.fillStyle = style.strokeColor;
+      ctx.fill();
+    });
+  }
+
+  const offset = centerOffsetIn(gridPattern, cellSizeIn);
+  const labelX = centerPx.x + offset.dx * ppi;
+  const labelY = centerPx.y + offset.dy * ppi;
+  const label = String(paletteIndex + 1);
+
+  ctx.font = `${style.fontWeight} ${style.fontPx}px -apple-system, sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.letterSpacing = `${letterSpacingForLabel(label)}px`;
+  ctx.fillStyle = style.textTint.color === "white" ? "#f5f5f5" : `rgba(0,0,0,${style.textTint.percentBlack / 100})`;
+  ctx.fillText(label, labelX, labelY);
+  ctx.letterSpacing = "0px";
+}
+
 export function renderMosaicPreview(canvas, opts) {
   const {
     mode, // 'print' | 'solved'
@@ -132,15 +204,7 @@ export function renderMosaicPreview(canvas, opts) {
   }
 
   const assignments = assignDistinctShades(cells.map((c) => c.color), palette);
-  const blackoutMode = gridTintPercent >= 100;
-
-  const font = recommendFont(cellSizeMm, palette.length);
-  const textTint = recommendTextTint(cellSizeMm, blackoutMode);
-  const fontPx = Math.max(6, font.sizePt * PT_TO_IN * DETAIL_PPI);
-  const fontWeight = font.weight.includes("Thin") ? 200 : font.weight.includes("Light") ? 300 : 500;
-  const borderPx = Math.max(0.5, borderWeightPt * PT_TO_IN * DETAIL_PPI);
-  const strokeColor = gridColorFromTint(gridTintPercent);
-  const radiusPx = cornerRadiusIn(cornerRadiusPercent, fullGrid.cellSizeIn) * DETAIL_PPI;
+  const style = computeCellStyle({ cellSizeMm, cellSizeIn: fullGrid.cellSizeIn, borderWeightPt, gridTintPercent, cornerRadiusPercent, palette, ppi: DETAIL_PPI });
 
   const cropWidthPx = colsVisible * cellSizePx;
   const cropHeightPx = rowsVisible * cellSizePx;
@@ -152,62 +216,16 @@ export function renderMosaicPreview(canvas, opts) {
   ctx.rect(originX, originY, cropWidthPx, cropHeightPx);
   ctx.clip();
 
-  ctx.fillStyle = mode === "solved" ? "#111318" : blackoutMode ? "#141414" : "#f5f3ee";
+  ctx.fillStyle = mode === "solved" ? "#111318" : style.blackoutMode ? "#141414" : "#f5f3ee";
   ctx.fillRect(originX, originY, cropWidthPx, cropHeightPx);
 
   cells.forEach((cell, index) => {
-    const { col, row } = cell;
-    const localCenterIn = cellCenterIn(gridPattern, col - colStart, row - rowStart, fullGrid.cellSizeIn);
+    const localCenterIn = cellCenterIn(gridPattern, cell.col - colStart, cell.row - rowStart, fullGrid.cellSizeIn);
     const centerPx = { x: originX + localCenterIn.x * DETAIL_PPI, y: originY + localCenterIn.y * DETAIL_PPI };
-    const points = cellPolygonIn(gridPattern, fullGrid.cellSizeIn);
-    const pxPoints = polygonToPx(points, centerPx, DETAIL_PPI);
-    const paletteIndex = assignments[index];
-    const swatch = palette[paletteIndex];
-
-    if (isFullCircle(cornerRadiusPercent)) {
-      ctx.beginPath();
-      ctx.arc(centerPx.x, centerPx.y, cellSizePx / 2, 0, Math.PI * 2);
-    } else {
-      roundedPolygonPath(ctx, pxPoints, radiusPx);
-    }
-
-    if (mode === "solved") {
-      ctx.fillStyle = swatch.hex;
-      ctx.fill();
-      ctx.strokeStyle = "rgba(0,0,0,0.15)";
-      ctx.lineWidth = 0.5;
-      ctx.stroke();
-      return;
-    }
-
-    ctx.fillStyle = blackoutMode ? "#141414" : "#fdfcf9";
-    ctx.fill();
-
-    if (gridPattern !== "dot-matrix") {
-      ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = borderPx;
-      ctx.stroke();
-    } else {
-      pxPoints.forEach((pt) => {
-        ctx.beginPath();
-        ctx.arc(pt.x, pt.y, Math.max(0.8, borderPx * 0.6), 0, Math.PI * 2);
-        ctx.fillStyle = strokeColor;
-        ctx.fill();
-      });
-    }
-
-    const offset = centerOffsetIn(gridPattern, fullGrid.cellSizeIn);
-    const labelX = centerPx.x + offset.dx * DETAIL_PPI;
-    const labelY = centerPx.y + offset.dy * DETAIL_PPI;
-    const label = String(paletteIndex + 1);
-
-    ctx.font = `${fontWeight} ${fontPx}px -apple-system, sans-serif`;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.letterSpacing = `${letterSpacingForLabel(label)}px`;
-    ctx.fillStyle = textTint.color === "white" ? "#f5f5f5" : `rgba(0,0,0,${textTint.percentBlack / 100})`;
-    ctx.fillText(label, labelX, labelY);
-    ctx.letterSpacing = "0px";
+    drawCell(ctx, {
+      centerPx, cellSizeIn: fullGrid.cellSizeIn, cellSizePx, ppi: DETAIL_PPI, gridPattern, mode,
+      paletteIndex: assignments[index], palette, style, cornerRadiusPercent,
+    });
   });
 
   ctx.restore();
@@ -221,5 +239,62 @@ export function renderMosaicPreview(canvas, opts) {
     canvas.height - 12
   );
 
-  return { fullGrid, colsVisible, rowsVisible, font, borderPx };
+  return { fullGrid, colsVisible, rowsVisible, font: style.font, borderPx: style.borderPx };
+}
+
+// Renders the ENTIRE safe-zone grid onto `canvas` at the real chosen print DPI —
+// this is the actual page content embedded into the exported PDF, not a preview.
+// `canvas` must already be sized to canvasDims.widthPx x canvasDims.heightPx.
+export function renderFullMosaicGrid(canvas, opts) {
+  const {
+    mode, // 'print' | 'solved'
+    dpi, canvasDims, safeZone, pageSide,
+    gridPattern, cellSizeMm, borderWeightPt, gridTintPercent, cornerRadiusPercent,
+    palette, sourceCanvas,
+  } = opts;
+
+  const ctx = canvas.getContext("2d");
+  const fullGrid = computeGridDimensions(safeZone.widthIn, safeZone.heightIn, cellSizeMm, gridPattern);
+  const style = computeCellStyle({ cellSizeMm, cellSizeIn: fullGrid.cellSizeIn, borderWeightPt, gridTintPercent, cornerRadiusPercent, palette, ppi: dpi });
+
+  ctx.fillStyle = mode === "solved" ? "#ffffff" : style.blackoutMode ? "#141414" : "#ffffff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Trim sits flush to whichever edge is the spine; bleed is only added to the
+  // outer edge + top/bottom (see bleedEngine), so this mirrors that placement.
+  const trimXIn = pageSide === "right" ? 0 : canvasDims.bleedIn;
+  const trimYIn = canvasDims.bleedIn;
+  const safeXIn = trimXIn + safeZone.left;
+  const safeYIn = trimYIn + safeZone.top;
+  const originXPx = safeXIn * dpi;
+  const originYPx = safeYIn * dpi;
+
+  const sourceCtx = sourceCanvas.getContext("2d");
+  const sourceImageData = sourceCtx.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height);
+
+  const cellSizePx = fullGrid.cellSizeIn * dpi;
+  const colors = [];
+  for (let row = 0; row < fullGrid.rows; row += 1) {
+    for (let col = 0; col < fullGrid.cols; col += 1) {
+      const u = fullGrid.cols > 1 ? col / (fullGrid.cols - 1) : 0.5;
+      const v = fullGrid.rows > 1 ? row / (fullGrid.rows - 1) : 0.5;
+      colors.push(sampleFromImageData(sourceImageData, u, v));
+    }
+  }
+  const assignments = assignDistinctShades(colors, palette);
+
+  let index = 0;
+  for (let row = 0; row < fullGrid.rows; row += 1) {
+    for (let col = 0; col < fullGrid.cols; col += 1) {
+      const localCenterIn = cellCenterIn(gridPattern, col, row, fullGrid.cellSizeIn);
+      const centerPx = { x: originXPx + localCenterIn.x * dpi, y: originYPx + localCenterIn.y * dpi };
+      drawCell(ctx, {
+        centerPx, cellSizeIn: fullGrid.cellSizeIn, cellSizePx, ppi: dpi, gridPattern, mode,
+        paletteIndex: assignments[index], palette, style, cornerRadiusPercent,
+      });
+      index += 1;
+    }
+  }
+
+  return { fullGrid };
 }

@@ -1,11 +1,8 @@
 import { state, setState, subscribe } from "../../state.js";
 import { MAX_BATCH_SIZE, addToBatch, removeFromBatch, updateItemSettings } from "../../modules/batchEngine.js";
-import { reorder, computePagination, statusBadges } from "../../modules/storyboardEngine.js";
+import { reorder, computePagination, statusBadges, FRONT_MATTER_INTERIOR_PAGES } from "../../modules/storyboardEngine.js";
 import { computeSolutionPageCount } from "../../modules/solutionGenerationEngine.js";
 import { GRID_PATTERNS } from "../../modules/gridPatternEngine.js";
-
-// "10 front matter pages = 20 interior pages" per the blueprint's single-sided-printing math.
-const FRONT_MATTER_INTERIOR_PAGES = 20;
 
 const el = {
   fileInput: document.getElementById("batch-file-input"),
@@ -15,7 +12,15 @@ const el = {
   summaryHint: document.getElementById("solution-summary-hint"),
 };
 
-let dragFromIndex = null;
+// Manual mouse-based drag (not native HTML5 draggable, and not Pointer Events +
+// setPointerCapture either): native drag-and-drop needs the browser to open its own
+// internal drag session from a real OS gesture, which synthetic/automated input can't
+// reliably trigger; pointer capture, in turn, was observed emitting a spurious
+// pointercancel under CDP-simulated input, ending the gesture right after it starts.
+// Plain mousemove/mouseup listened on `document` sidesteps both — it tracks the whole
+// gesture regardless of what element the cursor is over, and the reorder only commits
+// once on release, so the mid-drag DOM never gets rebuilt out from under it.
+let dragState = null; // { fromId, hoverId }
 
 export function initBatchStoryboardPanel() {
   el.fileInput.addEventListener("change", handleFileInput);
@@ -46,7 +51,6 @@ function render(current) {
   paginated.forEach((item, index) => {
     const cell = document.createElement("div");
     cell.className = "storyboard-item";
-    cell.draggable = true;
     cell.dataset.itemId = item.id;
 
     const badges = statusBadges(item, { gridPattern: current.gridPattern, borderPreset: null });
@@ -58,31 +62,24 @@ function render(current) {
       <span class="shape-badge" title="Click to override this page's grid pattern">${badges.join(" · ")}</span>
     `;
 
-    cell.querySelector(".remove-btn").addEventListener("click", (e) => {
+    const removeBtn = cell.querySelector(".remove-btn");
+    removeBtn.addEventListener("mousedown", (e) => e.stopPropagation());
+    removeBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       const batch = removeFromBatch(state.batchItems, item.id);
       setState({ batchItems: batch, activeBatchItemId: batch[0]?.id ?? null });
     });
 
-    cell.querySelector(".shape-badge").addEventListener("click", (e) => {
+    const shapeBadge = cell.querySelector(".shape-badge");
+    shapeBadge.addEventListener("mousedown", (e) => e.stopPropagation());
+    shapeBadge.addEventListener("click", (e) => {
       e.stopPropagation();
       const batch = updateItemSettings(state.batchItems, item.id, { gridPattern: nextPatternOverride(item.settings.gridPattern) });
       setState({ batchItems: batch });
     });
 
     cell.addEventListener("click", () => setState({ activeBatchItemId: item.id }));
-    cell.addEventListener("dragstart", () => {
-      dragFromIndex = index;
-      cell.classList.add("dragging");
-    });
-    cell.addEventListener("dragend", () => cell.classList.remove("dragging"));
-    cell.addEventListener("dragover", (e) => e.preventDefault());
-    cell.addEventListener("drop", (e) => {
-      e.preventDefault();
-      if (dragFromIndex === null || dragFromIndex === index) return;
-      setState({ batchItems: reorder(state.batchItems, dragFromIndex, index) });
-      dragFromIndex = null;
-    });
+    cell.addEventListener("mousedown", (e) => startDrag(e, cell, item.id));
 
     if (item.id === current.activeBatchItemId) cell.style.outline = "2px solid var(--accent)";
 
@@ -103,4 +100,42 @@ function nextPatternOverride(currentOverride) {
   const ids = [null, ...GRID_PATTERNS.map((p) => p.id)];
   const idx = ids.indexOf(currentOverride);
   return ids[(idx + 1) % ids.length];
+}
+
+function startDrag(e, cell, itemId) {
+  if (e.button !== 0) return;
+  e.preventDefault(); // stop native text/image drag or selection from hijacking the gesture
+  dragState = { fromId: itemId, hoverId: null };
+  cell.classList.add("dragging");
+
+  document.addEventListener("mousemove", handleDragMove);
+  document.addEventListener("mouseup", finishDrag, { once: true });
+}
+
+function handleDragMove(e) {
+  if (!dragState) return;
+
+  const hovered = document.elementFromPoint(e.clientX, e.clientY)?.closest(".storyboard-item");
+  const hoverId = hovered && hovered.dataset.itemId !== dragState.fromId ? hovered.dataset.itemId : null;
+
+  if (hoverId !== dragState.hoverId) {
+    el.grid.querySelectorAll(".storyboard-item.drag-over").forEach((n) => n.classList.remove("drag-over"));
+    if (hovered && hoverId) hovered.classList.add("drag-over");
+    dragState.hoverId = hoverId;
+  }
+}
+
+function finishDrag() {
+  document.removeEventListener("mousemove", handleDragMove);
+  el.grid.querySelectorAll(".storyboard-item.dragging, .storyboard-item.drag-over").forEach((n) => n.classList.remove("dragging", "drag-over"));
+
+  const { fromId, hoverId } = dragState ?? {};
+  dragState = null;
+  if (!hoverId || hoverId === fromId) return;
+
+  const fromIndex = state.batchItems.findIndex((item) => item.id === fromId);
+  const toIndex = state.batchItems.findIndex((item) => item.id === hoverId);
+  if (fromIndex === -1 || toIndex === -1) return;
+
+  setState({ batchItems: reorder(state.batchItems, fromIndex, toIndex) });
 }

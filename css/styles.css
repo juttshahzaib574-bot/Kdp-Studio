@@ -512,6 +512,11 @@ input[type="file"] {
   opacity: 0.4;
 }
 
+.storyboard-item.drag-over {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
 .storyboard-item img {
   width: 100%;
   height: 100%;
@@ -675,4 +680,53 @@ input[type="file"] {
 .canvas-stage.emphasized {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px var(--accent-dim);
+}
+
+/* --- Export panel --- */
+
+.text-input {
+  width: 100%;
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 0.85rem;
+}
+
+.btn-primary {
+  width: 100%;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  padding: 10px 14px;
+}
+
+.btn-primary:hover {
+  background: #4a78e0;
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.export-progress {
+  margin-top: 12px;
+}
+
+.export-progress-track {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.export-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--accent);
+  transition: width 0.2s ease;
 }

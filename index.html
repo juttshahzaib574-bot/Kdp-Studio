@@ -200,6 +200,31 @@
         </div>
       </section>
 
+      <section class="panel-section" id="export-setup">
+        <h2><span class="step-badge">8</span> Unified Export Pipeline</h2>
+
+        <div class="field-group">
+          <label for="book-title-input">Book Title</label>
+          <input type="text" id="book-title-input" class="text-input" />
+        </div>
+        <div class="field-group">
+          <label for="book-subtitle-input">Subtitle</label>
+          <input type="text" id="book-subtitle-input" class="text-input" />
+        </div>
+        <div class="field-group">
+          <label for="book-author-input">Author / Publisher</label>
+          <input type="text" id="book-author-input" class="text-input" placeholder="Optional" />
+        </div>
+
+        <div class="field-group">
+          <button type="button" class="btn btn-primary" id="export-pdf-btn">Export Print-Ready Interior PDF</button>
+          <div class="export-progress" id="export-progress" hidden>
+            <div class="export-progress-track"><div class="export-progress-fill" id="export-progress-fill"></div></div>
+            <p class="hint" id="export-progress-label"></p>
+          </div>
+        </div>
+      </section>
+
     </aside>
 
     <section class="preview-panel">
