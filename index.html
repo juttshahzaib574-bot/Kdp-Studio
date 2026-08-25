@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KDP Studio</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <span class="brand-mark">KDP</span> Studio
+    </div>
+    <p class="brand-tagline">Zero-API · Fully Local · Print-Ready Mosaic Book Engine</p>
+  </header>
+
+  <main class="app-shell">
+    <aside class="settings-panel">
+
+      <section class="panel-section" id="canvas-setup">
+        <h2><span class="step-badge">1</span> Canvas Dimension &amp; Resolution</h2>
+
+        <div class="field-group">
+          <label>Trim Size</label>
+          <div class="trim-size-grid" id="trim-size-options"></div>
+        </div>
+
+        <div class="field-group">
+          <label for="dpi-input">Resolution (DPI)</label>
+          <div class="dpi-control">
+            <input type="range" id="dpi-slider" min="300" max="600" step="1" value="300" />
+            <input type="number" id="dpi-input" min="300" max="600" step="1" value="300" />
+          </div>
+          <p class="hint">300–600 DPI. 300 is KDP's print minimum; higher DPI improves fidelity for dense grids.</p>
+        </div>
+      </section>
+
+      <section class="panel-section" id="bleed-architecture">
+        <h2><span class="step-badge">2</span> Print-Ready Bleed Architecture</h2>
+
+        <div class="toggle-row">
+          <label class="switch">
+            <input type="checkbox" id="bleed-toggle" checked />
+            <span class="slider-track"></span>
+          </label>
+          <div>
+            <strong>KDP Mandatory Bleed — 0.125"</strong>
+            <p class="hint">Automatically extends the canvas 0.125" on the outer edge and top/bottom so full-bleed backgrounds print to the paper's edge.</p>
+          </div>
+        </div>
+
+        <div class="toggle-row" id="edge-to-edge-row">
+          <label class="switch">
+            <input type="checkbox" id="edge-to-edge-toggle" />
+            <span class="slider-track"></span>
+          </label>
+          <div>
+            <strong>Page uses edge-to-edge / blackout background assets</strong>
+            <p class="hint">Flag this if a background image or blackout page must reach the trim edge with no white margin.</p>
+          </div>
+        </div>
+
+        <p class="risk-banner" id="risk-banner" hidden>
+          ⚠️ No-Bleed is active on a page flagged edge-to-edge. Amazon KDP may reject this PDF during automated print review.
+        </p>
+      </section>
+
+    </aside>
+
+    <section class="preview-panel">
+      <h2>Live Canvas Preview</h2>
+      <div class="canvas-stage">
+        <canvas id="preview-canvas" width="640" height="640"></canvas>
+      </div>
+      <dl class="dimension-readout" id="dimension-readout"></dl>
+    </section>
+  </main>
+
+  <dialog id="risk-dialog">
+    <h3>⚠️ Bleed Safety Warning</h3>
+    <p>You've turned off KDP's mandatory bleed while flagging this page as an edge-to-edge or blackout background asset.</p>
+    <p>Amazon KDP requires a 0.125" bleed for any artwork that touches the trim edge. Submitting without bleed <strong>may cause Amazon to reject your PDF</strong> during its automated print-readiness review.</p>
+    <label class="risk-ack">
+      <input type="checkbox" id="risk-ack-checkbox" />
+      I understand the risk and want to proceed without bleed anyway.
+    </label>
+    <div class="dialog-actions">
+      <button id="risk-cancel-btn" type="button" class="btn btn-secondary">Cancel — Re-enable Bleed</button>
+      <button id="risk-proceed-btn" type="button" class="btn btn-danger" disabled>Proceed at My Own Risk</button>
+    </div>
+  </dialog>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
