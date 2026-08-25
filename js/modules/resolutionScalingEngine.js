@@ -1,6 +1,6 @@
 // Module 7: Adaptive Resolution & Cell Scaling Engine
 import { computeGridDimensions, inToMm } from "./gridPatternEngine.js";
-import { splitSafeZoneForKey } from "./layoutEngine.js";
+import { computeLayout, isColorKeyOffloaded, normalizeComposition } from "./layoutCompositionEngine.js";
 
 export const SCALING_PRIORITIES = [
   {
@@ -15,9 +15,10 @@ export const SCALING_PRIORITIES = [
   },
 ];
 
-// Only unlocked once the color key has migrated off the primary canvas (Expanded layout).
-export function isAdaptiveScalingUnlocked(layoutMode) {
-  return layoutMode === "expanded";
+// Only unlocked once the color key has migrated off the primary canvas — i.e. the
+// composition places it on the blank page (or hides it), freeing grid real estate.
+export function isAdaptiveScalingUnlocked(composition) {
+  return isColorKeyOffloaded(composition);
 }
 
 // extraSafeZone*In: the extra safe-zone space freed up by migrating the key away.
@@ -52,17 +53,27 @@ export function computeAdaptiveGrid(baseGrid, extraSafeZoneWidthIn, extraSafeZon
 // closes that gap; grid-expansion needs no such pin, since its cols/rows already come
 // from that same computeGridDimensions call over the same full area, so an independent
 // recompute downstream reproduces it exactly (deterministic function, identical inputs).
-export function resolveEffectiveGrid(safeZone, cellSizeMm, gridPattern, layoutMode, resolutionPriority) {
-  if (!isAdaptiveScalingUnlocked(layoutMode)) {
+export function resolveEffectiveGrid(safeZone, cellSizeMm, gridPattern, composition, resolutionPriority) {
+  const comp = normalizeComposition(composition);
+  if (!isAdaptiveScalingUnlocked(comp)) {
     return { cellSizeMm, gridOverride: null };
   }
 
-  const unifiedSplit = splitSafeZoneForKey(safeZone, "unified");
-  const baseGrid = computeGridDimensions(unifiedSplit.gridZone.widthIn, unifiedSplit.gridZone.heightIn, cellSizeMm, gridPattern);
-  baseGrid.widthIn = unifiedSplit.gridZone.widthIn;
-  baseGrid.heightIn = unifiedSplit.gridZone.heightIn;
+  // Baseline = the exact same composition but with the color key forced back onto the
+  // grid bottom (what the page would be in Unified layout, holding text elements fixed).
+  // Actual = the current composition (key offloaded). The difference in grid-region size
+  // is precisely the space the offloaded key freed — the real "extra" area to redistribute.
+  const baselineComp = { ...comp, colorKey: { ...comp.colorKey, target: "grid", zone: "bottom" } };
+  const baseRegion = computeLayout(safeZone, baselineComp).gridZone;
+  const actualRegion = computeLayout(safeZone, comp).gridZone;
 
-  const adaptive = computeAdaptiveGrid(baseGrid, 0, unifiedSplit.keyStripHeightIn, gridPattern, resolutionPriority);
+  const baseGrid = computeGridDimensions(baseRegion.widthIn, baseRegion.heightIn, cellSizeMm, gridPattern);
+  baseGrid.widthIn = baseRegion.widthIn;
+  baseGrid.heightIn = baseRegion.heightIn;
+
+  const freedWidthIn = Math.max(0, actualRegion.widthIn - baseRegion.widthIn);
+  const freedHeightIn = Math.max(0, actualRegion.heightIn - baseRegion.heightIn);
+  const adaptive = computeAdaptiveGrid(baseGrid, freedWidthIn, freedHeightIn, gridPattern, resolutionPriority);
 
   return {
     cellSizeMm: adaptive.cellSizeMm,

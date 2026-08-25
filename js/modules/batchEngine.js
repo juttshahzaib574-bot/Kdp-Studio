@@ -16,6 +16,7 @@ export function createBatchItem(file) {
       cornerRadiusPercent: null,
       colorSetOverride: null,
       backBackgroundAssetId: null,
+      composition: null, // Page-Specific layout override (null = inherit the global composition)
     },
   };
 }

@@ -12,7 +12,7 @@ import { recommendFont, recommendTextTint, adjustForBorderWeight, centerOffsetIn
 import { gridColorFromTint } from "../modules/borderStyleEngine.js";
 import { cornerRadiusIn, isFullCircle } from "../modules/cornerRadiusEngine.js";
 import { assignDistinctShades } from "../modules/shadeQuantizationEngine.js";
-import { splitSafeZoneForKey } from "../modules/layoutEngine.js";
+import { computeLayout, LAYOUT_ELEMENTS } from "../modules/layoutCompositionEngine.js";
 
 const DETAIL_PPI = 300;
 const PT_TO_IN = 1 / 72;
@@ -191,10 +191,38 @@ function drawCell(ctx, { centerPx, cellSizeIn, cellSizePx, ppi, gridPattern, mod
   ctx.letterSpacing = "0px";
 }
 
+const ELEMENT_LABELS = Object.fromEntries(LAYOUT_ELEMENTS.map((e) => [e.id, e.label]));
+
+// Draws the composition's reserved element bands as labeled translucent overlays on the
+// preview frame, so a creator sees where the title / subtitle / instruction / color key
+// sit and how much space they take from the grid.
+function drawPlacementBoxes(ctx, geometry, safeZone, placements, blackoutMode) {
+  placements.forEach(({ id, rect }) => {
+    const x = geometry.safeX + rect.xIn * geometry.scale;
+    const y = geometry.safeY + rect.yIn * geometry.scale;
+    const w = rect.wIn * geometry.scale;
+    const h = rect.hIn * geometry.scale;
+    ctx.save();
+    ctx.fillStyle = id === "colorKey" ? "rgba(91,140,255,0.18)" : "rgba(58,209,154,0.16)";
+    ctx.strokeStyle = id === "colorKey" ? "rgba(91,140,255,0.75)" : "rgba(58,209,154,0.7)";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 3]);
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeRect(x, y, w, h);
+    ctx.setLineDash([]);
+    ctx.fillStyle = blackoutMode ? "#e7e9ee" : "#334";
+    ctx.font = "10px -apple-system, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    if (h > 12 && w > 30) ctx.fillText(ELEMENT_LABELS[id] ?? id, x + w / 2, y + Math.min(h / 2, 10));
+    ctx.restore();
+  });
+}
+
 export function renderMosaicPreview(canvas, opts) {
   const {
     mode, // 'print' | 'solved'
-    trimSize, dpi, bleedEnabled, canvasDims, safeZone, pageSide, layoutMode = "unified",
+    trimSize, dpi, bleedEnabled, canvasDims, safeZone, pageSide, composition,
     gridPattern, cellSizeMm, gridOverride = null, borderWeightPt, gridTintPercent, cornerRadiusPercent,
     palette, sourceCanvas,
   } = opts;
@@ -205,14 +233,26 @@ export function renderMosaicPreview(canvas, opts) {
   const geometry = computeFrameGeometry(canvas.width, canvas.height, { trimSize, bleedEnabled, canvasDims, safeZone, pageSide });
   drawFrame(ctx, geometry, { trimSize, dpi, bleedEnabled, showLabels: false });
 
-  // Unified layout reserves a key strip at the bottom of the safe zone (drawn by the
-  // PDF exporter, not here — see mosaicRenderer.js header comment); the grid itself
-  // only ever occupies gridZone, so cell density here matches the real exported page.
-  const { gridZone } = splitSafeZoneForKey(safeZone, layoutMode);
+  // The grid only ever occupies the region left after the composition's element bands
+  // are reserved, so cell density here matches the real exported page. The reserved
+  // element bands are drawn as labeled overlays so the layout composition is visible.
+  const layout = computeLayout(safeZone, composition);
+  const gridZone = layout.gridZone;
+  const style0 = computeCellStyle({ cellSizeMm, cellSizeIn: 0.1, borderWeightPt, gridTintPercent, cornerRadiusPercent, palette, ppi: DETAIL_PPI });
+  drawPlacementBoxes(ctx, geometry, safeZone, layout.gridPlacements, style0.blackoutMode);
+
   const fullGrid = resolveGrid(gridZone, cellSizeMm, gridPattern, gridOverride);
   const cellSizePx = fullGrid.cellSizeIn * DETAIL_PPI;
-  const colsVisible = Math.max(3, Math.min(fullGrid.cols, Math.floor(geometry.safeW / cellSizePx) || 3));
-  const rowsVisible = Math.max(3, Math.min(fullGrid.rows, Math.floor(geometry.safeH / cellSizePx) || 3));
+  // Center the detail crop inside the grid region (not the whole canvas), so it reads
+  // correctly relative to the reserved element bands around it.
+  const gridRegionPx = {
+    x: geometry.trimX + gridZone.left * geometry.scale,
+    y: geometry.trimY + gridZone.top * geometry.scale,
+    w: gridZone.widthIn * geometry.scale,
+    h: gridZone.heightIn * geometry.scale,
+  };
+  const colsVisible = Math.max(3, Math.min(fullGrid.cols, Math.floor(gridRegionPx.w / cellSizePx) || 3));
+  const rowsVisible = Math.max(3, Math.min(fullGrid.rows, Math.floor(gridRegionPx.h / cellSizePx) || 3));
   const colStart = Math.floor((fullGrid.cols - colsVisible) / 2);
   const rowStart = Math.floor((fullGrid.rows - rowsVisible) / 2);
 
@@ -233,8 +273,8 @@ export function renderMosaicPreview(canvas, opts) {
 
   const cropWidthPx = colsVisible * cellSizePx;
   const cropHeightPx = rowsVisible * cellSizePx;
-  const originX = canvas.width / 2 - cropWidthPx / 2;
-  const originY = canvas.height / 2 - cropHeightPx / 2;
+  const originX = gridRegionPx.x + gridRegionPx.w / 2 - cropWidthPx / 2;
+  const originY = gridRegionPx.y + gridRegionPx.h / 2 - cropHeightPx / 2;
 
   ctx.save();
   ctx.beginPath();
@@ -275,13 +315,14 @@ export function renderMosaicPreview(canvas, opts) {
 export function renderFullMosaicGrid(canvas, opts) {
   const {
     mode, // 'print' | 'solved'
-    dpi, canvasDims, safeZone, pageSide, layoutMode = "unified",
+    dpi, canvasDims, safeZone, pageSide, composition,
     gridPattern, cellSizeMm, gridOverride = null, borderWeightPt, gridTintPercent, cornerRadiusPercent,
     palette, sourceCanvas,
   } = opts;
 
   const ctx = canvas.getContext("2d");
-  const { gridZone, keyStripHeightIn } = splitSafeZoneForKey(safeZone, layoutMode);
+  const layout = computeLayout(safeZone, composition);
+  const gridZone = layout.gridZone;
   const fullGrid = resolveGrid(gridZone, cellSizeMm, gridPattern, gridOverride);
   const style = computeCellStyle({ cellSizeMm, cellSizeIn: fullGrid.cellSizeIn, borderWeightPt, gridTintPercent, cornerRadiusPercent, palette, ppi: dpi });
 
@@ -327,5 +368,5 @@ export function renderFullMosaicGrid(canvas, opts) {
     }
   }
 
-  return { fullGrid, gridZone, keyStripHeightIn };
+  return { fullGrid, gridZone, layout };
 }
