@@ -4,7 +4,7 @@
 // page) and free-form user-created "albums" for organizing reference images before they're
 // assigned a role. Drag a thumbnail onto any bucket in the sidebar to move it there.
 
-import { state, setState, subscribe } from "../../state.js";
+import { state, setState, subscribe } from "../../state.js?v=4";
 import {
   ASSET_CATEGORIES,
   loadGallery,
@@ -19,9 +19,9 @@ import {
   createAlbum,
   renameAlbum,
   deleteAlbum,
-} from "../../modules/assetGalleryEngine.js";
-import { getTrimSizeById } from "../../modules/canvasEngine.js";
-import { computeCanvasDimensions } from "../../modules/bleedEngine.js";
+} from "../../modules/assetGalleryEngine.js?v=4";
+import { getTrimSizeById } from "../../modules/canvasEngine.js?v=4";
+import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=4";
 
 let nextAssetId = 1;
 let activeBucketId = ASSET_CATEGORIES[0].id;

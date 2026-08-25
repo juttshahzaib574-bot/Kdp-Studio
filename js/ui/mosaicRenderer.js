@@ -6,13 +6,13 @@
 //   - renderFullMosaicGrid: the entire safe-zone grid at the real chosen print DPI,
 //     used to generate the actual page image embedded into the exported PDF.
 
-import { computeFrameGeometry, drawFrame } from "./preview.js";
-import { computeGridDimensions, cellCenterIn, cellPolygonIn, mmToIn, isCellInGridSilhouette } from "../modules/gridPatternEngine.js";
-import { recommendFont, recommendTextTint, adjustForBorderWeight, centerOffsetIn, letterSpacingForLabel } from "../modules/typographyEngine.js";
-import { gridColorFromTint } from "../modules/borderStyleEngine.js";
-import { cornerRadiusIn, isFullCircle } from "../modules/cornerRadiusEngine.js";
-import { assignDistinctShades } from "../modules/shadeQuantizationEngine.js";
-import { computeLayout, LAYOUT_ELEMENTS } from "../modules/layoutCompositionEngine.js";
+import { computeFrameGeometry, drawFrame } from "./preview.js?v=4";
+import { computeGridDimensions, cellCenterIn, cellPolygonIn, mmToIn, isCellInGridSilhouette } from "../modules/gridPatternEngine.js?v=4";
+import { recommendFont, recommendTextTint, adjustForBorderWeight, centerOffsetIn, letterSpacingForLabel } from "../modules/typographyEngine.js?v=4";
+import { gridColorFromTint } from "../modules/borderStyleEngine.js?v=4";
+import { cornerRadiusIn, isFullCircle } from "../modules/cornerRadiusEngine.js?v=4";
+import { assignDistinctShades } from "../modules/shadeQuantizationEngine.js?v=4";
+import { computeLayout, LAYOUT_ELEMENTS } from "../modules/layoutCompositionEngine.js?v=4";
 
 const PT_TO_IN = 1 / 72;
 
