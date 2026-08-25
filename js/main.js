@@ -7,6 +7,7 @@ import { initBatchStoryboardPanel } from "./ui/panels/batchStoryboardPanel.js";
 import { initGalleryPanel } from "./ui/panels/galleryPanel.js";
 import { initPreviewGalleryPanel } from "./ui/panels/previewGalleryPanel.js";
 import { initExportPanel } from "./ui/panels/exportPanel.js";
+import { initPdfPreviewPanel } from "./ui/panels/pdfPreviewPanel.js";
 
 function init() {
   initApp();
@@ -18,6 +19,7 @@ function init() {
   initGalleryPanel();
   initPreviewGalleryPanel();
   initExportPanel();
+  initPdfPreviewPanel();
 }
 
 document.addEventListener("DOMContentLoaded", init);

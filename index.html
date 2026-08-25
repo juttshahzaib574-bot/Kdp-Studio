@@ -43,9 +43,6 @@
       <div class="panel-section" id="live-preview-setup">
         <h2>Live Preview — Generated Result</h2>
 
-        <button type="button" class="btn btn-primary" id="generate-preview-btn" disabled>✨ Generate Preview</button>
-        <p class="hint">Renders the selected storyboard image at your current grid, border, color and layout settings. Adjust settings freely, then click again to refresh — switching images regenerates automatically.</p>
-
         <div class="preview-toolbar">
           <label class="loop-toggle">
             <input type="checkbox" id="preview-loop-toggle" />
@@ -58,7 +55,7 @@
             <canvas id="preview-canvas-print" width="440" height="440" hidden></canvas>
             <div class="preview-placeholder" id="preview-placeholder-print">
               <span class="preview-placeholder-icon">🧩</span>
-              <p>Upload artwork, then click Generate Preview</p>
+              <p>Upload artwork above to see it here</p>
               <span class="preview-placeholder-sub">Numbered grid, sharp outlines</span>
             </div>
             <p class="canvas-caption">Print Asset — numbered grid</p>
@@ -71,7 +68,7 @@
             <canvas id="preview-canvas-solved" width="440" height="440" hidden></canvas>
             <div class="preview-placeholder" id="preview-placeholder-solved">
               <span class="preview-placeholder-icon">🎨</span>
-              <p>Upload artwork, then click Generate Preview</p>
+              <p>Upload artwork above to see it here</p>
               <span class="preview-placeholder-sub">Vibrant exact hues, quantized to your palette</span>
             </div>
             <p class="canvas-caption">Solved State — quantized colors</p>
@@ -349,6 +346,41 @@
           </div>
           <p class="hint" id="asset-format-hint"></p>
           <div class="gallery-grid" id="asset-list"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="workspace-top" id="pdf-preview-workspace">
+    <div class="panel-section" id="pdf-preview-setup">
+      <h2>PDF Page Preview</h2>
+      <p class="hint">See every page of your book exactly as it will print, before downloading anything — this renders the real generated PDF, not an approximation.</p>
+
+      <div class="pdf-preview-toolbar">
+        <button type="button" class="btn btn-primary" id="pdf-preview-refresh-btn">🔄 Load / Refresh PDF Preview</button>
+        <div class="export-progress" id="pdf-preview-progress" hidden>
+          <div class="export-progress-track"><div class="export-progress-fill" id="pdf-preview-progress-fill"></div></div>
+          <p class="hint" id="pdf-preview-progress-label"></p>
+        </div>
+      </div>
+
+      <div class="preview-placeholder" id="pdf-viewer-placeholder">
+        <span class="preview-placeholder-icon">📄</span>
+        <p>Click "Load / Refresh PDF Preview" to see your book's pages</p>
+        <span class="preview-placeholder-sub">Every front-matter, puzzle, solution and back-matter page, exactly as it will print</span>
+      </div>
+
+      <div class="pdf-viewer" id="pdf-viewer" hidden>
+        <div class="pdf-viewer-pages" id="pdf-viewer-pages"></div>
+        <div class="pdf-viewer-main">
+          <div class="pdf-viewer-nav">
+            <button type="button" class="btn btn-secondary btn-small" id="pdf-prev-btn">◀ Prev</button>
+            <span id="pdf-page-label">Page 1 of 1</span>
+            <button type="button" class="btn btn-secondary btn-small" id="pdf-next-btn">Next ▶</button>
+          </div>
+          <div class="pdf-viewer-canvas-stage">
+            <canvas id="pdf-viewer-canvas"></canvas>
+          </div>
         </div>
       </div>
     </div>

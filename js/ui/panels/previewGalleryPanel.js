@@ -18,7 +18,6 @@ const el = {
   solvedPlaceholder: document.getElementById("preview-placeholder-solved"),
   loopToggle: document.getElementById("preview-loop-toggle"),
   loopState: document.getElementById("preview-loop-state"),
-  generateBtn: document.getElementById("generate-preview-btn"),
   downloadPrintPng: document.getElementById("download-print-png"),
   downloadPrintPdf: document.getElementById("download-print-pdf"),
   downloadSolvedPng: document.getElementById("download-solved-png"),
@@ -30,13 +29,11 @@ let solvedStage;
 let loopController;
 let cachedSourceCanvas = null;
 let cachedSourceKey = null;
-// The heavy quantize-and-draw pass only runs on an explicit Generate click, or when the
-// active storyboard image changes (a deliberate "show me this one" action) — never on a
-// slider drag. This mirrors the reference tool's own workflow (stats update live, the
-// actual render is gated behind its own "Generate All" button) and avoids re-quantizing
-// a dense grid on every keystroke while a setting is being dragged.
-let lastRenderedItemKey = undefined;
-let hasGeneratedOnce = false;
+// Auto-regenerates on every relevant state change (upload, settings, layout edits) — no
+// manual "Generate" step. A short debounce coalesces a burst of changes (e.g. dragging a
+// slider) into one render instead of quantizing the grid on every intermediate tick.
+let debounceTimer = null;
+const DEBOUNCE_MS = 180;
 
 export function initPreviewGalleryPanel() {
   printStage = el.printCanvas.closest(".canvas-stage");
@@ -62,15 +59,18 @@ export function initPreviewGalleryPanel() {
     }
   });
 
-  el.generateBtn.addEventListener("click", () => runGenerate(state));
-
   wireDownloadButton(el.downloadPrintPng, () => downloadActiveItemPng(state, "print"));
   wireDownloadButton(el.downloadPrintPdf, () => downloadActiveItemPdf(state, "print"));
   wireDownloadButton(el.downloadSolvedPng, () => downloadActiveItemPng(state, "solved"));
   wireDownloadButton(el.downloadSolvedPdf, () => downloadActiveItemPdf(state, "solved"));
 
-  subscribe(onStateChange);
-  onStateChange(state);
+  subscribe(scheduleRender);
+  render(state);
+}
+
+function scheduleRender(current) {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => render(current), DEBOUNCE_MS);
 }
 
 // Full-resolution PNG/PDF generation can take a moment for large trims at high DPI —
@@ -120,77 +120,57 @@ function resolveActiveSettings(current, globalPalette) {
   return { gridPattern, borderWeightPt, gridTintPercent, cornerRadiusPercent, palette };
 }
 
-// Fires on every state change but is cheap: it only decides WHETHER to (re)generate,
-// it never draws. A settings tweak (slider, dropdown, layout edit) leaves the last
-// generated result on screen untouched — only picking a different storyboard image
-// triggers an automatic regenerate, since that's a navigation action, not a tweak.
-// With nothing queued yet, Generate stays disabled and the placeholder stays put —
-// no auto-render of the decorative gradient stand-in on a cold page load.
-function onStateChange(current) {
+// Renders automatically for whatever's currently active — no manual step. With nothing
+// queued yet, the placeholder stays up and canvases stay hidden.
+async function render(current) {
   const activeItem = current.batchItems.find((item) => item.id === current.activeBatchItemId);
-  el.generateBtn.disabled = !activeItem;
-  if (!activeItem) return;
-
-  const key = activeItem.objectUrl;
-  if (key === lastRenderedItemKey) return;
-  lastRenderedItemKey = key;
-  runGenerate(current);
-}
-
-async function runGenerate(current) {
-  el.generateBtn.disabled = true;
-  el.generateBtn.textContent = "⏳ Generating…";
-
-  try {
-    const sourceCanvas = await resolveSourceCanvas(current);
-
-    const trimSize = getTrimSizeById(current.trimSizeId);
-    const canvasDims = computeCanvasDimensions(trimSize, current.dpi, current.bleedEnabled);
-    const safeZone = computeSafeZone(trimSize, current.pageSide);
-    const sizes = getSizesForSelection(current.colorSetOptionId, current.colorSetCustomPair);
-    const globalPalette = buildCombinedPalette(sizes, current.colorBrand);
-    const effective = resolveActiveSettings(current, globalPalette);
-    const activeItem = current.batchItems.find((item) => item.id === current.activeBatchItemId);
-    const composition = current.layoutScope === "page-specific" && activeItem?.settings.composition
-      ? normalizeComposition(activeItem.settings.composition)
-      : normalizeComposition(current.globalComposition);
-    const { cellSizeMm: effectiveCellSizeMm, gridOverride } = resolveEffectiveGrid(safeZone, current.cellSizeMm, effective.gridPattern, composition, current.resolutionPriority);
-
-    const baseOpts = {
-      trimSize,
-      dpi: current.dpi,
-      bleedEnabled: current.bleedEnabled,
-      canvasDims,
-      safeZone,
-      pageSide: current.pageSide,
-      composition,
-      gridPattern: effective.gridPattern,
-      cellSizeMm: effectiveCellSizeMm,
-      gridOverride,
-      borderWeightPt: effective.borderWeightPt,
-      gridTintPercent: effective.gridTintPercent,
-      cornerRadiusPercent: effective.cornerRadiusPercent,
-      palette: effective.palette,
-      sourceCanvas,
-      gridCornerTrim: current.gridCornerTrim,
-    };
-
-    // Yield a frame so the "Generating…" label actually paints before the (possibly
-    // dense) quantize-and-draw pass blocks the main thread.
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-
-    renderMosaicPreview(el.printCanvas, { ...baseOpts, mode: "print" });
-    renderMosaicPreview(el.solvedCanvas, { ...baseOpts, mode: "solved" });
-
-    hasGeneratedOnce = true;
-    el.printCanvas.hidden = false;
-    el.solvedCanvas.hidden = false;
-    el.printPlaceholder.hidden = true;
-    el.solvedPlaceholder.hidden = true;
-  } finally {
-    el.generateBtn.disabled = !state.batchItems.some((item) => item.id === state.activeBatchItemId);
-    el.generateBtn.textContent = hasGeneratedOnce ? "✨ Regenerate Preview" : "✨ Generate Preview";
+  if (!activeItem) {
+    el.printCanvas.hidden = true;
+    el.solvedCanvas.hidden = true;
+    el.printPlaceholder.hidden = false;
+    el.solvedPlaceholder.hidden = false;
+    return;
   }
+
+  const sourceCanvas = await resolveSourceCanvas(current);
+
+  const trimSize = getTrimSizeById(current.trimSizeId);
+  const canvasDims = computeCanvasDimensions(trimSize, current.dpi, current.bleedEnabled);
+  const safeZone = computeSafeZone(trimSize, current.pageSide);
+  const sizes = getSizesForSelection(current.colorSetOptionId, current.colorSetCustomPair);
+  const globalPalette = buildCombinedPalette(sizes, current.colorBrand);
+  const effective = resolveActiveSettings(current, globalPalette);
+  const composition = current.layoutScope === "page-specific" && activeItem.settings.composition
+    ? normalizeComposition(activeItem.settings.composition)
+    : normalizeComposition(current.globalComposition);
+  const { cellSizeMm: effectiveCellSizeMm, gridOverride } = resolveEffectiveGrid(safeZone, current.cellSizeMm, effective.gridPattern, composition, current.resolutionPriority);
+
+  const baseOpts = {
+    trimSize,
+    dpi: current.dpi,
+    bleedEnabled: current.bleedEnabled,
+    canvasDims,
+    safeZone,
+    pageSide: current.pageSide,
+    composition,
+    gridPattern: effective.gridPattern,
+    cellSizeMm: effectiveCellSizeMm,
+    gridOverride,
+    borderWeightPt: effective.borderWeightPt,
+    gridTintPercent: effective.gridTintPercent,
+    cornerRadiusPercent: effective.cornerRadiusPercent,
+    palette: effective.palette,
+    sourceCanvas,
+    gridCornerTrim: current.gridCornerTrim,
+  };
+
+  renderMosaicPreview(el.printCanvas, { ...baseOpts, mode: "print" });
+  renderMosaicPreview(el.solvedCanvas, { ...baseOpts, mode: "solved" });
+
+  el.printCanvas.hidden = false;
+  el.solvedCanvas.hidden = false;
+  el.printPlaceholder.hidden = true;
+  el.solvedPlaceholder.hidden = true;
 }
 
 async function resolveSourceCanvas(current) {
