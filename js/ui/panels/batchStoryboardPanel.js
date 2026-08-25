@@ -1,9 +1,9 @@
-import { state, setState, subscribe } from "../../state.js";
-import { MAX_BATCH_SIZE, addToBatch, removeFromBatch, updateItemSettings } from "../../modules/batchEngine.js";
-import { reorder, computePagination, statusBadges, FRONT_MATTER_INTERIOR_PAGES } from "../../modules/storyboardEngine.js";
-import { computeSolutionPageCount } from "../../modules/solutionGenerationEngine.js";
-import { GRID_PATTERNS } from "../../modules/gridPatternEngine.js";
-import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js";
+import { state, setState, subscribe } from "../../state.js?v=4";
+import { MAX_BATCH_SIZE, addToBatch, removeFromBatch, updateItemSettings } from "../../modules/batchEngine.js?v=4";
+import { reorder, computePagination, statusBadges, FRONT_MATTER_INTERIOR_PAGES } from "../../modules/storyboardEngine.js?v=4";
+import { computeSolutionPageCount } from "../../modules/solutionGenerationEngine.js?v=4";
+import { GRID_PATTERNS } from "../../modules/gridPatternEngine.js?v=4";
+import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=4";
 
 const CORNER_RADIUS_CHOICES = [0, 25, 50, 75, 100];
 const COLOR_SET_CHOICES = [12, 24, 36];
