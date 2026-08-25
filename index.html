@@ -65,6 +65,141 @@
         </p>
       </section>
 
+      <section class="panel-section" id="grid-border-setup">
+        <h2><span class="step-badge">3</span> Grid Pattern, Typography &amp; Border Style</h2>
+
+        <div class="field-group">
+          <label>Grid Pattern</label>
+          <div class="pattern-grid" id="grid-pattern-options"></div>
+        </div>
+
+        <div class="field-group">
+          <label for="cell-size-slider">Cell Size (mm)</label>
+          <div class="dpi-control">
+            <input type="range" id="cell-size-slider" min="2.5" max="6.0" step="0.1" value="4.0" />
+            <input type="number" id="cell-size-input" min="2.5" max="6.0" step="0.1" value="4.0" />
+          </div>
+          <p class="hint" id="typography-hint"></p>
+        </div>
+
+        <div class="field-group">
+          <label>One-Click Master Presets</label>
+          <div class="preset-row">
+            <button type="button" class="btn btn-secondary" id="preset-seamless">Seamless Realism</button>
+            <button type="button" class="btn btn-secondary" id="preset-midnight">Midnight Marker</button>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label for="border-weight-slider">Border Line Weight (pt)</label>
+          <div class="dpi-control">
+            <input type="range" id="border-weight-slider" min="0.5" max="6" step="0.1" value="0.9" />
+            <input type="number" id="border-weight-input" min="0.5" max="6" step="0.1" value="0.9" />
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label for="grid-tint-slider">Grid Line Tint (% Black)</label>
+          <div class="dpi-control">
+            <input type="range" id="grid-tint-slider" min="0" max="100" step="1" value="35" />
+            <input type="number" id="grid-tint-input" min="0" max="100" step="1" value="35" />
+          </div>
+          <p class="hint">100% activates Blackout / Midnight mode — dark cell fill with white numbers.</p>
+        </div>
+
+        <div class="field-group">
+          <label for="corner-radius-slider">Corner Radius</label>
+          <div class="dpi-control">
+            <input type="range" id="corner-radius-slider" min="0" max="100" step="1" value="0" />
+            <input type="number" id="corner-radius-input" min="0" max="100" step="1" value="0" />
+          </div>
+          <p class="hint">0% sharp · 50% pillowed · 100% full circle</p>
+        </div>
+      </section>
+
+      <section class="panel-section" id="layout-resolution-setup">
+        <h2><span class="step-badge">4</span> Dual-Page Layout &amp; Adaptive Resolution</h2>
+
+        <div class="field-group">
+          <label>Layout Mode</label>
+          <div class="option-list" id="layout-mode-options"></div>
+        </div>
+
+        <div class="field-group">
+          <label>Adaptive Cell Scaling <span class="lock-note" id="adaptive-lock-note"></span></label>
+          <div class="option-list" id="resolution-priority-options"></div>
+          <p class="hint" id="adaptive-readout"></p>
+        </div>
+      </section>
+
+      <section class="panel-section" id="color-key-setup">
+        <h2><span class="step-badge">5</span> Color Key Standards</h2>
+
+        <div class="field-group">
+          <label for="color-set-select">Color Set</label>
+          <select id="color-set-select"></select>
+        </div>
+
+        <div class="field-group" id="custom-pair-group" hidden>
+          <label>Choose 2 Sets</label>
+          <div class="option-list" id="custom-pair-options"></div>
+        </div>
+
+        <div class="field-group">
+          <label>Pencil Brand</label>
+          <div class="option-list" id="color-brand-options"></div>
+        </div>
+
+        <div class="field-group">
+          <label>Swatch Preview</label>
+          <div class="swatch-list" id="color-swatch-list"></div>
+        </div>
+      </section>
+
+      <section class="panel-section" id="batch-storyboard-setup">
+        <h2><span class="step-badge">6</span> Batch Upload &amp; Storyboard</h2>
+
+        <div class="field-group">
+          <label for="batch-file-input">Upload Artwork (up to 120 images)</label>
+          <input type="file" id="batch-file-input" accept="image/*" multiple />
+          <p class="hint" id="batch-count-hint">0 / 120 images queued.</p>
+        </div>
+
+        <div class="field-group">
+          <label>Storyboard (drag to reorder)</label>
+          <div class="storyboard-grid" id="storyboard-grid"></div>
+        </div>
+
+        <div class="field-group">
+          <label for="solution-per-page-select">Solution Thumbnails per Page</label>
+          <select id="solution-per-page-select">
+            <option value="4">4 per page</option>
+            <option value="6">6 per page</option>
+          </select>
+          <p class="hint" id="solution-summary-hint"></p>
+        </div>
+      </section>
+
+      <section class="panel-section" id="asset-gallery-setup">
+        <h2><span class="step-badge">7</span> Front &amp; Back Matter Asset Gallery</h2>
+
+        <div class="field-group">
+          <label for="asset-category-select">Category</label>
+          <select id="asset-category-select"></select>
+        </div>
+
+        <div class="field-group">
+          <label for="asset-file-input">Upload Custom Page</label>
+          <input type="file" id="asset-file-input" accept="image/*" />
+          <p class="hint" id="asset-format-hint"></p>
+        </div>
+
+        <div class="field-group">
+          <label>Saved Assets (this browser)</label>
+          <div class="asset-list" id="asset-list"></div>
+        </div>
+      </section>
+
     </aside>
 
     <section class="preview-panel">
@@ -73,6 +208,27 @@
         <canvas id="preview-canvas" width="640" height="640"></canvas>
       </div>
       <dl class="dimension-readout" id="dimension-readout"></dl>
+
+      <div class="mosaic-gallery">
+        <h2>Stacked Live Preview Gallery</h2>
+        <div class="preview-toolbar">
+          <label class="loop-toggle">
+            <input type="checkbox" id="preview-loop-toggle" />
+            Auto-loop every 3s (3-Second Looping Interface)
+          </label>
+          <span class="hint" id="preview-loop-state"></span>
+        </div>
+        <div class="dual-canvas-row">
+          <div class="canvas-stage">
+            <canvas id="preview-canvas-print" width="440" height="440"></canvas>
+            <p class="canvas-caption">Print Asset — numbered grid</p>
+          </div>
+          <div class="canvas-stage">
+            <canvas id="preview-canvas-solved" width="440" height="440"></canvas>
+            <p class="canvas-caption">Solved State — quantized colors</p>
+          </div>
+        </div>
+      </div>
     </section>
   </main>
 
