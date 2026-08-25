@@ -3,6 +3,10 @@ import { MAX_BATCH_SIZE, addToBatch, removeFromBatch, updateItemSettings } from 
 import { reorder, computePagination, statusBadges, FRONT_MATTER_INTERIOR_PAGES } from "../../modules/storyboardEngine.js";
 import { computeSolutionPageCount } from "../../modules/solutionGenerationEngine.js";
 import { GRID_PATTERNS } from "../../modules/gridPatternEngine.js";
+import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js";
+
+const CORNER_RADIUS_CHOICES = [0, 25, 50, 75, 100];
+const COLOR_SET_CHOICES = [12, 24, 36];
 
 const el = {
   fileInput: document.getElementById("batch-file-input"),
@@ -49,41 +53,10 @@ function render(current) {
   }
 
   paginated.forEach((item, index) => {
-    const cell = document.createElement("div");
-    cell.className = "storyboard-item";
-    cell.dataset.itemId = item.id;
-
-    const badges = statusBadges(item, { gridPattern: current.gridPattern, borderPreset: null });
-
-    cell.innerHTML = `
-      <img src="${item.objectUrl}" alt="${item.name}" />
-      <span class="page-badge">p.${item.puzzlePage}</span>
-      <button type="button" class="remove-btn" title="Remove">×</button>
-      <span class="shape-badge" title="Click to override this page's grid pattern">${badges.join(" · ")}</span>
-    `;
-
-    const removeBtn = cell.querySelector(".remove-btn");
-    removeBtn.addEventListener("mousedown", (e) => e.stopPropagation());
-    removeBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const batch = removeFromBatch(state.batchItems, item.id);
-      setState({ batchItems: batch, activeBatchItemId: batch[0]?.id ?? null });
-    });
-
-    const shapeBadge = cell.querySelector(".shape-badge");
-    shapeBadge.addEventListener("mousedown", (e) => e.stopPropagation());
-    shapeBadge.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const batch = updateItemSettings(state.batchItems, item.id, { gridPattern: nextPatternOverride(item.settings.gridPattern) });
-      setState({ batchItems: batch });
-    });
-
-    cell.addEventListener("click", () => setState({ activeBatchItemId: item.id }));
-    cell.addEventListener("mousedown", (e) => startDrag(e, cell, item.id));
-
-    if (item.id === current.activeBatchItemId) cell.style.outline = "2px solid var(--accent)";
-
-    el.grid.appendChild(cell);
+    el.grid.appendChild(buildItemCell(item, index, current));
+    if (current.expandedSettingsItemId === item.id) {
+      el.grid.appendChild(buildSettingsDrawer(item, current));
+    }
   });
 
   el.countHint.textContent = `${current.batchItems.length} / ${MAX_BATCH_SIZE} images queued.`;
@@ -96,10 +69,109 @@ function render(current) {
       : `${pageCount} back-matter solution page(s) at ${current.solutionThumbsPerPage} thumbnails each — auto-synced to storyboard order.`;
 }
 
-function nextPatternOverride(currentOverride) {
-  const ids = [null, ...GRID_PATTERNS.map((p) => p.id)];
-  const idx = ids.indexOf(currentOverride);
-  return ids[(idx + 1) % ids.length];
+function buildItemCell(item, index, current) {
+  const cell = document.createElement("div");
+  cell.className = "storyboard-item";
+  cell.dataset.itemId = item.id;
+
+  const badges = statusBadges(item, { gridPattern: current.gridPattern, borderPreset: null });
+
+  cell.innerHTML = `
+    <img src="${item.objectUrl}" alt="${item.name}" />
+    <span class="page-badge">p.${item.puzzlePage}</span>
+    <button type="button" class="remove-btn" title="Remove">×</button>
+    <button type="button" class="settings-btn" title="Per-image overrides">⚙</button>
+    <span class="shape-badge" title="${badges.join(" · ")}">${badges.join(" · ")}</span>
+  `;
+
+  const removeBtn = cell.querySelector(".remove-btn");
+  removeBtn.addEventListener("mousedown", (e) => e.stopPropagation());
+  removeBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const batch = removeFromBatch(state.batchItems, item.id);
+    setState({ batchItems: batch, activeBatchItemId: batch[0]?.id ?? null });
+  });
+
+  const settingsBtn = cell.querySelector(".settings-btn");
+  settingsBtn.addEventListener("mousedown", (e) => e.stopPropagation());
+  settingsBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    setState({ expandedSettingsItemId: current.expandedSettingsItemId === item.id ? null : item.id });
+  });
+
+  cell.addEventListener("click", () => setState({ activeBatchItemId: item.id }));
+  cell.addEventListener("mousedown", (e) => startDrag(e, cell, item.id));
+
+  if (item.id === current.activeBatchItemId) cell.style.outline = "2px solid var(--accent)";
+  if (item.id === current.expandedSettingsItemId) cell.classList.add("settings-open");
+
+  return cell;
+}
+
+function buildSettingsDrawer(item, current) {
+  const drawer = document.createElement("div");
+  drawer.className = "item-settings-drawer";
+
+  const backgroundAssets = current.assetGallery["back-page-background"] ?? [];
+
+  drawer.innerHTML = `
+    <div class="drawer-field">
+      <label>Grid Pattern</label>
+      <select data-key="gridPattern">
+        <option value="">Inherit (${current.gridPattern})</option>
+        ${GRID_PATTERNS.map((p) => `<option value="${p.id}">${p.label}</option>`).join("")}
+      </select>
+    </div>
+    <div class="drawer-field">
+      <label>Border Preset</label>
+      <select data-key="borderPreset">
+        <option value="">Inherit (custom sliders)</option>
+        ${Object.entries(BORDER_PRESETS).map(([id, preset]) => `<option value="${id}">${preset.label}</option>`).join("")}
+      </select>
+    </div>
+    <div class="drawer-field">
+      <label>Corner Radius</label>
+      <select data-key="cornerRadiusPercent">
+        <option value="">Inherit (${current.cornerRadiusPercent}%)</option>
+        ${CORNER_RADIUS_CHOICES.map((v) => `<option value="${v}">${v}%</option>`).join("")}
+      </select>
+    </div>
+    <div class="drawer-field">
+      <label>Color Set</label>
+      <select data-key="colorSetOverride">
+        <option value="">Inherit (book default)</option>
+        ${COLOR_SET_CHOICES.map((v) => `<option value="${v}">${v}-Color</option>`).join("")}
+      </select>
+    </div>
+    <div class="drawer-field">
+      <label>Back Page Background</label>
+      <select data-key="backBackgroundAssetId">
+        <option value="">Inherit (global default)</option>
+        ${backgroundAssets.map((a) => `<option value="${a.id}">${a.name}</option>`).join("")}
+      </select>
+    </div>
+    <button type="button" class="btn btn-secondary drawer-close">Done</button>
+  `;
+
+  drawer.querySelectorAll("select[data-key]").forEach((select) => {
+    const key = select.dataset.key;
+    const currentValue = item.settings[key];
+    select.value = currentValue === null || currentValue === undefined ? "" : String(currentValue);
+
+    select.addEventListener("change", () => {
+      const raw = select.value;
+      let value = raw === "" ? null : raw;
+      if (key === "cornerRadiusPercent" || key === "colorSetOverride") {
+        value = raw === "" ? null : Number(raw);
+      }
+      const batch = updateItemSettings(state.batchItems, item.id, { [key]: value });
+      setState({ batchItems: batch });
+    });
+  });
+
+  drawer.querySelector(".drawer-close").addEventListener("click", () => setState({ expandedSettingsItemId: null }));
+
+  return drawer;
 }
 
 function startDrag(e, cell, itemId) {

@@ -30,6 +30,8 @@ export function computePagination(items, frontMatterPageCount) {
 export function statusBadges(item, globalDefaults) {
   const badges = [item.settings.gridPattern ?? globalDefaults.gridPattern];
   if ((item.settings.borderPreset ?? globalDefaults.borderPreset) === "midnight-marker") badges.push("midnight-mode");
+  if (item.settings.cornerRadiusPercent !== null && item.settings.cornerRadiusPercent !== undefined) badges.push("custom-radius");
   if (item.settings.colorSetOverride) badges.push("custom-palette");
+  if (item.settings.backBackgroundAssetId) badges.push("custom-back");
   return badges;
 }

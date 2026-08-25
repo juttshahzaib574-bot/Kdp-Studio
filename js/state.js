@@ -31,6 +31,7 @@ export const state = {
   // High-Capacity Batch Engine + Drag-and-Drop Storyboard Dashboard
   batchItems: [],
   activeBatchItemId: null,
+  expandedSettingsItemId: null,
 
   // Automated Solution Generation Engine
   solutionThumbsPerPage: 4,
@@ -46,6 +47,10 @@ export const state = {
   bookTitle: "Untitled Mystery Mosaic Book",
   bookSubtitle: "A Mosaic Color-by-Number Puzzle Book",
   bookAuthor: "",
+
+  // Back matter: "About the Artist" + "Series Promo" (blank = page is skipped)
+  authorBio: "",
+  seriesPromoText: "",
 };
 
 export function setState(patch) {

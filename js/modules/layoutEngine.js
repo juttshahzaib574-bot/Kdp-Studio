@@ -32,3 +32,22 @@ export function migratedKeyStyle(hasCustomBackground) {
     ? { textColor: "white", swatchBorder: "white" }
     : { textColor: "dark-gray", swatchBorder: "dark-gray" };
 }
+
+// Fraction of safe-zone height reserved for an embedded color key strip at the bottom
+// of the puzzle page in Unified layout. This is the SAME footprint that Expanded
+// layout frees back into the grid — both the embedded-strip geometry and the adaptive
+// resolution math key off this one constant so the two modes stay physically consistent.
+export const KEY_STRIP_HEIGHT_RATIO = 0.22;
+
+// Splits a safe zone into the grid's drawable area and (in Unified mode) the key strip
+// reserved below it. In Expanded mode nothing is reserved — the grid gets the full area.
+export function splitSafeZoneForKey(safeZone, layoutMode) {
+  if (layoutMode !== "unified") {
+    return { gridZone: safeZone, keyStripHeightIn: 0 };
+  }
+  const keyStripHeightIn = safeZone.heightIn * KEY_STRIP_HEIGHT_RATIO;
+  return {
+    gridZone: { ...safeZone, heightIn: safeZone.heightIn - keyStripHeightIn },
+    keyStripHeightIn,
+  };
+}

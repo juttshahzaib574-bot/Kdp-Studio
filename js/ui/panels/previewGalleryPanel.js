@@ -4,6 +4,8 @@ import { getTrimSizeById } from "../../modules/canvasEngine.js";
 import { computeCanvasDimensions } from "../../modules/bleedEngine.js";
 import { computeSafeZone } from "../../modules/safeZoneEngine.js";
 import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js";
+import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js";
+import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js";
 import { getPlaceholderSource, loadImageSource, drawSourceToCanvas, renderMosaicPreview } from "../mosaicRenderer.js";
 import { createLoopController } from "../../modules/previewLoopEngine.js";
 
@@ -48,6 +50,28 @@ export function initPreviewGalleryPanel() {
   render(state);
 }
 
+// Mirrors pdfExport.js's resolveItemEffectiveSettings so the preview of the active
+// image is a true 1:1 match for what that image will actually export as.
+function resolveActiveSettings(current, globalPalette) {
+  const activeItem = current.batchItems.find((item) => item.id === current.activeBatchItemId);
+  if (!activeItem) {
+    return { gridPattern: current.gridPattern, borderWeightPt: current.borderWeightPt, gridTintPercent: current.gridTintPercent, cornerRadiusPercent: current.cornerRadiusPercent, palette: globalPalette };
+  }
+
+  const gridPattern = activeItem.settings.gridPattern ?? current.gridPattern;
+  let borderWeightPt = current.borderWeightPt;
+  let gridTintPercent = current.gridTintPercent;
+  if (activeItem.settings.borderPreset) {
+    const preset = BORDER_PRESETS[activeItem.settings.borderPreset];
+    borderWeightPt = preset.borderPt;
+    gridTintPercent = preset.gridTintPercent;
+  }
+  const cornerRadiusPercent = activeItem.settings.cornerRadiusPercent ?? current.cornerRadiusPercent;
+  const palette = activeItem.settings.colorSetOverride ? buildCombinedPalette([activeItem.settings.colorSetOverride], current.colorBrand) : globalPalette;
+
+  return { gridPattern, borderWeightPt, gridTintPercent, cornerRadiusPercent, palette };
+}
+
 async function render(current) {
   const sourceCanvas = await resolveSourceCanvas(current);
 
@@ -55,7 +79,9 @@ async function render(current) {
   const canvasDims = computeCanvasDimensions(trimSize, current.dpi, current.bleedEnabled);
   const safeZone = computeSafeZone(trimSize, current.pageSide);
   const sizes = getSizesForSelection(current.colorSetOptionId, current.colorSetCustomPair);
-  const palette = buildCombinedPalette(sizes, current.colorBrand);
+  const globalPalette = buildCombinedPalette(sizes, current.colorBrand);
+  const effective = resolveActiveSettings(current, globalPalette);
+  const { cellSizeMm: effectiveCellSizeMm, gridOverride } = resolveEffectiveGrid(safeZone, current.cellSizeMm, effective.gridPattern, current.layoutMode, current.resolutionPriority);
 
   const baseOpts = {
     trimSize,
@@ -64,12 +90,14 @@ async function render(current) {
     canvasDims,
     safeZone,
     pageSide: current.pageSide,
-    gridPattern: current.gridPattern,
-    cellSizeMm: current.cellSizeMm,
-    borderWeightPt: current.borderWeightPt,
-    gridTintPercent: current.gridTintPercent,
-    cornerRadiusPercent: current.cornerRadiusPercent,
-    palette,
+    layoutMode: current.layoutMode,
+    gridPattern: effective.gridPattern,
+    cellSizeMm: effectiveCellSizeMm,
+    gridOverride,
+    borderWeightPt: effective.borderWeightPt,
+    gridTintPercent: effective.gridTintPercent,
+    cornerRadiusPercent: effective.cornerRadiusPercent,
+    palette: effective.palette,
     sourceCanvas,
   };
 
