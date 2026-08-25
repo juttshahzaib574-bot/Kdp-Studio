@@ -1,1 +1,327 @@
 
+Section Pages Purpose
+Title Page 1 (right side) Book title, subtitle, author/publisher name
+Copyright Page 1 (right side) © notice, ISBN, rights reserved, disclaimer
+"This Book Belongs To" Page 1 (optional, right side) Personalization — great for gifts
+Color Test Page 1 (right side) Swatch grid for buyers to test markers before coloring real pages
+"How to Use This Book" Page 1 (optional, right side) Brief instructions for beginners
+Blank Backs Every even page Critical: Protects next design from marker bleed-through, for premium we use black blank pages(or custom pages design and color available) with hint and color test section at the centre near bottom
+Mosaic Coloring Pages 30–60 designs (odd pages only) The main content — numbered grid + color key
+Answer Key / Solution Pages 2–4 pages at back Small thumbnail of each completed image so buyers can check their work. Solutions" section at the back with 4–6 small completed thumbnails per page.
+Blank "Color Test" Pages at Back 2–4 pages Extra swatch space for marker testing
+Review Request Page 1 (right side) Gentle ask for Amazon review
+
+
+
+Premium KDP Sellers
+
+1. Answer Keys — Do They Include Them?
+
+Yes, but strategically.
+ Premium Mystery Mosaic Books: Include answer key/solution pages at the BACK of the book — small thumbnails showing what each completed mosaic should look like. This is a premium feature because:
+   - It lets buyers verify they colored correctly
+   - It adds perceived value ("solutions included")
+   - It prevents frustration for buyers who get stuck
+
+Our Goal: For a premium KDP mosaic book, include a "Solutions" section at the back with 4 small completed thumbnails per page. It costs almost nothing in print but justifies a higher price.
+
+---
+
+2. Front Matter & Back Matter Structure
+
+Front Matter (What Premium Books Include)
+
+
+Page Type Function Description
+Title & Copyright Pages Meet standard industry requirements, make your book look authoritative and provide legal protection
+"Belongs-To" Page Instantly customize the book and greatly improve its suitability as a gift
+Instructions Page A must-have part for mosaic books, which contains clear guidelines for reading the grid, matching numbers, and a warning about placing a scrap paper behind the page to prevent marker bleed
+Color Test Page The mark of a professional seller. The color palette testing grid set in the front matter allows users to swatch their markers or pencils before working on the puzzle pages
+Master Palette Page The absolute best way to handle this like a 1% top seller is to create a Master Palette Page right after your instructions.Write a header: "Your Master Color Guide".State clearly
+
+
+
+How to Design the "Belongs To" Page
+Do not overcomplicate it. You just want a clean, beautifully styled page right after your title page.
+What to include on the page:
+A nice header at the top (e.g., "This Book Belongs To:")
+A clean, horizontal line in the middle for their name.
+A small, unnumbered mosaic border or a few pixel art decorative elements around the edges to match the theme of your book.
+The Exact Text to Use
+Keep it simple and classic:
+This Mystery Mosaic Book Belongs To:
+
+Instructions Page Layout & Text
+How to Solve These Mystery MosaicsFind Your Number: Look at the numbers inside the tiny grid cells on the puzzle page.Check the Key: Match that number to the corresponding color palette grid on the page.Color it In: Use your pencil or marker to fill the cell completely. Watch the mystery image slowly reveal itself!⚠️ Important: Palette RequirementTo complete all the mystery puzzles in this book, you will need a standard 24-Pack of Colored Pencils or Markers (such as standard sets from Crayola, Castle Arts, or Mr. Pen).👉 Please turn to the next page to view the Master Palette Guide to see the exact shades you will need and to swatch your own colors before you begin!
+
+The absolute best way to handle this like a 1% top seller is to create a Master Palette Page right after your instructions.
+Write a header: "Your Master Color Guide".
+State clearly: "This book utilizes a standard 24-color palette."
+Print 24 clean squares with the generic color names (e.g., Red, Light Green, Sky Blue, Dark Brown).
+Leave a blank white box next to each printed name.
+The customer can take their 24-pack of Crayola or Castle Arts pencils, color in the blank box with their physical pencil, and instantly see if their personal shade matches your book's guide!
+Back Matter (What Premium Books Include)
+
+Page	Content	Notes	
+Solutions/Answer Key	Small thumbnails of completed images	Premium differentiator	
+Extra Color Test Pages	More blank swatch grids	Protects real designs	
+"About the Artist"	Brief bio + website/social links	Builds brand	
+Review Request	"If you enjoyed this book, please leave a review on Amazon"	Policy-compliant if no incentive offered	
+Series Promo	"Also available: Mystery Mosaics Vol. 2, 3, 4..."	Drives repeat purchases	
+
+Note: Because of single-sided printing, every "page" of content = 2 KDP pages (content on odd, blank on even). So 10 front matter pages = 20 interior pages. 
+
+---
+
+3. Technical Specs for a Premium Mosaic PDF
+
+Spec	Requirement	
+Sizes section these sizes to select before starting.
+8.5" x 8.5" (Square) 2550 px 2550 px The Industry Standard. Best for square pixel art and modern mosaic grids.
+8.5" x 11" (Letter) 2550 px 3300 px Maximum Real Estate. Best for vertical landscapes or complex portraits.
+8.25" x 8.25" (Small Square) 2475 px 2475 px Travel-sized or pocket mosaic puzzle books.
+8" x 10" (Standard Portrait) 2400 px 3000 px Alternative portrait layout, slightly wider than a standard letter.
+   
+
+
+
+All these sizes should be available in two resolutions:
+DPI	300 DPI minimum and 600 dpi maximum. Anything less prints fuzzy.	allow to choose option before creating so adding another selectable feature.
+Safe Zone	Keep all numbers and critical content 0.25" inside trim (0.5" from gutter for spine-side safety)	
+Grid Lines & Numbers: Should NOT be pure 100% black. They should be a clean Grayscale tint (roughly 20% to 30% black) with standard anti-aliasing so the tiny numbers remain smooth and legible. 
+The Blackout Pages: Should be 100% solid black (Rich Black or K: 100%) so they completely block light and prevent marker bleed-through on the back of the page. for this we will create another section called back page background. in which we will have so many backgrounds to choose from. i will give you the images and you will upload and save them as assets so we can use them whenever we want, we can select any background we choose before creating. 
+To achieve this, we will add a new section named "Back Page Background".
+This section will house a wide range of background materials for you to choose freely from. I will send you all the relevant image assets later, and you will be responsible for uploading these images and saving them as reusable assets on the platform, so that we can access and use them at any time later.
+After all the preparation work is finished, you can pick any preferred background from this section to complete the settings before officially creating your pdf. The whole process is simple and smooth, which can effectively improve the flexibility and efficiency of content production.
+For a professional 3.5 mm or 4.2 mm mosaic grid, your line weights should be extremely thin:
+Grid Cell Outlines: 0.8 pt to 0.9 pt to 1pt. They need to be just thick enough for the KDP printer to register them as solid vectors, but thin enough that they disappear under colored pencils or markers. allow grid pt as a selectable feature you choose on your own choice.
+Color: Just like the numbers, the grid lines should never be 100% pure black. They should match your numbers at a 30% to 40% gray tint (or thin gray vector lines). If the lines are thin and light gray, the finished color-by-number looks like a seamless mosaic painting rather than a rigid grid of black boxes.
+
+Font Specifications by Cell Size (in mm)
+4.0 mm 4.5 pt to 5.0 pt Regular The Best Seller Sweet Spot. Easy for adults to read, lots of room for numbers, prints perfectly crisp.
+3.5 mm 3.5 pt to 4.0 pt Light or Regular Advanced Adult Detail. Requires a clean, thin font. Very seamless look once colored, but harder for older eyes to read.
+3.0 mm 3.0 pt to 3.5 pt Light / Thin Extreme Risk Zone. Microscopic. You must use a "Light" weight font so double-digit numbers (like 12 or 24) don't bleed into each other.
+   
+
+
+
+Strict Formatting Rules for 3mm to 4mm Cells
+The Double-Digit Trap: A 3mm or 3.5mm cell is incredibly narrow. If your color palette has more than 9 colors, you will have double digits (e.g., 10, 18). A Regular font might be too wide horizontally, forcing you to use a Light or Condensed font weight so the two digits fit inside the cell boundaries.
+Font Choice Matters: Stick to ultra-clean, uniform lines like Arial Regular/Light or Inter Light. Avoid fonts like Times New Roman where some parts of the number are thick and other parts are whisper-thin.
+Color Adjustments: If you drop down to a 3mm cell with a 3pt Light font, change your font color to 60% Black (Dark Gray). If you use a 30% light gray on a font that microscopic, the KDP printer won't lay down enough ink dots, and the number will look like it vanished.
+
+Blueprint: Advanced Mosaic Grid & Layout Generator
+This section outlines the architectural blueprint for the grid generation tool. The engine will empower creators to customize interior page layouts by offering dynamic control over cell shapes, line weights, and background colors. By providing these features, the tool ensures the output can align perfectly with best-selling market trends, including the highly successful "Midnight" or "Blackout" editions.
+
+Module : Dynamic Grid Pattern Selector
+To provide maximum versatility beyond standard square mosaics, the tool will feature a selectable grid pattern interface. Users can easily toggle between multiple geometric frameworks to alter the final coloring experience.
+
+Standard Square: The classic, traditional mosaic layout.
+Hexagon (Honeycomb): Offers a smooth, interlocking aesthetic that eliminates sharp corners and hides grid rigidity.
+Diamond: Creates an argyle or isometric visual effect for a highly stylized final image.
+Dot Matrix: Replaces hard borders with corner dots for a minimalist, trace-friendly design that prioritizes seamless blending.
+
+Module : Border Thickness & Background Engine
+This module dictates line weight, border padding, and background contrast. It is explicitly designed to replicate the commercial success of thick-bordered, black-background designs by automating the following functional elements:
+
+The Marker Bleed Buffer: The engine generates ultra-thick borders to act as visual gutters. This absorbs the natural ink bleed of heavy alcohol or water-based markers, guaranteeing crisp, geometric shapes even if the user's hand is unsteady.
+
+High-Contrast Visual Pop: By generating heavy black frameworks, the tool leverages simultaneous contrast. This enhances the vibrancy of standard coloring mediums, producing a highly luminous "stained glass" or mosaic tile aesthetic.
+
+Frictionless Coloring: The tool allows creators to prioritize relaxation. The generated thick borders create a forgiving design, ensuring end-users can color casually without the intense focus required by thin gray lines.
+
+Maximized Optical Camouflage: When set to "Mystery" mode, the thick black borders aggressively shatter the underlying macro-shapes of the original artwork. This guarantees the final picture remains completely disguised until the user is actively coloring the page.
+
+Module : Smart Text Formatting & Alignment
+To ensure perfect legibility across all custom grid styles, the tool will feature an automated typography engine. This system dynamically recalculates font properties whenever the user alters the grid shape, cell size, or border thickness.
+
+Dynamic Font Scaling: The engine mathematically determines the maximum legible font size based on the specific interior area of the chosen shape. For example, text within a standard square requires different scaling than text restricted by the angled walls of a diamond. The engine scales seamlessly whether the layout is a 40 by 50 grid with 4.38 mm cells or a denser 50 by 65 grid utilizing tighter 3.5 mm cells on an 8.5 by 11-inch canvas.
+
+Smart Contrast & Color Switching: The text color automatically inverts based on the background and border weight. If the "Blackout" mode with heavy borders is engaged, the text automatically defaults to stark white or light gray for high visibility. For traditional light-lined grids, the text remains dark gray to fade under colored markers.
+
+Geometric Center Calibration: Because different shapes have different optical centers, the engine automatically adjusts the X and Y coordinates of the text. This prevents letters and numbers from appearing off-center in asymmetrical spaces like hexagons.
+
+Character Width Adjustment: The engine detects the character length of the cell's label. It automatically condenses the font width or kerning for double-digit numbers (like 12 or 24) to ensure they do not collide with the cell walls, while allowing single digits or letters (like 3 or A) to rest naturally.
+The Border Weight & Style Controller
+This module puts the visual output entirely in the hands of the creator, allowing them to shift seamlessly between a delicate, realistic puzzle and a high-contrast, relaxing marker book.
+The Line Weight Slider: Creators will have access to a continuous slider to define the exact border thickness of their cells.
+Grid Line Tint & Color Selector: A companion setting that allows the user to define the exact ink value of the grid lines. Users can input a specific grayscale percentage (e.g., 30% K for light gray) or select 100% Rich Black for the stained-glass aesthetic.
+One-Click Master Presets: To streamline the creation process, the tool will feature quick-select profile buttons that automatically configure the sliders and typography engine based on our previous analysis: Preset 1: "Seamless Realism" automatically sets borders to 0.9 pt, grid color to 35% Gray, and text to Dark Gray.
+Preset 2: "Midnight Marker" automatically sets borders to 4.0 pt, grid color to 100% Black, and text to stark White.
+Dynamic Typography Syncing: As the user adjusts the border thickness slider, the interior text automatically shrinks or expands. If a thick border starts encroaching on the interior cell space, the text drops half a point in size to ensure it never clips into the black lines.
+
+Corner Radius (Border Rounding) Control
+To give creators full control over ink-bleed management and aesthetic softness, the tool will feature a corner radius modifier that applies to any selected grid shape.
+The Rounding Slider: A customizable setting that adjusts the sharpness of the cell corners. e.g 0% (Sharp): Perfect 90-degree squares or sharp diamond points for traditional realism.
+50% (Softened): The "pillowed" effect seen in perfect for marker bleed control. The controller will have complete control with adjustable slider.
+100% (Maximum): Converts standard shapes into circles 
+
+
+---
+Blueprint Continued: Spatial Optimization & Print Tolerances
+Module : Dual-Page Layout & Key Migration Engine
+To accommodate highly complex puzzles without shrinking the cells to unreadable sizes, the tool will feature a selectable layout configuration. This allows creators to completely detach the metadata and color keys from the primary artwork canvas, granting absolute control over how interior page sequences are formatted.
+Unified Layout (Standard): The grid, title, and color key are all formatted together on a single right-hand (odd) page. This is ideal for simpler 12-color designs or smaller 8.25 by 8.25-inch pocket books.
+Expanded Canvas Layout: This mode isolates the grid, dedicating 100% of the right-hand page to the coloring area. The title, instructions, and Master Palette guide are automatically migrated to the adjacent left-hand (even) page.
+Smart Integration: When using custom backgrounds on the even pages, this engine formats the migrated key with high-contrast text and swatch boxes overlaid onto the background. This utilizes what is traditionally dead space, vastly improving the customer's coloring real estate on the primary page.
+Module : Print-Ready Bleed Architecture
+Because full-page blackout backgrounds must stretch to the absolute edge of the physical paper, the tool will include a dedicated print tolerance controller to handle KDP's strict trimming rules.
+KDP Mandatory Bleed (Automated): When this standard setting is active, the engine automatically calculates and adds KDP’s required 0.125 inches to the top, bottom, and outer edges of the canvas. It stretches the background assets seamlessly into this bleed zone while locking the puzzle grid inside the safe margins.
+No-Bleed Override: Creators can manually select a "No Bleed" option for traditional, white-margin books.
+Risk Acknowledgment System: If a user selects the "No Bleed" override while utilizing a blackout background or edge-to-edge assets, the tool will trigger a UI warning. This ensures the user is aware that Amazon KDP may reject the PDF during the automated review phase, and they proceed at their own risk.
+Module 7: Adaptive Resolution & Cell Scaling Engine
+Once the layout engine detects that the color key has been migrated off the primary canvas, it unlocks a secondary set of scaling options. Creators can select a processing priority to determine how the tool utilizes the extra vertical space on standard 8.5 by 11-inch interiors.
+Priority 1: Enhanced Accessibility (Cell Enlargement) The engine keeps the overall grid dimensions lower (such as a 40 by 50 grid) but mathematically expands the physical dimensions of each cell to fill the page.
+A cell that previously measured 4.38 mm can automatically scale up to 5.0 mm or larger.
+This creates an incredibly comfortable coloring experience tailored perfectly for seniors, beginners, or users with visual impairments.
+Priority 2: High-Fidelity Intricacy (Grid Expansion) The engine locks the cell dimensions to a smaller, precise size (such as 3.5 mm) and injects more cells into the newly freed canvas space.
+The tool seamlessly upgrades the layout to a much denser 50 by 65 grid.
+This vastly increases the "pixel count" of the page, allowing the engine to generate highly detailed, complex artwork and smooth color gradients suitable for advanced hobbyists.
+Intelligent Typography Recalibration Regardless of which priority the user selects, the typography engine instantly syncs with this module. If a 4.38 mm cell scales up to 5.5 mm, the font automatically bumps up from a 4.5 pt Regular weight to a highly legible 6.0 pt size, maintaining perfect margins within the cell borders.
+This dual-path scaling ensures your tool covers every possible demographic in the coloring book market, from casual beginners to intense hobbyists.
+
+
+Blueprint Continued: Bulk Processing & Granular Control
+Module : High-Capacity Batch Engine
+To support the creation of full-length, professional publications in a single workflow, the tool will feature a robust bulk processing system. Creators will not be forced to generate and download pages one by one; instead, the engine will handle entire book interiors simultaneously.
+The 120-Image Threshold: The system allows users to upload and process a batch of up to 120 individual artwork files at once. This upward limit perfectly aligns with standard KDP spine-width requirements and the maximum page counts typical of premium, best-selling coloring books.
+Unified Export Pipeline: Once the batch is processed, the tool seamlessly stitches the individual pages—along with their designated front matter, migrated color keys, and back matter solutions—into a single, print-ready PDF interior file.
+Module : Per-Image Granularity System
+Uploading a bulk batch of 120 images does not mean every puzzle must look identical. To maintain user engagement throughout a massive book, the tool will include a selectable interface that provides independent control over every single file in the queue.
+Independent Shape Selection: Within the bulk upload dashboard, the creator can assign different grid styles to specific images. For instance, when assembling a sprawling project like "The Grand Observatory Mystery," a creator can set Image 1 to a traditional Square grid, Image 2 to an interlocking Hexagon grid, and Image 3 to a Diamond grid.
+Granular Setting Overrides: Alongside the grid shape, all other dynamic settings can be uniquely adjusted per image. A creator can designate page 10 as a "Seamless Realism" puzzle with 0.8 pt thin gray lines, while making page 11 a "Midnight Marker" puzzle with a 4.0 pt solid black border and a custom "Blackout" back page.
+Seamless Global Integration: The architecture ensures these disparate settings work flawlessly together. The typography engine and Print-Ready Bleed Architecture will automatically recalculate the math for each individual page in the batch, guaranteeing that a 3.0 mm dot-matrix grid and a 5.0 mm hexagon grid can coexist in the same PDF without breaking the universal trim size or margins.
+By combining the 120-image bulk upload with per-image granularity, the tool transforms from a simple grid generator into a complete book-building software suite.
+
+Blueprint Continued: Visual Sequence & Storyboard Management
+Module : Drag-and-Drop Storyboard Dashboard
+Managing an upward limit of 120 individual artwork files requires a highly intuitive visual interface. The tool will feature a comprehensive storyboard dashboard, allowing creators to view their entire uploaded batch as a grid of thumbnails and manipulate the sequence with zero friction.
+Fluid Reordering: Creators can simply drag and drop images to rearrange the exact flow of the book before hitting the export button. This guarantees total control over pacing and difficulty progression.
+Narrative Sequencing: This feature is especially critical for creators assembling logic puzzle story pages where the visual progression must perfectly match a narrative timeline. It allows users to effortlessly sequence a visual mystery, ensuring that formats inspired by books like The Sunnybrook Farm Mystery flow seamlessly from page to page.
+Automated Pagination Syncing: When a creator drags Image 45 to the Image 10 slot, the engine instantly recalculates the entire book's architecture. It automatically updates the odd/even page assignments, shifts the corresponding custom back pages, and ensures the migrated color keys remain locked to their newly assigned spreads.
+Thumbnail Status Indicators: Each thumbnail in the drag-and-drop dashboard will display quick-glance icons showing which granular settings are active for that specific image (e.g., a small "Hexagon" icon, a "Midnight Mode" badge, or a "Custom Palette" tag). This allows creators to audit a massive 120-page book in seconds without clicking into every individual file.
+By implementing this storyboard dashboard, the tool completely eliminates the anxiety of uploading files in the "wrong" order, turning the assembly process into a fluid, visual experience.
+
+Blueprint Continued: Automated Assembly & Custom Asset Galleries
+Building on the drag-and-drop storyboard, the final piece of the architecture involves automating the tedious book-assembly process while giving creators complete creative freedom over their front and back matter.
+Here is the blueprint for the automated answer keys and the custom asset library, which perfectly accommodates highly stylized pages like the 1000127537.png file you provided.
+Module : Automated Solution Generation Engine
+Creators will not need to manually format tiny thumbnails in external software to build their answer keys. The tool will handle this natively based on the final, sequenced batch of images.
+Auto-Thumbnail Creation: Once the 120-image sequence is finalized in the storyboard, the engine automatically generates miniature, fully colored "solution" versions of every puzzle.
+Dynamic Layout Control: Creators can select their preferred solution layout from a dropdown menu (e.g., 4 thumbnails per page, or 6 thumbnails per page). The engine automatically calculates how many back-matter pages are required, numbers the thumbnails to match the corresponding puzzle pages, and formats them perfectly within KDP's safe zones.
+Auto-Syncing: If a creator changes the order of the puzzles in the storyboard, the solution thumbnails automatically shift to match the new sequence.
+Module : The Front & Back Matter Asset Gallery
+To ensure the PDF exports as a complete, publish-ready book, the tool will feature an integrated gallery for all non-puzzle pages.
+Pre-Loaded Selectable Assets: The platform will host a robust library of high-quality, pre-formatted templates. Creators can simply browse and select designs for their Title Page, Copyright Page, "Belongs To" Page, Color Test grids, and Master Palette Guides.
+Background Material Library: As discussed for the blackout style, this gallery will also house a wide range of selectable background designs specifically engineered to prevent marker bleed-through on even pages.
+Module : Custom Asset Upload & Permanent Storage Library
+To allow for premium branding and unique thematic designs, the tool will not restrict creators to the pre-loaded templates.
+Custom Page Integration: Creators can upload their own fully designed front or back matter pages. For example, a creator publishing a gaming-themed book can upload a highly customized, pixel-art instruction page exactly like the 1000127537.png file. 
+Permanent User Galleries: Once a creator uploads a custom asset (whether it is an instruction page, a unique copyright layout, or a custom bleed-prevention background), the tool saves it to their personal account gallery. These custom assets remain available for 1-click selection on all future projects, massively speeding up the production pipeline for a book series.
+Format Auto-Check: When a custom page is uploaded, the engine automatically checks its dimensions and DPI to ensure it perfectly matches the canvas size (e.g., 8.5" x 11") and complies with the selected bleed/no-bleed print tolerances.
+
+Blueprint Continued: Dynamic Previews & Quality Control
+Module : The 3-Second Looping Interface
+To provide immediate, frictionless visual feedback, the tool will feature an automated, looping presentation within the editing dashboard. Designing this smooth UI interaction sequence ensures creators do not have to manually click back and forth to evaluate their work.
+The Auto-Toggle Loop: Every 3 seconds, the preview window seamlessly transitions between the two critical states of the puzzle.
+State A (The PDF Asset): This displays the blank, numbered grid exactly as it will print on the KDP page. This allows creators to check font legibility, border thickness, and the effect of the corner rounding.
+State B (The Solved State): This displays the fully colored grid. Because it uses the exact quantized 36-color palette, the creator can instantly verify if the final artwork is highly distinguishable and visually striking, or if it has become muddy.
+Manual Override: Creators can easily pause the 3-second animation loop to scrutinize a specific cell's typography or color alignment on either state.
+Module : Granular Shade Separation
+While the algorithm strictly snaps colors to the standardized 36-color constraint (or 12/24 sets), it will actively preserve the internal contrast of the original artwork.
+Distinct Shade Allocation: If an original image contains a deep navy night sky and a bright turquoise river, the quantization engine will ensure they are mapped to two entirely separate, distinct blues within the standard set (e.g., "Prussian Blue" and "Sky Blue").
+Contrast Preservation: By guaranteeing that separate shades are assigned separate physical colors whenever the palette allows, the tool actively prevents intricate details from collapsing into flat, indistinguishable patches.
+
+
+Blueprint Continued: Persistent Side-by-Side Quality Control
+Module : Stacked Live Preview Gallery
+To provide immediate, frictionless visual feedback, the tool features a persistent, stacked gallery located directly below the primary settings. This ensures quality control is a passive, continuous process rather than an active chore.
+Persistent Dual-State Visibility: The gallery constantly displays two high-resolution panels side-by-side for the active image.
+The Print Asset (Left Panel): This displays the uncolored, numbered grid exactly as it will render in the final PDF. This constant visibility is crucial when dialing in dense 50 by 65 grids at 300 DPI, ensuring the microscopic numbers and thin borders remain crisp and legible before moving forward.
+The Solved State (Right Panel): This displays the fully colored solution, utilizing the strict quantized color palette. Creators can instantly verify that the colors remain distinguishable and the image's integrity holds up under the standard pencil constraints.
+Real-Time Syncing: As the user adjusts the border thickness slider, toggles the corner radius, or alters the grid dimensions in the settings above, both preview panels update instantly, providing a true 1:1 representation of the final book interior.
+This layout perfectly streamlines the workflow, allowing creators to make adjustments and instantly verify the results without navigating away from their main control panel.
+
+
+4. Color Key Standards for Mosaic Color-by-Number Books
+To deliver an optimal customer experience for mosaic color-by-number book users, the color key should align with the exact official color names from mainstream budget and mid-tier colored pencil brands. Since most consumers purchase standard 12, 24 and 36-count colored pencil sets, matching the color key to these common configurations effectively avoids user frustration caused by mismatched color names. Below is the verified official color name mapping covering Crayola, Mr. Pen and Castle Arts across the three standard set sizes.
+
+12-Pencil Base Set (Core Palette)
+This set is applicable for quick, simple puzzle designs that require no more than 12 colors, using the following universally recognized color names:
+
+We'll add a clear, dedicated selectable section on the tool setup for us to customize the color set of your book. In this section, you can easily pick from the following options:
+
+1. A 12-color version of the book
+2. A 24-color version of the book
+3. A 36-color version of the book
+4. A book that includes all 3 color sets (12, 24 and 36 colors)
+5. A book that contains any 2 of these 3 color sets, you can freely choose which two you need. e.g (12 & 24) or (12 & 36) or (24 & 36)
+
+All options are presented with plain labels and clear descriptions, so you can quickly find and confirm the exact color combination you want without any confusion.
+
+Color Group Crayola (12 Set) Mr. Pen (12 Set) Castle Arts (12 Base)
+Red Red Red Crimson / Red
+Orange Orange Orange Orange
+Yellow Yellow Yellow Lemon Yellow / Yellow
+Green Green Green Grass Green / Green
+Light Green Yellow-Green Light Green Lime Green
+Blue Blue Blue Deep Blue
+Sky Blue Sky Blue Light Blue Sky Blue / Light Blue
+Purple Violet (Purple) Purple Violet
+Brown Brown Brown Dark Brown
+Black Black Black Black
+White White White White
+Pink/Other Red-Orange Pink Soft Pink / Salmon
+
+
+24-Pencil Expanded Set (Best-Seller Sweet Spot)
+This is the most popular configuration designed for mosaic color-by-number books targeted at teens and adult users.
+
+Color Family Crayola (24 Set) Mr. Pen (24 Set) Castle Arts (24 Set)
+Reds / Pinks Red, Scarlet, Magenta Red, Crimson, Pink Red, Crimson, Deep Red, Coral
+Oranges Orange, Red-Orange, Yellow-Orange Orange, Peach Orange, Vermilion, Peach
+Yellows Yellow, Golden Yellow Yellow, Gold Yellow, Lemon Yellow, Ochre
+Greens Green, Yellow-Green, Jade Green Green, Light Green, Olive Emerald, Sap Green, Lime, Olive
+Blues Blue, Sky Blue, Aqua-Green Blue, Light Blue, Turquoise Ultramarine, Sky Blue, Turquoise
+Purples Violet Purple, Violet Violet, Purple, Orchid
+Earth Tones Brown, Light Brown, Peach, Tan Brown, Raw Sienna, Burnt Sienna Vandyke Brown, Sienna, Terracotta
+Neutrals Black, Gray, White Black, Dark Gray, White Black, Cool Gray, White
+
+
+36-Pencil Intricate Set (Advanced Adult Puzzles)
+This set is designed for highly detailed 40x40 or 50x50 grid puzzles that require shading, depth rendering and smooth color gradients. Since Mr. Pen's core product lines focus on 12, 24 and 50-count sets, the 36-set color name list provided below is developed based on their official standard expanded color palette.
+
+Crayola (36 Set Official Names)
+
+• Reds & Pinks: Red, Scarlet, Raspberry, Magenta, Pink, Salmon
+• Oranges & Yellows: Orange, Red-Orange, Yellow-Orange, Yellow, Golden Yellow, Light Yellow
+• Greens: Green, Yellow-Green, Pine Green, Lime Green, Jade Green, Olive Green
+• Blues: Blue, Sky Blue, Light Blue, Aqua-Green, Turquoise, Navy Blue
+• Purples: Violet, Orchid, Plum, Lavender
+• Neutrals & Earth: Brown, Light Brown, Mahogany, Tan, Peach, Harvest Gold, Gray, Cool Gray, Black, White
+
+Castle Arts (36 Premium Set Official Names)
+Castle Arts adopts professional artistic pigment names, which can add distinct premium value to your color key for audiences pursuing a high-quality artistic experience.
+
+• Reds & Pinks: Cadmium Red, Crimson, Carmine, Rose Pink, Madder Lake
+• Oranges & Yellows: Orange, Tangerine, Lemon Yellow, Cadmium Yellow, Naples Yellow, Yellow Ochre
+• Greens: Emerald Green, Grass Green, Moss Green, Sage Green, Olive Green, Lime Green
+• Blues: Cobalt Blue, Ultramarine, Cerulean, Sky Blue, Indigo, Prussian Blue
+• Purples: Violet, Imperial Purple, Mauve, Lavender
+• Neutrals & Earth: Burnt Sienna, Raw Umber, Terracotta, Chocolate, Venetian Red, Cool Gray, Warm Gray, Black, White
+
+Mr. Pen (36 Set Structural Equivalents)
+
+• Reds & Pinks: Red, Dark Red, Hot Pink, Soft Pink, Rose, Coral
+• Oranges & Yellows: Orange, Light Orange, Yellow, Golden Yellow, Cream, Peach
+• Greens: Dark Green, Kelly Green, Mint Green, Lime Green, Olive, Sage
+• Blues: Navy Blue, Royal Blue, Sky Blue, Baby Blue, Turquoise, Teal
+• Purples: Deep Purple, Lilac, Lavender, Violet
+• Neutrals & Earth: Dark Brown, Medium Brown, Tan, Brick Red, Charcoal, Slate Gray, Black, White
+
+Professional Formatting Tip for Color Key Pages
+When arranging the color key in your KDP interior layout, do not simply list text-only color names. Place small, neatly rendered 0.75pt vector color squares next to each corresponding color name, so customers can directly visualize the exact appearance of colors such as Jade Green or Naples Yellow for clearer reference.
+---
+
+
+
