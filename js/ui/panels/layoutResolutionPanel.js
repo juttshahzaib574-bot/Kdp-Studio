@@ -1,6 +1,6 @@
 import { state, setState, subscribe } from "../../state.js";
 import { LAYOUT_MODES } from "../../modules/layoutEngine.js";
-import { SCALING_PRIORITIES, isAdaptiveScalingUnlocked, computeAdaptiveGrid } from "../../modules/resolutionScalingEngine.js";
+import { SCALING_PRIORITIES, isAdaptiveScalingUnlocked, resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js";
 import { getTrimSizeById } from "../../modules/canvasEngine.js";
 import { computeSafeZone } from "../../modules/safeZoneEngine.js";
 import { computeGridDimensions } from "../../modules/gridPatternEngine.js";
@@ -58,27 +58,21 @@ function render(current) {
     btn.classList.toggle("active", unlocked && btn.dataset.priorityId === current.resolutionPriority);
     btn.disabled = !unlocked;
   });
-  el.lockNote.textContent = unlocked ? "(unlocked)" : "(unlocks in Expanded Canvas Layout)";
+  el.lockNote.textContent = unlocked ? "(unlocked — applied to every exported puzzle page)" : "(unlocks in Expanded Canvas Layout)";
 
   if (!unlocked) {
-    el.readout.textContent = "Switch to Expanded Canvas Layout to migrate the color key off-page and unlock cell scaling.";
+    el.readout.textContent = "Switch to Expanded Canvas Layout to migrate the color key off-page and unlock cell scaling. In Unified layout the key is embedded directly on the puzzle page instead.";
     return;
   }
 
   const trimSize = getTrimSizeById(current.trimSizeId);
   const safeZone = computeSafeZone(trimSize, current.pageSide);
-  const baseGrid = computeGridDimensions(safeZone.widthIn, safeZone.heightIn, current.cellSizeMm, current.gridPattern);
-  baseGrid.widthIn = safeZone.widthIn;
-  baseGrid.heightIn = safeZone.heightIn;
-
-  // Expanded layout frees the key's footprint back into the grid — approximated here
-  // as an extra 20% of safe-zone height becoming available to the puzzle canvas.
-  const extraHeightIn = safeZone.heightIn * 0.2;
-  const adaptiveGrid = computeAdaptiveGrid(baseGrid, 0, extraHeightIn, current.gridPattern, current.resolutionPriority);
+  const { cellSizeMm: effectiveCellSizeMm, gridOverride } = resolveEffectiveGrid(safeZone, current.cellSizeMm, current.gridPattern, current.layoutMode, current.resolutionPriority);
+  const grid = gridOverride ?? computeGridDimensions(safeZone.widthIn, safeZone.heightIn, effectiveCellSizeMm, current.gridPattern);
 
   const sizes = getSizesForSelection(current.colorSetOptionId, current.colorSetCustomPair);
   const colorCount = buildCombinedPalette(sizes, current.colorBrand).length;
-  const font = recommendFont(adaptiveGrid.cellSizeMm, colorCount);
+  const font = recommendFont(effectiveCellSizeMm, colorCount);
 
-  el.readout.textContent = `${adaptiveGrid.cols}×${adaptiveGrid.rows} grid @ ${adaptiveGrid.cellSizeMm.toFixed(2)}mm cells → ${font.sizePt}pt ${font.weight} (recalibrated automatically).`;
+  el.readout.textContent = `${grid.cols}×${grid.rows} grid @ ${effectiveCellSizeMm.toFixed(2)}mm cells (base ${current.cellSizeMm.toFixed(1)}mm) → ${font.sizePt}pt ${font.weight}. This is exactly what the exported PDF will render.`;
 }

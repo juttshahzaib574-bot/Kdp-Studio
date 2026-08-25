@@ -7,11 +7,12 @@
 //     used to generate the actual page image embedded into the exported PDF.
 
 import { computeFrameGeometry, drawFrame } from "./preview.js";
-import { computeGridDimensions, cellCenterIn, cellPolygonIn } from "../modules/gridPatternEngine.js";
-import { recommendFont, recommendTextTint, centerOffsetIn, letterSpacingForLabel } from "../modules/typographyEngine.js";
+import { computeGridDimensions, cellCenterIn, cellPolygonIn, mmToIn } from "../modules/gridPatternEngine.js";
+import { recommendFont, recommendTextTint, adjustForBorderWeight, centerOffsetIn, letterSpacingForLabel } from "../modules/typographyEngine.js";
 import { gridColorFromTint } from "../modules/borderStyleEngine.js";
 import { cornerRadiusIn, isFullCircle } from "../modules/cornerRadiusEngine.js";
 import { assignDistinctShades } from "../modules/shadeQuantizationEngine.js";
+import { splitSafeZoneForKey } from "../modules/layoutEngine.js";
 
 const DETAIL_PPI = 300;
 const PT_TO_IN = 1 / 72;
@@ -99,11 +100,26 @@ function roundedPolygonPath(ctx, points, radiusPx) {
   ctx.closePath();
 }
 
+// Resolves the actual grid to render. When gridOverride is set (cell-enlargement
+// mode — see resolutionScalingEngine.js's resolveEffectiveGrid for why), it pins
+// cols/rows explicitly instead of re-deriving them from cellSizeMm + area, which for
+// that mode can silently produce a different cell count than intended.
+function resolveGrid(gridZone, cellSizeMm, gridPattern, gridOverride) {
+  if (gridOverride) {
+    return { cols: gridOverride.cols, rows: gridOverride.rows, cellSizeIn: mmToIn(cellSizeMm) };
+  }
+  return computeGridDimensions(gridZone.widthIn, gridZone.heightIn, cellSizeMm, gridPattern);
+}
+
 // Shared typography/border/radius derivation used by both renderers, so the on-screen
 // preview and the exported PDF page always agree on point sizes and weights.
 function computeCellStyle({ cellSizeMm, cellSizeIn, borderWeightPt, gridTintPercent, cornerRadiusPercent, palette, ppi }) {
   const blackoutMode = gridTintPercent >= 100;
-  const font = recommendFont(cellSizeMm, palette.length);
+  const baseFont = recommendFont(cellSizeMm, palette.length);
+  // Dynamic Typography Syncing: a thick border encroaching on the cell interior drops
+  // the font half a point so the glyph never clips into the line.
+  const sizePt = adjustForBorderWeight(baseFont.sizePt, borderWeightPt, cellSizeMm);
+  const font = { ...baseFont, sizePt };
   const textTint = recommendTextTint(cellSizeMm, blackoutMode);
 
   return {
@@ -173,8 +189,8 @@ function drawCell(ctx, { centerPx, cellSizeIn, cellSizePx, ppi, gridPattern, mod
 export function renderMosaicPreview(canvas, opts) {
   const {
     mode, // 'print' | 'solved'
-    trimSize, dpi, bleedEnabled, canvasDims, safeZone, pageSide,
-    gridPattern, cellSizeMm, borderWeightPt, gridTintPercent, cornerRadiusPercent,
+    trimSize, dpi, bleedEnabled, canvasDims, safeZone, pageSide, layoutMode = "unified",
+    gridPattern, cellSizeMm, gridOverride = null, borderWeightPt, gridTintPercent, cornerRadiusPercent,
     palette, sourceCanvas,
   } = opts;
 
@@ -184,7 +200,11 @@ export function renderMosaicPreview(canvas, opts) {
   const geometry = computeFrameGeometry(canvas.width, canvas.height, { trimSize, bleedEnabled, canvasDims, safeZone, pageSide });
   drawFrame(ctx, geometry, { trimSize, dpi, bleedEnabled, showLabels: false });
 
-  const fullGrid = computeGridDimensions(safeZone.widthIn, safeZone.heightIn, cellSizeMm, gridPattern);
+  // Unified layout reserves a key strip at the bottom of the safe zone (drawn by the
+  // PDF exporter, not here — see mosaicRenderer.js header comment); the grid itself
+  // only ever occupies gridZone, so cell density here matches the real exported page.
+  const { gridZone } = splitSafeZoneForKey(safeZone, layoutMode);
+  const fullGrid = resolveGrid(gridZone, cellSizeMm, gridPattern, gridOverride);
   const cellSizePx = fullGrid.cellSizeIn * DETAIL_PPI;
   const colsVisible = Math.max(3, Math.min(fullGrid.cols, Math.floor(geometry.safeW / cellSizePx) || 3));
   const rowsVisible = Math.max(3, Math.min(fullGrid.rows, Math.floor(geometry.safeH / cellSizePx) || 3));
@@ -248,13 +268,14 @@ export function renderMosaicPreview(canvas, opts) {
 export function renderFullMosaicGrid(canvas, opts) {
   const {
     mode, // 'print' | 'solved'
-    dpi, canvasDims, safeZone, pageSide,
-    gridPattern, cellSizeMm, borderWeightPt, gridTintPercent, cornerRadiusPercent,
+    dpi, canvasDims, safeZone, pageSide, layoutMode = "unified",
+    gridPattern, cellSizeMm, gridOverride = null, borderWeightPt, gridTintPercent, cornerRadiusPercent,
     palette, sourceCanvas,
   } = opts;
 
   const ctx = canvas.getContext("2d");
-  const fullGrid = computeGridDimensions(safeZone.widthIn, safeZone.heightIn, cellSizeMm, gridPattern);
+  const { gridZone, keyStripHeightIn } = splitSafeZoneForKey(safeZone, layoutMode);
+  const fullGrid = resolveGrid(gridZone, cellSizeMm, gridPattern, gridOverride);
   const style = computeCellStyle({ cellSizeMm, cellSizeIn: fullGrid.cellSizeIn, borderWeightPt, gridTintPercent, cornerRadiusPercent, palette, ppi: dpi });
 
   ctx.fillStyle = mode === "solved" ? "#ffffff" : style.blackoutMode ? "#141414" : "#ffffff";
@@ -264,8 +285,8 @@ export function renderFullMosaicGrid(canvas, opts) {
   // outer edge + top/bottom (see bleedEngine), so this mirrors that placement.
   const trimXIn = pageSide === "right" ? 0 : canvasDims.bleedIn;
   const trimYIn = canvasDims.bleedIn;
-  const safeXIn = trimXIn + safeZone.left;
-  const safeYIn = trimYIn + safeZone.top;
+  const safeXIn = trimXIn + gridZone.left;
+  const safeYIn = trimYIn + gridZone.top;
   const originXPx = safeXIn * dpi;
   const originYPx = safeYIn * dpi;
 
@@ -296,5 +317,5 @@ export function renderFullMosaicGrid(canvas, opts) {
     }
   }
 
-  return { fullGrid };
+  return { fullGrid, gridZone, keyStripHeightIn };
 }

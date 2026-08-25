@@ -15,6 +15,7 @@ export function createBatchItem(file) {
       borderPreset: null,
       cornerRadiusPercent: null,
       colorSetOverride: null,
+      backBackgroundAssetId: null,
     },
   };
 }
