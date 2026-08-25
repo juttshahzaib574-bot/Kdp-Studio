@@ -14,11 +14,69 @@
     <p class="brand-tagline">Zero-API · Fully Local · Print-Ready Mosaic Book Engine</p>
   </header>
 
+  <section class="workspace-top">
+    <div class="upload-preview-grid">
+      <div class="panel-section" id="batch-storyboard-setup">
+        <h2><span class="step-badge">1</span> Upload Artwork &amp; Storyboard</h2>
+
+        <div class="field-group">
+          <label for="batch-file-input">Upload Artwork (up to 120 images)</label>
+          <input type="file" id="batch-file-input" accept="image/*" multiple />
+          <p class="hint" id="batch-count-hint">0 / 120 images queued.</p>
+        </div>
+
+        <div class="field-group">
+          <label>Storyboard (drag to reorder · click to preview)</label>
+          <div class="storyboard-grid" id="storyboard-grid"></div>
+        </div>
+
+        <div class="field-group">
+          <label for="solution-per-page-select">Solution Thumbnails per Page</label>
+          <select id="solution-per-page-select">
+            <option value="4">4 per page</option>
+            <option value="6">6 per page</option>
+          </select>
+          <p class="hint" id="solution-summary-hint"></p>
+        </div>
+      </div>
+
+      <div class="panel-section" id="live-preview-setup">
+        <h2>Live Preview — Generated Result</h2>
+        <div class="preview-toolbar">
+          <label class="loop-toggle">
+            <input type="checkbox" id="preview-loop-toggle" />
+            Auto-loop every 3s (3-Second Looping Interface)
+          </label>
+          <span class="hint" id="preview-loop-state"></span>
+        </div>
+        <div class="dual-canvas-row">
+          <div class="canvas-stage">
+            <canvas id="preview-canvas-print" width="440" height="440"></canvas>
+            <p class="canvas-caption">Print Asset — numbered grid</p>
+            <div class="preview-download-row">
+              <button type="button" class="btn btn-secondary btn-small" id="download-print-png">Download PNG</button>
+              <button type="button" class="btn btn-secondary btn-small" id="download-print-pdf">Download PDF</button>
+            </div>
+          </div>
+          <div class="canvas-stage">
+            <canvas id="preview-canvas-solved" width="440" height="440"></canvas>
+            <p class="canvas-caption">Solved State — quantized colors</p>
+            <div class="preview-download-row">
+              <button type="button" class="btn btn-secondary btn-small" id="download-solved-png">Download PNG</button>
+              <button type="button" class="btn btn-secondary btn-small" id="download-solved-pdf">Download PDF</button>
+            </div>
+          </div>
+        </div>
+        <p class="hint">Shows the currently selected storyboard image, fully rendered with your active grid, border, color and layout settings — exactly what will be embedded in the exported PDF.</p>
+      </div>
+    </div>
+  </section>
+
   <main class="app-shell">
     <aside class="settings-panel">
 
       <section class="panel-section" id="canvas-setup">
-        <h2><span class="step-badge">1</span> Canvas Dimension &amp; Resolution</h2>
+        <h2><span class="step-badge">2</span> Canvas Dimension &amp; Resolution</h2>
 
         <div class="field-group">
           <label>Trim Size</label>
@@ -36,7 +94,7 @@
       </section>
 
       <section class="panel-section" id="bleed-architecture">
-        <h2><span class="step-badge">2</span> Print-Ready Bleed Architecture</h2>
+        <h2><span class="step-badge">3</span> Print-Ready Bleed Architecture</h2>
 
         <div class="toggle-row">
           <label class="switch">
@@ -66,7 +124,7 @@
       </section>
 
       <section class="panel-section" id="grid-border-setup">
-        <h2><span class="step-badge">3</span> Grid Pattern, Typography &amp; Border Style</h2>
+        <h2><span class="step-badge">4</span> Grid Pattern, Typography &amp; Border Style</h2>
 
         <div class="field-group">
           <label>Grid Pattern</label>
@@ -118,7 +176,7 @@
       </section>
 
       <section class="panel-section" id="layout-resolution-setup">
-        <h2><span class="step-badge">4</span> Dual-Page Layout &amp; Adaptive Resolution</h2>
+        <h2><span class="step-badge">5</span> Dual-Page Layout &amp; Adaptive Resolution</h2>
 
         <div class="field-group">
           <label>Layout Mode</label>
@@ -133,7 +191,7 @@
       </section>
 
       <section class="panel-section" id="layout-composer-setup">
-        <h2><span class="step-badge">5</span> Universal Layout Composer</h2>
+        <h2><span class="step-badge">6</span> Universal Layout Composer</h2>
 
         <div class="field-group">
           <label>Layout Scope</label>
@@ -155,7 +213,7 @@
       </section>
 
       <section class="panel-section" id="color-key-setup">
-        <h2><span class="step-badge">6</span> Color Key Standards</h2>
+        <h2><span class="step-badge">7</span> Color Key Standards</h2>
 
         <div class="field-group">
           <label for="color-set-select">Color Set</label>
@@ -175,30 +233,6 @@
         <div class="field-group">
           <label>Swatch Preview</label>
           <div class="swatch-list" id="color-swatch-list"></div>
-        </div>
-      </section>
-
-      <section class="panel-section" id="batch-storyboard-setup">
-        <h2><span class="step-badge">7</span> Batch Upload &amp; Storyboard</h2>
-
-        <div class="field-group">
-          <label for="batch-file-input">Upload Artwork (up to 120 images)</label>
-          <input type="file" id="batch-file-input" accept="image/*" multiple />
-          <p class="hint" id="batch-count-hint">0 / 120 images queued.</p>
-        </div>
-
-        <div class="field-group">
-          <label>Storyboard (drag to reorder)</label>
-          <div class="storyboard-grid" id="storyboard-grid"></div>
-        </div>
-
-        <div class="field-group">
-          <label for="solution-per-page-select">Solution Thumbnails per Page</label>
-          <select id="solution-per-page-select">
-            <option value="4">4 per page</option>
-            <option value="6">6 per page</option>
-          </select>
-          <p class="hint" id="solution-summary-hint"></p>
         </div>
       </section>
 
@@ -262,32 +296,11 @@
     </aside>
 
     <section class="preview-panel">
-      <h2>Live Canvas Preview</h2>
+      <h2>Trim / Bleed / Safe-Zone Diagram</h2>
       <div class="canvas-stage">
         <canvas id="preview-canvas" width="640" height="640"></canvas>
       </div>
       <dl class="dimension-readout" id="dimension-readout"></dl>
-
-      <div class="mosaic-gallery">
-        <h2>Stacked Live Preview Gallery</h2>
-        <div class="preview-toolbar">
-          <label class="loop-toggle">
-            <input type="checkbox" id="preview-loop-toggle" />
-            Auto-loop every 3s (3-Second Looping Interface)
-          </label>
-          <span class="hint" id="preview-loop-state"></span>
-        </div>
-        <div class="dual-canvas-row">
-          <div class="canvas-stage">
-            <canvas id="preview-canvas-print" width="440" height="440"></canvas>
-            <p class="canvas-caption">Print Asset — numbered grid</p>
-          </div>
-          <div class="canvas-stage">
-            <canvas id="preview-canvas-solved" width="440" height="440"></canvas>
-            <p class="canvas-caption">Solved State — quantized colors</p>
-          </div>
-        </div>
-      </div>
     </section>
   </main>
 

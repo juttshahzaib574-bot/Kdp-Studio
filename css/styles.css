@@ -942,3 +942,43 @@ input[type="file"] {
   background: var(--accent);
   transition: width 0.2s ease;
 }
+
+/* --- Workspace top: Upload + Live Preview, front-and-center right after the header --- */
+
+.workspace-top {
+  padding: 24px 32px 0;
+}
+
+.upload-preview-grid {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .upload-preview-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+#live-preview-setup .dual-canvas-row {
+  margin-top: 4px;
+}
+
+#live-preview-setup .preview-toolbar {
+  margin-bottom: 12px;
+}
+
+.preview-download-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.btn-small {
+  flex: 1;
+  padding: 7px 8px;
+  font-size: 0.78rem;
+  text-align: center;
+}
