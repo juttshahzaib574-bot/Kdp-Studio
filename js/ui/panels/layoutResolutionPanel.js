@@ -6,6 +6,7 @@ import { computeSafeZone } from "../../modules/safeZoneEngine.js";
 import { computeGridDimensions } from "../../modules/gridPatternEngine.js";
 import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js";
 import { recommendFont } from "../../modules/typographyEngine.js";
+import { withColorKeyTarget, normalizeComposition, layoutModeFromComposition, isColorKeyOffloaded } from "../../modules/layoutCompositionEngine.js";
 
 const el = {
   layoutOptions: document.getElementById("layout-mode-options"),
@@ -30,7 +31,12 @@ function renderLayoutOptions() {
     btn.className = "option-item";
     btn.dataset.modeId = mode.id;
     btn.innerHTML = `<strong>${mode.label}</strong><span class="size-note">${mode.note}</span>`;
-    btn.addEventListener("click", () => setState({ layoutMode: mode.id }));
+    // The Unified/Expanded quick toggle is a shortcut for the color key's placement in
+    // the composition (grid bottom strip vs. offloaded to the blank page). It writes both
+    // layoutMode (mirror) and the global composition, which the Layout Composer refines.
+    btn.addEventListener("click", () =>
+      setState({ layoutMode: mode.id, globalComposition: withColorKeyTarget(state.globalComposition, mode.id) })
+    );
     el.layoutOptions.appendChild(btn);
   });
 }
@@ -49,25 +55,27 @@ function renderResolutionOptions() {
 }
 
 function render(current) {
+  const composition = normalizeComposition(current.globalComposition);
+  const effectiveMode = layoutModeFromComposition(composition);
   el.layoutOptions.querySelectorAll(".option-item").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.modeId === current.layoutMode);
+    btn.classList.toggle("active", btn.dataset.modeId === effectiveMode);
   });
 
-  const unlocked = isAdaptiveScalingUnlocked(current.layoutMode);
+  const unlocked = isColorKeyOffloaded(composition);
   el.resolutionOptions.querySelectorAll(".option-item").forEach((btn) => {
     btn.classList.toggle("active", unlocked && btn.dataset.priorityId === current.resolutionPriority);
     btn.disabled = !unlocked;
   });
-  el.lockNote.textContent = unlocked ? "(unlocked — applied to every exported puzzle page)" : "(unlocks in Expanded Canvas Layout)";
+  el.lockNote.textContent = unlocked ? "(unlocked — applied to every exported puzzle page)" : "(unlocks when the color key is off the grid page)";
 
   if (!unlocked) {
-    el.readout.textContent = "Switch to Expanded Canvas Layout to migrate the color key off-page and unlock cell scaling. In Unified layout the key is embedded directly on the puzzle page instead.";
+    el.readout.textContent = "Move the color key off the puzzle page (Expanded Canvas Layout, or via the Layout Composer) to unlock cell scaling. While it sits on the grid the key is embedded directly on the puzzle page.";
     return;
   }
 
   const trimSize = getTrimSizeById(current.trimSizeId);
   const safeZone = computeSafeZone(trimSize, current.pageSide);
-  const { cellSizeMm: effectiveCellSizeMm, gridOverride } = resolveEffectiveGrid(safeZone, current.cellSizeMm, current.gridPattern, current.layoutMode, current.resolutionPriority);
+  const { cellSizeMm: effectiveCellSizeMm, gridOverride } = resolveEffectiveGrid(safeZone, current.cellSizeMm, current.gridPattern, composition, current.resolutionPriority);
   const grid = gridOverride ?? computeGridDimensions(safeZone.widthIn, safeZone.heightIn, effectiveCellSizeMm, current.gridPattern);
 
   const sizes = getSizesForSelection(current.colorSetOptionId, current.colorSetCustomPair);

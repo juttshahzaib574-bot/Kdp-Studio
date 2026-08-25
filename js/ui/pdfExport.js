@@ -12,9 +12,10 @@ import { getSizesForSelection, buildCombinedPalette } from "../modules/colorKeyE
 import { computePagination, FRONT_MATTER_INTERIOR_PAGES } from "../modules/storyboardEngine.js";
 import { buildSolutionPages } from "../modules/solutionGenerationEngine.js";
 import { BORDER_PRESETS } from "../modules/borderStyleEngine.js";
-import { splitSafeZoneForKey, migratedKeyStyle } from "../modules/layoutEngine.js";
+import { migratedKeyStyle } from "../modules/layoutEngine.js";
 import { resolveEffectiveGrid } from "../modules/resolutionScalingEngine.js";
 import { computeKeyGridLayout } from "../modules/colorKeyLayoutEngine.js";
+import { normalizeComposition, computeLayout } from "../modules/layoutCompositionEngine.js";
 import { renderFullMosaicGrid, getPlaceholderSource, loadImageSource, drawSourceToCanvas } from "./mosaicRenderer.js";
 
 const PT_PER_IN = 72;
@@ -118,6 +119,15 @@ function resolveItemBackImage(item, backImagesByAssetId, globalBackImage) {
   return globalBackImage;
 }
 
+// Universal Layout Control: in Global mode every page uses the global composition; in
+// Page-Specific mode an item may carry its own composition that overrides the global one.
+function resolveItemComposition(item, state) {
+  if (state.layoutScope === "page-specific" && item.settings.composition) {
+    return normalizeComposition(item.settings.composition);
+  }
+  return normalizeComposition(state.globalComposition);
+}
+
 // ---- Color key legend (numbered, filled swatches) ----
 // Shared geometry (computeKeyGridLayout) with the embedded Unified-layout strip and
 // the full Expanded-layout migrated page, so both read as the same design language.
@@ -163,30 +173,67 @@ function drawKeyEntries(page, rect, palette, regular, textColor, entryHeightMaxI
   });
 }
 
-// Converts the embedded grid image's reserved key-strip area (in page-relative inches,
-// top-down) into a pdf-lib rect (points, bottom-up) — matches exactly where
-// renderFullMosaicGrid left the raster canvas blank.
-function computeKeyStripPdfRect({ canvasDims, safeZone, pageSide, gridZone, keyStripHeightIn, pageHeightPt }) {
+// Converts a composition placement rect (safe-zone-local, y-down inches) into a pdf-lib
+// rect (absolute points, y-up). This is exactly where renderFullMosaicGrid left the
+// raster canvas blank for that element, so vector content lands over the reserved band.
+function safeLocalRectToPdf(rect, { canvasDims, safeZone, pageSide, pageHeightPt }) {
   const trimXIn = pageSide === "right" ? 0 : canvasDims.bleedIn;
   const trimYIn = canvasDims.bleedIn;
-  const xIn = trimXIn + safeZone.left;
-  const topIn = trimYIn + safeZone.top + gridZone.heightIn;
-
+  const xIn = trimXIn + safeZone.left + rect.xIn;
+  const topIn = trimYIn + safeZone.top + rect.yIn;
   return {
     xPt: xIn * PT_PER_IN,
-    widthPt: safeZone.widthIn * PT_PER_IN,
-    heightPt: keyStripHeightIn * PT_PER_IN,
-    yPt: pageHeightPt - topIn * PT_PER_IN - keyStripHeightIn * PT_PER_IN,
+    widthPt: rect.wIn * PT_PER_IN,
+    heightPt: rect.hIn * PT_PER_IN,
+    yPt: pageHeightPt - (topIn + rect.hIn) * PT_PER_IN,
   };
 }
 
-function drawMigratedKeyPage(page, { palette, bold, regular, w, h, backImage, blackoutDefault }) {
+// Draws a single wrapped/aligned text block inside a pdf rect (points, y-up origin at
+// bottom-left). Text is laid out top-down from the rect's top and horizontally aligned.
+function drawBoxedText(page, rectPt, text, font, size, color, align = "center") {
+  const maxWidth = rectPt.widthPt - 8;
+  const lines = wrapText(font, text, size, maxWidth);
+  const lineHeight = size + 3;
+  let y = rectPt.yPt + rectPt.heightPt - size - 2;
+  lines.forEach((line) => {
+    if (y < rectPt.yPt) return;
+    const lineWidth = font.widthOfTextAtSize(line, size);
+    let x = rectPt.xPt + 4;
+    if (align === "center") x = rectPt.xPt + (rectPt.widthPt - lineWidth) / 2;
+    else if (align === "end") x = rectPt.xPt + rectPt.widthPt - lineWidth - 4;
+    page.drawText(line, { x, y, size, font, color });
+    y -= lineHeight;
+  });
+}
+
+const ELEMENT_TEXT_SIZE = { title: 16, subtitle: 11, instruction: 9.5 };
+
+// Draws one placed composition element (color key, or a title/subtitle/instruction text
+// block) into its reserved rect, with contrast-appropriate colors.
+function drawPlacedElement(page, { id, rect, elConfig, state, palette, bold, regular, textColor }, geom) {
+  const rectPt = safeLocalRectToPdf(rect, geom);
+  if (id === "colorKey") {
+    drawKeyEntries(page, rectPt, palette, regular, textColor, 0.24);
+    return;
+  }
+  const fallback = { title: state.bookTitle, subtitle: state.bookSubtitle, instruction: elConfig.text }[id] || "";
+  const text = (elConfig.text || "").trim() || fallback;
+  if (!text) return;
+  const font = id === "title" ? bold : regular;
+  const align = id === "title" || id === "subtitle" ? (elConfig.align === "start" ? "start" : elConfig.align === "end" ? "end" : "center") : "start";
+  drawBoxedText(page, rectPt, text, font, ELEMENT_TEXT_SIZE[id] ?? 10, textColor, align);
+}
+
+// Composed blank (facing / even) page: paints the background (custom asset, or rich
+// black in Midnight/Blackout, or white), then lays down every element the composition
+// offloaded here — title, subtitle, instruction, and/or the migrated color key —
+// overlaid on that background with contrast-appropriate colors (Smart Integration).
+function drawComposedBlankPage(page, { blankPlacements, comp, state, palette, bold, regular, w, h, backImage, blackoutDefault, geom }) {
   const hasBackground = Boolean(backImage);
   if (hasBackground) {
     page.drawImage(backImage, { x: 0, y: 0, width: w, height: h });
   } else if (blackoutDefault) {
-    // No custom asset selected, but Midnight/Blackout is active — default this page to
-    // the same rich-black background rather than a jarring white page mid-blackout book.
     page.drawRectangle({ x: 0, y: 0, width: w, height: h, color: rgb(0, 0, 0) });
   } else {
     page.drawRectangle({ x: 0, y: 0, width: w, height: h, color: rgb(1, 1, 1) });
@@ -194,13 +241,10 @@ function drawMigratedKeyPage(page, { palette, bold, regular, w, h, backImage, bl
 
   const style = migratedKeyStyle(hasBackground || blackoutDefault);
   const textColor = style.textColor === "white" ? rgb(0.97, 0.97, 0.97) : rgb(0.18, 0.18, 0.18);
-  const dimColor = style.textColor === "white" ? rgb(0.85, 0.85, 0.85) : rgb(0.4, 0.4, 0.4);
 
-  centerText(page, "Your Color Key", bold, 17, h - 52, textColor);
-  centerText(page, "Match each number to its color below before you begin.", regular, 9.5, h - 70, dimColor);
-
-  const marginPt = 44;
-  drawKeyEntries(page, { xPt: marginPt, yPt: 40, widthPt: w - marginPt * 2, heightPt: h - 112 }, palette, regular, textColor, 0.32);
+  blankPlacements.forEach(({ id, rect }) => {
+    drawPlacedElement(page, { id, rect, elConfig: comp[id], state, palette, bold, regular, textColor }, geom);
+  });
 }
 
 // ---- Generated front/back matter pages ----
@@ -537,76 +581,59 @@ export async function exportInteriorPdf(state, { onProgress } = {}) {
 
   // ---- Puzzle interior (storyboard order, per-item overrides applied) ----
   const solvedCanvasByItemId = new Map();
+  const geom = { canvasDims, safeZone, pageSide: state.pageSide, pageHeightPt };
   for (const item of state.batchItems) {
     const effective = resolveItemEffectiveSettings(item, state, globalPalette);
+    const comp = resolveItemComposition(item, state);
+    const layout = computeLayout(safeZone, comp);
     const sourceCanvas = await resolveItemSource(item);
-    const { cellSizeMm: effectiveCellSizeMm, gridOverride } = resolveEffectiveGrid(safeZone, state.cellSizeMm, effective.gridPattern, state.layoutMode, state.resolutionPriority);
+    const { cellSizeMm: effectiveCellSizeMm, gridOverride } = resolveEffectiveGrid(safeZone, state.cellSizeMm, effective.gridPattern, comp, state.resolutionPriority);
+
+    const renderOpts = {
+      dpi: state.dpi,
+      canvasDims,
+      safeZone,
+      pageSide: state.pageSide,
+      composition: comp,
+      gridPattern: effective.gridPattern,
+      cellSizeMm: effectiveCellSizeMm,
+      gridOverride,
+      borderWeightPt: effective.borderWeightPt,
+      gridTintPercent: effective.gridTintPercent,
+      cornerRadiusPercent: effective.cornerRadiusPercent,
+      palette: effective.palette,
+      sourceCanvas,
+    };
 
     const printCanvas = document.createElement("canvas");
     printCanvas.width = canvasDims.widthPx;
     printCanvas.height = canvasDims.heightPx;
-    const renderResult = renderFullMosaicGrid(printCanvas, {
-      mode: "print",
-      dpi: state.dpi,
-      canvasDims,
-      safeZone,
-      pageSide: state.pageSide,
-      layoutMode: state.layoutMode,
-      gridPattern: effective.gridPattern,
-      cellSizeMm: effectiveCellSizeMm,
-      gridOverride,
-      borderWeightPt: effective.borderWeightPt,
-      gridTintPercent: effective.gridTintPercent,
-      cornerRadiusPercent: effective.cornerRadiusPercent,
-      palette: effective.palette,
-      sourceCanvas,
-    });
+    renderFullMosaicGrid(printCanvas, { ...renderOpts, mode: "print" });
     const printImage = await doc.embedPng(await canvasToPngBytes(printCanvas));
     const puzzlePage = doc.addPage([pageWidthPt, pageHeightPt]);
     puzzlePage.drawImage(printImage, { x: 0, y: 0, width: pageWidthPt, height: pageHeightPt });
 
-    // Unified Layout: the color key is embedded as crisp vector text/swatches directly
-    // on the puzzle page, in the strip renderFullMosaicGrid left reserved and blank.
-    if (state.layoutMode === "unified") {
-      const rect = computeKeyStripPdfRect({
-        canvasDims, safeZone, pageSide: state.pageSide,
-        gridZone: renderResult.gridZone, keyStripHeightIn: renderResult.keyStripHeightIn, pageHeightPt,
-      });
-      // The strip sits on renderFullMosaicGrid's canvas background — black in
-      // Midnight/Blackout mode (see the Midnight/Blackout Cell & Background Standard) —
-      // so the key text needs to flip light there or it's invisible.
-      const keyStripTextColor = effective.gridTintPercent >= 100 ? rgb(0.95, 0.95, 0.95) : rgb(0.18, 0.18, 0.18);
-      drawKeyEntries(puzzlePage, rect, effective.palette, regular, keyStripTextColor, 0.2);
-    }
+    // Draw every element the composition placed ON the grid page as crisp vector content,
+    // in the bands renderFullMosaicGrid left reserved and blank. Text flips light on a
+    // Midnight/Blackout background (which the grid raster painted behind the bands).
+    const gridTextColor = effective.gridTintPercent >= 100 ? rgb(0.95, 0.95, 0.95) : rgb(0.18, 0.18, 0.18);
+    layout.gridPlacements.forEach(({ id, rect }) => {
+      drawPlacedElement(puzzlePage, { id, rect, elConfig: comp[id], state, palette: effective.palette, bold, regular, textColor: gridTextColor }, geom);
+    });
 
     const solvedCanvas = document.createElement("canvas");
     solvedCanvas.width = canvasDims.widthPx;
     solvedCanvas.height = canvasDims.heightPx;
-    renderFullMosaicGrid(solvedCanvas, {
-      mode: "solved",
-      dpi: state.dpi,
-      canvasDims,
-      safeZone,
-      pageSide: state.pageSide,
-      layoutMode: state.layoutMode,
-      gridPattern: effective.gridPattern,
-      cellSizeMm: effectiveCellSizeMm,
-      gridOverride,
-      borderWeightPt: effective.borderWeightPt,
-      gridTintPercent: effective.gridTintPercent,
-      cornerRadiusPercent: effective.cornerRadiusPercent,
-      palette: effective.palette,
-      sourceCanvas,
-    });
+    renderFullMosaicGrid(solvedCanvas, { ...renderOpts, mode: "solved" });
     solvedCanvasByItemId.set(item.id, solvedCanvas);
 
-    // Expanded Layout: the facing even page hosts the migrated color key instead of
-    // being blank. Unified (or any other) mode gets the standard hint+swatch blank back.
+    // The facing even page: if the composition offloaded any elements here, compose them
+    // over the background; otherwise it's a standard blank back (bleed hint + test strip).
     const backPage = doc.addPage([pageWidthPt, pageHeightPt]);
     const itemBackImage = resolveItemBackImage(item, backImagesByAssetId, globalBackImage);
     const blackoutDefault = effective.gridTintPercent >= 100;
-    if (state.layoutMode === "expanded") {
-      drawMigratedKeyPage(backPage, { palette: effective.palette, bold, regular, w: pageWidthPt, h: pageHeightPt, backImage: itemBackImage, blackoutDefault });
+    if (layout.blankPlacements.length > 0) {
+      drawComposedBlankPage(backPage, { blankPlacements: layout.blankPlacements, comp, state, palette: effective.palette, bold, regular, w: pageWidthPt, h: pageHeightPt, backImage: itemBackImage, blackoutDefault, geom });
     } else {
       drawBlankBackPage(backPage, { backImage: itemBackImage, palette: effective.palette, regular, w: pageWidthPt, h: pageHeightPt, blackoutDefault });
     }

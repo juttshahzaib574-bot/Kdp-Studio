@@ -6,6 +6,7 @@ import { computeSafeZone } from "../../modules/safeZoneEngine.js";
 import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js";
 import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js";
 import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js";
+import { normalizeComposition } from "../../modules/layoutCompositionEngine.js";
 import { getPlaceholderSource, loadImageSource, drawSourceToCanvas, renderMosaicPreview } from "../mosaicRenderer.js";
 import { createLoopController } from "../../modules/previewLoopEngine.js";
 
@@ -81,7 +82,11 @@ async function render(current) {
   const sizes = getSizesForSelection(current.colorSetOptionId, current.colorSetCustomPair);
   const globalPalette = buildCombinedPalette(sizes, current.colorBrand);
   const effective = resolveActiveSettings(current, globalPalette);
-  const { cellSizeMm: effectiveCellSizeMm, gridOverride } = resolveEffectiveGrid(safeZone, current.cellSizeMm, effective.gridPattern, current.layoutMode, current.resolutionPriority);
+  const activeItem = current.batchItems.find((item) => item.id === current.activeBatchItemId);
+  const composition = current.layoutScope === "page-specific" && activeItem?.settings.composition
+    ? normalizeComposition(activeItem.settings.composition)
+    : normalizeComposition(current.globalComposition);
+  const { cellSizeMm: effectiveCellSizeMm, gridOverride } = resolveEffectiveGrid(safeZone, current.cellSizeMm, effective.gridPattern, composition, current.resolutionPriority);
 
   const baseOpts = {
     trimSize,
@@ -90,7 +95,7 @@ async function render(current) {
     canvasDims,
     safeZone,
     pageSide: current.pageSide,
-    layoutMode: current.layoutMode,
+    composition,
     gridPattern: effective.gridPattern,
     cellSizeMm: effectiveCellSizeMm,
     gridOverride,

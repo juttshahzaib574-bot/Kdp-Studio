@@ -20,8 +20,12 @@ export const state = {
   cornerRadiusPercent: 0,
 
   // Dual-Page Layout & Key Migration + Adaptive Resolution & Cell Scaling
-  layoutMode: "unified",
+  layoutMode: "unified", // mirror of globalComposition.colorKey placement (grid=unified/blank=expanded)
   resolutionPriority: "cell-enlargement",
+
+  // Universal Layout Control & Element Positioning
+  layoutScope: "global", // "global" (one composition for all pages) | "page-specific"
+  globalComposition: null, // null → defaultComposition(); set by the Layout Composer
 
   // Section 4: Color Key Standards
   colorSetOptionId: "set-24",
