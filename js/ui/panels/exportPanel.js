@@ -5,6 +5,7 @@ const el = {
   titleInput: document.getElementById("book-title-input"),
   subtitleInput: document.getElementById("book-subtitle-input"),
   authorInput: document.getElementById("book-author-input"),
+  isbnInput: document.getElementById("book-isbn-input"),
   authorBioInput: document.getElementById("author-bio-input"),
   seriesPromoInput: document.getElementById("series-promo-input"),
   exportBtn: document.getElementById("export-pdf-btn"),
@@ -17,6 +18,7 @@ export function initExportPanel() {
   el.titleInput.addEventListener("change", () => setState({ bookTitle: el.titleInput.value || "Untitled Mystery Mosaic Book" }));
   el.subtitleInput.addEventListener("change", () => setState({ bookSubtitle: el.subtitleInput.value }));
   el.authorInput.addEventListener("change", () => setState({ bookAuthor: el.authorInput.value }));
+  el.isbnInput.addEventListener("change", () => setState({ bookIsbn: el.isbnInput.value }));
   el.authorBioInput.addEventListener("change", () => setState({ authorBio: el.authorBioInput.value }));
   el.seriesPromoInput.addEventListener("change", () => setState({ seriesPromoText: el.seriesPromoInput.value }));
   el.exportBtn.addEventListener("click", handleExport);
@@ -53,6 +55,7 @@ function render(current) {
   if (document.activeElement !== el.titleInput) el.titleInput.value = current.bookTitle;
   if (document.activeElement !== el.subtitleInput) el.subtitleInput.value = current.bookSubtitle;
   if (document.activeElement !== el.authorInput) el.authorInput.value = current.bookAuthor;
+  if (document.activeElement !== el.isbnInput) el.isbnInput.value = current.bookIsbn;
   if (document.activeElement !== el.authorBioInput) el.authorBioInput.value = current.authorBio;
   if (document.activeElement !== el.seriesPromoInput) el.seriesPromoInput.value = current.seriesPromoText;
 }
