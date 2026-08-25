@@ -14,7 +14,6 @@ import { cornerRadiusIn, isFullCircle } from "../modules/cornerRadiusEngine.js";
 import { assignDistinctShades } from "../modules/shadeQuantizationEngine.js";
 import { computeLayout, LAYOUT_ELEMENTS } from "../modules/layoutCompositionEngine.js";
 
-const DETAIL_PPI = 300;
 const PT_TO_IN = 1 / 72;
 
 let placeholderCanvas = null;
@@ -135,10 +134,21 @@ function computeCellStyle({ cellSizeMm, cellSizeIn, borderWeightPt, gridTintPerc
 }
 
 // Draws one cell (shape + fill + border/dots + number label) at centerPx, ppi px/inch.
-function drawCell(ctx, { centerPx, cellSizeIn, cellSizePx, ppi, gridPattern, mode, paletteIndex, palette, style, cornerRadiusPercent }) {
+// `lowDetail` skips the polygon path, stroke and number entirely in favor of one flat
+// fillRect — used when a full-page preview packs cells too small to read a number
+// anyway, so the whole grid still renders responsively instead of just a zoomed crop.
+function drawCell(ctx, { centerPx, cellSizeIn, cellSizePx, ppi, gridPattern, mode, paletteIndex, palette, style, cornerRadiusPercent, lowDetail = false }) {
+  const swatch = palette[paletteIndex];
+
+  if (lowDetail) {
+    const half = cellSizePx / 2;
+    ctx.fillStyle = mode === "solved" ? swatch.hex : "#fdfcf9";
+    ctx.fillRect(centerPx.x - half, centerPx.y - half, cellSizePx, cellSizePx);
+    return;
+  }
+
   const points = cellPolygonIn(gridPattern, cellSizeIn);
   const pxPoints = polygonToPx(points, centerPx, ppi);
-  const swatch = palette[paletteIndex];
 
   if (isFullCircle(cornerRadiusPercent)) {
     ctx.beginPath();
@@ -238,75 +248,75 @@ export function renderMosaicPreview(canvas, opts) {
   // element bands are drawn as labeled overlays so the layout composition is visible.
   const layout = computeLayout(safeZone, composition);
   const gridZone = layout.gridZone;
-  const style0 = computeCellStyle({ cellSizeMm, cellSizeIn: 0.1, borderWeightPt, gridTintPercent, cornerRadiusPercent, palette, ppi: DETAIL_PPI });
-  drawPlacementBoxes(ctx, geometry, safeZone, layout.gridPlacements, style0.blackoutMode);
-
+  // Render the ENTIRE grid at whatever px/inch the on-screen canvas geometry already
+  // works out to (geometry.scale) — this is a true whole-page thumbnail matching what
+  // exportInteriorPdf will actually produce, not a zoomed-in fragment of a few cells.
+  const ppi = geometry.scale;
   const fullGrid = resolveGrid(gridZone, cellSizeMm, gridPattern, gridOverride);
-  const cellSizePx = fullGrid.cellSizeIn * DETAIL_PPI;
-  // Center the detail crop inside the grid region (not the whole canvas), so it reads
-  // correctly relative to the reserved element bands around it.
-  const gridRegionPx = {
-    x: geometry.trimX + gridZone.left * geometry.scale,
-    y: geometry.trimY + gridZone.top * geometry.scale,
-    w: gridZone.widthIn * geometry.scale,
-    h: gridZone.heightIn * geometry.scale,
-  };
-  const colsVisible = Math.max(3, Math.min(fullGrid.cols, Math.floor(gridRegionPx.w / cellSizePx) || 3));
-  const rowsVisible = Math.max(3, Math.min(fullGrid.rows, Math.floor(gridRegionPx.h / cellSizePx) || 3));
-  const colStart = Math.floor((fullGrid.cols - colsVisible) / 2);
-  const rowStart = Math.floor((fullGrid.rows - rowsVisible) / 2);
+  const style = computeCellStyle({ cellSizeMm, cellSizeIn: fullGrid.cellSizeIn, borderWeightPt, gridTintPercent, cornerRadiusPercent, palette, ppi });
+
+  // Paint the trim box with the real page background (white, or rich black in
+  // Blackout mode) before the element-band overlays — otherwise the app's dark UI
+  // chrome shows through the reserved bands and swallows the placement labels.
+  ctx.fillStyle = style.blackoutMode ? "#000000" : "#ffffff";
+  ctx.fillRect(geometry.trimX, geometry.trimY, geometry.trimW, geometry.trimH);
+  drawPlacementBoxes(ctx, geometry, safeZone, layout.gridPlacements, style.blackoutMode);
+
+  const cellSizePx = fullGrid.cellSizeIn * ppi;
+  const originX = geometry.trimX + gridZone.left * ppi;
+  const originY = geometry.trimY + gridZone.top * ppi;
+  const regionWpx = gridZone.widthIn * ppi;
+  const regionHpx = gridZone.heightIn * ppi;
 
   const sourceCtx = sourceCanvas.getContext("2d");
   const sourceImageData = sourceCtx.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height);
 
-  const cells = [];
-  for (let row = rowStart; row < rowStart + rowsVisible; row += 1) {
-    for (let col = colStart; col < colStart + colsVisible; col += 1) {
+  const colors = [];
+  for (let row = 0; row < fullGrid.rows; row += 1) {
+    for (let col = 0; col < fullGrid.cols; col += 1) {
       const u = fullGrid.cols > 1 ? col / (fullGrid.cols - 1) : 0.5;
       const v = fullGrid.rows > 1 ? row / (fullGrid.rows - 1) : 0.5;
-      cells.push({ col, row, color: sampleFromImageData(sourceImageData, u, v) });
+      colors.push(sampleFromImageData(sourceImageData, u, v));
     }
   }
+  const assignments = assignDistinctShades(colors, palette);
 
-  const assignments = assignDistinctShades(cells.map((c) => c.color), palette);
-  const style = computeCellStyle({ cellSizeMm, cellSizeIn: fullGrid.cellSizeIn, borderWeightPt, gridTintPercent, cornerRadiusPercent, palette, ppi: DETAIL_PPI });
-
-  const cropWidthPx = colsVisible * cellSizePx;
-  const cropHeightPx = rowsVisible * cellSizePx;
-  const originX = gridRegionPx.x + gridRegionPx.w / 2 - cropWidthPx / 2;
-  const originY = gridRegionPx.y + gridRegionPx.h / 2 - cropHeightPx / 2;
+  // Below this cell size a number is unreadable anyway, so cells fall back to a flat
+  // fillRect (see drawCell's lowDetail branch) — keeps a dense grid's live preview
+  // responsive on every state change instead of stalling on thousands of glyph draws.
+  const lowDetail = cellSizePx < 4;
 
   ctx.save();
   ctx.beginPath();
-  ctx.rect(originX, originY, cropWidthPx, cropHeightPx);
+  ctx.rect(originX, originY, regionWpx, regionHpx);
   ctx.clip();
 
   // Canvas background only — cells always render white regardless of this (see drawCell).
   // True K:100% rich black, per the Midnight/Blackout Cell & Background Standard.
   ctx.fillStyle = mode === "solved" ? "#111318" : style.blackoutMode ? "#000000" : "#f5f3ee";
-  ctx.fillRect(originX, originY, cropWidthPx, cropHeightPx);
+  ctx.fillRect(originX, originY, regionWpx, regionHpx);
 
-  cells.forEach((cell, index) => {
-    const localCenterIn = cellCenterIn(gridPattern, cell.col - colStart, cell.row - rowStart, fullGrid.cellSizeIn);
-    const centerPx = { x: originX + localCenterIn.x * DETAIL_PPI, y: originY + localCenterIn.y * DETAIL_PPI };
-    drawCell(ctx, {
-      centerPx, cellSizeIn: fullGrid.cellSizeIn, cellSizePx, ppi: DETAIL_PPI, gridPattern, mode,
-      paletteIndex: assignments[index], palette, style, cornerRadiusPercent,
-    });
-  });
+  let index = 0;
+  for (let row = 0; row < fullGrid.rows; row += 1) {
+    for (let col = 0; col < fullGrid.cols; col += 1) {
+      const localCenterIn = cellCenterIn(gridPattern, col, row, fullGrid.cellSizeIn);
+      const centerPx = { x: originX + localCenterIn.x * ppi, y: originY + localCenterIn.y * ppi };
+      drawCell(ctx, {
+        centerPx, cellSizeIn: fullGrid.cellSizeIn, cellSizePx, ppi, gridPattern, mode,
+        paletteIndex: assignments[index], palette, style, cornerRadiusPercent, lowDetail,
+      });
+      index += 1;
+    }
+  }
 
   ctx.restore();
 
   ctx.fillStyle = "#9aa1af";
   ctx.font = "11px -apple-system, sans-serif";
   ctx.textAlign = "left";
-  ctx.fillText(
-    `Detail crop: ${colsVisible}×${rowsVisible} of ${fullGrid.cols}×${fullGrid.rows} cells @ ${cellSizeMm.toFixed(1)}mm`,
-    12,
-    canvas.height - 12
-  );
+  ctx.fillText(`Full page: ${fullGrid.cols}×${fullGrid.rows} cells @ ${cellSizeMm.toFixed(1)}mm`, 12, canvas.height - 12);
 
-  return { fullGrid, colsVisible, rowsVisible, font: style.font, borderPx: style.borderPx };
+  return { fullGrid, font: style.font, borderPx: style.borderPx };
 }
 
 // Renders the ENTIRE safe-zone grid onto `canvas` at the real chosen print DPI —

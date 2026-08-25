@@ -699,3 +699,99 @@ export function downloadPdf(bytes, filename) {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+function filenameBase(state) {
+  const item = state.batchItems.find((i) => i.id === state.activeBatchItemId);
+  const raw = item ? item.name.replace(/\.[^.]+$/, "") : state.bookTitle || "kdp-studio-preview";
+  return raw.replace(/[^a-z0-9-]+/gi, "-") || "kdp-studio-preview";
+}
+
+// ---- Per-preview standalone PNG / single-page PDF downloads ----
+// Renders the CURRENTLY ACTIVE batch item's full-resolution page — the exact same
+// raster renderFullMosaicGrid produces for the real interior PDF — so each preview
+// box's own download button always matches true print output, never the on-screen
+// approximation. Used by the Stacked Live Preview Gallery's per-panel PNG/PDF buttons.
+async function renderActiveItemFullPage(state, mode) {
+  const trimSize = getTrimSizeById(state.trimSizeId);
+  const canvasDims = computeCanvasDimensions(trimSize, state.dpi, state.bleedEnabled);
+  const safeZone = computeSafeZone(trimSize, state.pageSide);
+  const sizes = getSizesForSelection(state.colorSetOptionId, state.colorSetCustomPair);
+  const globalPalette = buildCombinedPalette(sizes, state.colorBrand);
+  const pageWidthPt = inToPt(canvasDims.widthIn);
+  const pageHeightPt = inToPt(canvasDims.heightIn);
+
+  const activeItem = state.batchItems.find((i) => i.id === state.activeBatchItemId);
+  const sourceCanvas = activeItem ? await resolveItemSource(activeItem) : getPlaceholderSource();
+  const effective = activeItem
+    ? resolveItemEffectiveSettings(activeItem, state, globalPalette)
+    : { gridPattern: state.gridPattern, borderWeightPt: state.borderWeightPt, gridTintPercent: state.gridTintPercent, cornerRadiusPercent: state.cornerRadiusPercent, palette: globalPalette };
+  const comp = activeItem ? resolveItemComposition(activeItem, state) : normalizeComposition(state.globalComposition);
+  const { cellSizeMm: effectiveCellSizeMm, gridOverride } = resolveEffectiveGrid(safeZone, state.cellSizeMm, effective.gridPattern, comp, state.resolutionPriority);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = canvasDims.widthPx;
+  canvas.height = canvasDims.heightPx;
+  renderFullMosaicGrid(canvas, {
+    dpi: state.dpi,
+    canvasDims,
+    safeZone,
+    pageSide: state.pageSide,
+    composition: comp,
+    gridPattern: effective.gridPattern,
+    cellSizeMm: effectiveCellSizeMm,
+    gridOverride,
+    borderWeightPt: effective.borderWeightPt,
+    gridTintPercent: effective.gridTintPercent,
+    cornerRadiusPercent: effective.cornerRadiusPercent,
+    palette: effective.palette,
+    sourceCanvas,
+    mode,
+  });
+
+  const geom = { canvasDims, safeZone, pageSide: state.pageSide, pageHeightPt };
+  return { canvas, pageWidthPt, pageHeightPt, safeZone, comp, effective, geom };
+}
+
+// Downloads the active preview panel (mode: 'print' | 'solved') as a standalone PNG at
+// full print resolution — one image, no server round-trip.
+export async function downloadActiveItemPng(state, mode) {
+  const { canvas } = await renderActiveItemFullPage(state, mode);
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+  downloadBlob(blob, `${filenameBase(state)}-${mode}.png`);
+}
+
+// Downloads the active preview panel as a standalone single-page PDF (not the full
+// book export) — same raster + vector-overlay pipeline as exportInteriorPdf's puzzle
+// page, just one page, for quickly proofing or sharing a single image.
+export async function downloadActiveItemPdf(state, mode) {
+  const { canvas, pageWidthPt, pageHeightPt, comp, effective, geom } = await renderActiveItemFullPage(state, mode);
+
+  const doc = await PDFDocument.create();
+  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const regular = await doc.embedFont(StandardFonts.Helvetica);
+  const pngImage = await doc.embedPng(await canvasToPngBytes(canvas));
+  const page = doc.addPage([pageWidthPt, pageHeightPt]);
+  page.drawImage(pngImage, { x: 0, y: 0, width: pageWidthPt, height: pageHeightPt });
+
+  if (mode === "print") {
+    const layout = computeLayout(geom.safeZone, comp);
+    const gridTextColor = effective.gridTintPercent >= 100 ? rgb(0.95, 0.95, 0.95) : rgb(0.18, 0.18, 0.18);
+    layout.gridPlacements.forEach(({ id, rect }) => {
+      drawPlacedElement(page, { id, rect, elConfig: comp[id], state, palette: effective.palette, bold, regular, textColor: gridTextColor }, geom);
+    });
+  }
+
+  const bytes = await doc.save();
+  downloadPdf(bytes, `${filenameBase(state)}-${mode}.pdf`);
+}

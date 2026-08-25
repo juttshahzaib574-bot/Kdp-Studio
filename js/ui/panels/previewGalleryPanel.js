@@ -9,12 +9,17 @@ import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js";
 import { normalizeComposition } from "../../modules/layoutCompositionEngine.js";
 import { getPlaceholderSource, loadImageSource, drawSourceToCanvas, renderMosaicPreview } from "../mosaicRenderer.js";
 import { createLoopController } from "../../modules/previewLoopEngine.js";
+import { downloadActiveItemPng, downloadActiveItemPdf } from "../pdfExport.js";
 
 const el = {
   printCanvas: document.getElementById("preview-canvas-print"),
   solvedCanvas: document.getElementById("preview-canvas-solved"),
   loopToggle: document.getElementById("preview-loop-toggle"),
   loopState: document.getElementById("preview-loop-state"),
+  downloadPrintPng: document.getElementById("download-print-png"),
+  downloadPrintPdf: document.getElementById("download-print-pdf"),
+  downloadSolvedPng: document.getElementById("download-solved-png"),
+  downloadSolvedPdf: document.getElementById("download-solved-pdf"),
 };
 
 let printStage;
@@ -47,8 +52,38 @@ export function initPreviewGalleryPanel() {
     }
   });
 
+  wireDownloadButton(el.downloadPrintPng, () => downloadActiveItemPng(state, "print"));
+  wireDownloadButton(el.downloadPrintPdf, () => downloadActiveItemPdf(state, "print"));
+  wireDownloadButton(el.downloadSolvedPng, () => downloadActiveItemPng(state, "solved"));
+  wireDownloadButton(el.downloadSolvedPdf, () => downloadActiveItemPdf(state, "solved"));
+
   subscribe(render);
   render(state);
+}
+
+// Full-resolution PNG/PDF generation can take a moment for large trims at high DPI —
+// disable the button and show progress so a click always gets visible feedback instead
+// of looking like nothing happened (this was the user's original "can't even generate"
+// complaint elsewhere in the app).
+function wireDownloadButton(button, action) {
+  if (!button) return;
+  const originalLabel = button.textContent;
+  button.addEventListener("click", async () => {
+    button.disabled = true;
+    button.textContent = "Generating…";
+    try {
+      await action();
+    } catch (err) {
+      button.textContent = "Failed — retry";
+      setTimeout(() => {
+        button.textContent = originalLabel;
+      }, 2000);
+      return;
+    } finally {
+      button.disabled = false;
+    }
+    button.textContent = originalLabel;
+  });
 }
 
 // Mirrors pdfExport.js's resolveItemEffectiveSettings so the preview of the active
