@@ -32,6 +32,10 @@ export const state = {
   colorSetOptionId: "set-24",
   colorSetCustomPair: [12, 24],
 
+  // Color key flow direction: "horizontal" (fill each row, wrap to a new row) |
+  // "vertical" (fill each column, wrap to a new column) — see colorKeyLayoutEngine.js.
+  colorKeyOrientation: "horizontal",
+
   // Black Book: whole-book page-background control — independent of the grid tint/
   // border sliders. "all-white" | "all-black" | "grid-black" | "key-black" (see
   // modules/bookThemeEngine.js for exactly what each id paints).

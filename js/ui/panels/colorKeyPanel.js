@@ -1,6 +1,7 @@
-import { state, setState, subscribe } from "../../state.js?v=22";
-import { COLOR_SET_OPTIONS, getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=22";
-import { BOOK_COLOR_MODES } from "../../modules/bookThemeEngine.js?v=22";
+import { state, setState, subscribe } from "../../state.js?v=23";
+import { COLOR_SET_OPTIONS, getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=23";
+import { BOOK_COLOR_MODES } from "../../modules/bookThemeEngine.js?v=23";
+import { COLOR_KEY_ORIENTATIONS } from "../../modules/colorKeyLayoutEngine.js?v=23";
 
 const PAIR_CHOICES = [
   { id: "12-24", sizes: [12, 24], label: "12 & 24" },
@@ -14,6 +15,7 @@ const el = {
   setSelect: document.getElementById("color-set-select"),
   customPairGroup: document.getElementById("custom-pair-group"),
   customPairOptions: document.getElementById("custom-pair-options"),
+  orientationOptions: document.getElementById("color-key-orientation-options"),
   swatchList: document.getElementById("color-swatch-list"),
 };
 
@@ -21,11 +23,25 @@ export function initColorKeyPanel() {
   renderBookColorModeOptions();
   renderSetOptions();
   renderPairOptions();
+  renderOrientationOptions();
 
   el.setSelect.addEventListener("change", () => setState({ colorSetOptionId: el.setSelect.value }));
 
   subscribe(render);
   render(state);
+}
+
+function renderOrientationOptions() {
+  el.orientationOptions.innerHTML = "";
+  COLOR_KEY_ORIENTATIONS.forEach((orientation) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "option-item";
+    btn.dataset.orientationId = orientation.id;
+    btn.innerHTML = `<strong>${orientation.label}</strong><span class="size-note">${orientation.note}</span>`;
+    btn.addEventListener("click", () => setState({ colorKeyOrientation: orientation.id }));
+    el.orientationOptions.appendChild(btn);
+  });
 }
 
 function renderBookColorModeOptions() {
@@ -72,6 +88,10 @@ function render(current) {
     const pair = PAIR_CHOICES.find((p) => p.id === btn.dataset.pairId);
     const isActive = JSON.stringify(pair.sizes) === JSON.stringify(current.colorSetCustomPair);
     btn.classList.toggle("active", isActive);
+  });
+
+  el.orientationOptions.querySelectorAll(".option-item").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.orientationId === current.colorKeyOrientation);
   });
 
   const sizes = getSizesForSelection(current.colorSetOptionId, current.colorSetCustomPair);
