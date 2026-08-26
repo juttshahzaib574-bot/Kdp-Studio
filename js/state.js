@@ -32,6 +32,15 @@ export const state = {
   colorSetOptionId: "set-24",
   colorSetCustomPair: [12, 24],
 
+  // Black Book: whole-book page-background control — independent of the grid tint/
+  // border sliders. "all-white" | "all-black" | "grid-black" | "key-black" (see
+  // modules/bookThemeEngine.js for exactly what each id paints).
+  pageBackgroundMode: "all-white",
+
+  // Color Edition: "color" | "black-white" — a real KDP print-cost choice, so it's its
+  // own explicit switch rather than following any other setting.
+  bookColorMode: "color",
+
   // High-Capacity Batch Engine + Drag-and-Drop Storyboard Dashboard
   batchItems: [],
   activeBatchItemId: null,

@@ -6,13 +6,14 @@
 //   - renderFullMosaicGrid: the entire safe-zone grid at the real chosen print DPI,
 //     used to generate the actual page image embedded into the exported PDF.
 
-import { computeFrameGeometry, drawFrame } from "./preview.js?v=19";
-import { computeGridDimensions, cellCenterIn, cellPolygonIn, mmToIn, isCellInGridSilhouette } from "../modules/gridPatternEngine.js?v=19";
-import { recommendFont, recommendTextTint, adjustForBorderWeight, centerOffsetIn, letterSpacingForLabel } from "../modules/typographyEngine.js?v=19";
-import { gridColorFromTint } from "../modules/borderStyleEngine.js?v=19";
-import { cornerRadiusIn, isFullCircle } from "../modules/cornerRadiusEngine.js?v=19";
-import { nearestPaletteColor } from "../modules/shadeQuantizationEngine.js?v=19";
-import { computeLayout, LAYOUT_ELEMENTS } from "../modules/layoutCompositionEngine.js?v=19";
+import { computeFrameGeometry, drawFrame } from "./preview.js?v=20";
+import { computeGridDimensions, cellCenterIn, cellPolygonIn, mmToIn, isCellInGridSilhouette } from "../modules/gridPatternEngine.js?v=20";
+import { recommendFont, recommendTextTint, adjustForBorderWeight, centerOffsetIn, letterSpacingForLabel } from "../modules/typographyEngine.js?v=20";
+import { gridColorFromTint } from "../modules/borderStyleEngine.js?v=20";
+import { cornerRadiusIn, isFullCircle } from "../modules/cornerRadiusEngine.js?v=20";
+import { nearestPaletteColor } from "../modules/shadeQuantizationEngine.js?v=20";
+import { computeLayout, LAYOUT_ELEMENTS } from "../modules/layoutCompositionEngine.js?v=20";
+import { toGrayscaleHex } from "../modules/bookThemeEngine.js?v=20";
 
 const PT_TO_IN = 1 / 72;
 
@@ -474,8 +475,10 @@ function resolveGrid(gridZone, cellSizeMm, gridPattern, gridOverride) {
 
 // Shared typography/border/radius derivation used by both renderers, so the on-screen
 // preview and the exported PDF page always agree on point sizes and weights.
-function computeCellStyle({ cellSizeMm, cellSizeIn, borderWeightPt, gridTintPercent, cornerRadiusPercent, palette, ppi }) {
-  const blackoutMode = gridTintPercent >= 100;
+// `pageBlack` is an explicit flag resolved by the caller from the Black Book page-
+// background setting (see modules/bookThemeEngine.js) — never inferred from grid tint,
+// which only ever controls grid LINE darkness.
+function computeCellStyle({ cellSizeMm, cellSizeIn, borderWeightPt, gridTintPercent, cornerRadiusPercent, palette, ppi, pageBlack = false }) {
   const baseFont = recommendFont(cellSizeMm, palette.length);
   // Dynamic Typography Syncing: a thick border encroaching on the cell interior drops
   // the font half a point so the glyph never clips into the line.
@@ -484,7 +487,7 @@ function computeCellStyle({ cellSizeMm, cellSizeIn, borderWeightPt, gridTintPerc
   const textTint = recommendTextTint(cellSizeMm, gridTintPercent);
 
   return {
-    blackoutMode,
+    blackoutMode: pageBlack,
     font,
     textTint,
     fontPx: Math.max(6, font.sizePt * PT_TO_IN * ppi),
@@ -499,12 +502,16 @@ function computeCellStyle({ cellSizeMm, cellSizeIn, borderWeightPt, gridTintPerc
 // `lowDetail` skips the polygon path, stroke and number entirely in favor of one flat
 // fillRect — used when a full-page preview packs cells too small to read a number
 // anyway, so the whole grid still renders responsively instead of just a zoomed crop.
-function drawCell(ctx, { centerPx, cellSizeIn, cellSizePx, ppi, gridPattern, mode, paletteIndex, palette, style, cornerRadiusPercent, lowDetail = false }) {
+function drawCell(ctx, { centerPx, cellSizeIn, cellSizePx, ppi, gridPattern, mode, paletteIndex, palette, style, cornerRadiusPercent, lowDetail = false, blackWhiteEdition = false }) {
   const swatch = palette[paletteIndex];
+  // Black & White edition: nothing anywhere in the book spends real color ink, so the
+  // "solved" fill (the only place a cell ever shows a real color) substitutes each
+  // color's own grayscale luminance instead — still visually distinguishable, no ink cost.
+  const solvedFill = blackWhiteEdition ? toGrayscaleHex(swatch.rgb) : swatch.hex;
 
   if (lowDetail) {
     const half = cellSizePx / 2;
-    ctx.fillStyle = mode === "solved" ? swatch.hex : "#fdfcf9";
+    ctx.fillStyle = mode === "solved" ? solvedFill : "#fdfcf9";
     ctx.fillRect(centerPx.x - half, centerPx.y - half, cellSizePx, cellSizePx);
     return;
   }
@@ -522,7 +529,7 @@ function drawCell(ctx, { centerPx, cellSizeIn, cellSizePx, ppi, gridPattern, mod
   }
 
   if (mode === "solved") {
-    ctx.fillStyle = swatch.hex;
+    ctx.fillStyle = solvedFill;
     ctx.fill();
     ctx.strokeStyle = "rgba(0,0,0,0.15)";
     ctx.lineWidth = 0.5;
@@ -598,7 +605,7 @@ export function renderMosaicPreview(canvas, opts) {
     mode, // 'print' | 'solved'
     trimSize, dpi, bleedEnabled, canvasDims, safeZone, pageSide, composition,
     gridPattern, cellSizeMm, gridOverride = null, borderWeightPt, gridTintPercent, cornerRadiusPercent,
-    palette, sourceCanvas, gridCornerTrim = false,
+    palette, sourceCanvas, gridCornerTrim = false, gridPageBlack = false, blackWhiteEdition = false,
   } = opts;
 
   const ctx = canvas.getContext("2d");
@@ -617,7 +624,7 @@ export function renderMosaicPreview(canvas, opts) {
   // exportInteriorPdf will actually produce, not a zoomed-in fragment of a few cells.
   const ppi = geometry.scale;
   const fullGrid = resolveGrid(gridZone, cellSizeMm, gridPattern, gridOverride);
-  const style = computeCellStyle({ cellSizeMm, cellSizeIn: fullGrid.cellSizeIn, borderWeightPt, gridTintPercent, cornerRadiusPercent, palette, ppi });
+  const style = computeCellStyle({ cellSizeMm, cellSizeIn: fullGrid.cellSizeIn, borderWeightPt, gridTintPercent, cornerRadiusPercent, palette, ppi, pageBlack: gridPageBlack });
 
   // Paint the trim box with the real page background (white, or rich black in
   // Blackout mode) before the element-band overlays — otherwise the app's dark UI
@@ -658,7 +665,7 @@ export function renderMosaicPreview(canvas, opts) {
       const centerPx = { x: originX + localCenterIn.x * ppi, y: originY + localCenterIn.y * ppi };
       drawCell(ctx, {
         centerPx, cellSizeIn: fullGrid.cellSizeIn, cellSizePx, ppi, gridPattern, mode,
-        paletteIndex: assignments[index], palette: legend, style, cornerRadiusPercent, lowDetail,
+        paletteIndex: assignments[index], palette: legend, style, cornerRadiusPercent, lowDetail, blackWhiteEdition,
       });
       index += 1;
     }
@@ -682,14 +689,14 @@ export function renderFullMosaicGrid(canvas, opts) {
     mode, // 'print' | 'solved'
     dpi, canvasDims, safeZone, pageSide, composition,
     gridPattern, cellSizeMm, gridOverride = null, borderWeightPt, gridTintPercent, cornerRadiusPercent,
-    palette, sourceCanvas, gridCornerTrim = false,
+    palette, sourceCanvas, gridCornerTrim = false, gridPageBlack = false, blackWhiteEdition = false,
   } = opts;
 
   const ctx = canvas.getContext("2d");
   const layout = computeLayout(safeZone, composition);
   const gridZone = layout.gridZone;
   const fullGrid = resolveGrid(gridZone, cellSizeMm, gridPattern, gridOverride);
-  const style = computeCellStyle({ cellSizeMm, cellSizeIn: fullGrid.cellSizeIn, borderWeightPt, gridTintPercent, cornerRadiusPercent, palette, ppi: dpi });
+  const style = computeCellStyle({ cellSizeMm, cellSizeIn: fullGrid.cellSizeIn, borderWeightPt, gridTintPercent, cornerRadiusPercent, palette, ppi: dpi, pageBlack: gridPageBlack });
 
   // True K:100% solid Rich Black canvas background per the Midnight/Blackout standard.
   ctx.fillStyle = mode === "solved" ? "#ffffff" : style.blackoutMode ? "#000000" : "#ffffff";
@@ -718,7 +725,7 @@ export function renderFullMosaicGrid(canvas, opts) {
       const centerPx = { x: originXPx + localCenterIn.x * dpi, y: originYPx + localCenterIn.y * dpi };
       drawCell(ctx, {
         centerPx, cellSizeIn: fullGrid.cellSizeIn, cellSizePx, ppi: dpi, gridPattern, mode,
-        paletteIndex: assignments[index], palette: legend, style, cornerRadiusPercent,
+        paletteIndex: assignments[index], palette: legend, style, cornerRadiusPercent, blackWhiteEdition,
       });
       index += 1;
     }

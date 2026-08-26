@@ -1,14 +1,15 @@
-import { state, setState, subscribe } from "../../state.js?v=19";
-import { GRID_PATTERNS, computeGridDimensions, isCellInGridSilhouette } from "../../modules/gridPatternEngine.js?v=19";
-import { recommendFont, recommendTextTint } from "../../modules/typographyEngine.js?v=19";
-import { applyPreset, clampBorderWeight } from "../../modules/borderStyleEngine.js?v=19";
-import { CORNER_RADIUS_MIN_PERCENT, CORNER_RADIUS_MAX_PERCENT } from "../../modules/cornerRadiusEngine.js?v=19";
-import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=19";
-import { getTrimSizeById } from "../../modules/canvasEngine.js?v=19";
-import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=19";
-import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=19";
-import { normalizeComposition, computeLayout } from "../../modules/layoutCompositionEngine.js?v=19";
-import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=19";
+import { state, setState, subscribe } from "../../state.js?v=20";
+import { GRID_PATTERNS, computeGridDimensions, isCellInGridSilhouette } from "../../modules/gridPatternEngine.js?v=20";
+import { recommendFont, recommendTextTint } from "../../modules/typographyEngine.js?v=20";
+import { applyPreset, clampBorderWeight } from "../../modules/borderStyleEngine.js?v=20";
+import { CORNER_RADIUS_MIN_PERCENT, CORNER_RADIUS_MAX_PERCENT } from "../../modules/cornerRadiusEngine.js?v=20";
+import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=20";
+import { getTrimSizeById } from "../../modules/canvasEngine.js?v=20";
+import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=20";
+import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=20";
+import { normalizeComposition, computeLayout } from "../../modules/layoutCompositionEngine.js?v=20";
+import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=20";
+import { PAGE_BACKGROUND_MODES } from "../../modules/bookThemeEngine.js?v=20";
 
 const el = {
   patternGrid: document.getElementById("grid-pattern-options"),
@@ -17,6 +18,7 @@ const el = {
   typographyHint: document.getElementById("typography-hint"),
   presetSeamless: document.getElementById("preset-seamless"),
   presetMidnight: document.getElementById("preset-midnight"),
+  pageBackgroundOptions: document.getElementById("page-background-options"),
   borderSlider: document.getElementById("border-weight-slider"),
   borderInput: document.getElementById("border-weight-input"),
   tintSlider: document.getElementById("grid-tint-slider"),
@@ -31,6 +33,7 @@ const el = {
 
 export function initGridBorderPanel() {
   renderPatternOptions();
+  renderPageBackgroundOptions();
   bindCellSize();
   bindPresets();
   bindBorderWeight();
@@ -40,6 +43,19 @@ export function initGridBorderPanel() {
 
   subscribe(render);
   render(state);
+}
+
+function renderPageBackgroundOptions() {
+  el.pageBackgroundOptions.innerHTML = "";
+  PAGE_BACKGROUND_MODES.forEach((mode) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "option-item";
+    btn.dataset.modeId = mode.id;
+    btn.innerHTML = `<strong>${mode.label}</strong><span class="size-note">${mode.note}</span>`;
+    btn.addEventListener("click", () => setState({ pageBackgroundMode: mode.id }));
+    el.pageBackgroundOptions.appendChild(btn);
+  });
 }
 
 function renderPatternOptions() {
@@ -102,6 +118,10 @@ function render(current) {
     btn.classList.toggle("active", btn.dataset.patternId === current.gridPattern);
   });
 
+  el.pageBackgroundOptions.querySelectorAll(".option-item").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.modeId === current.pageBackgroundMode);
+  });
+
   syncPair(el.cellSlider, el.cellInput, current.cellSizeMm);
   syncPair(el.borderSlider, el.borderInput, current.borderWeightPt);
   syncPair(el.tintSlider, el.tintInput, current.gridTintPercent);
@@ -115,11 +135,11 @@ function render(current) {
   const font = recommendFont(current.cellSizeMm, colorCount);
   const tint = recommendTextTint(current.cellSizeMm, current.gridTintPercent);
 
+  // Grid tint only ever controls the darkness of the grid LINES — cells always stay
+  // white and the page background is its own separate choice (Black Book, above).
   el.typographyHint.textContent = `${current.cellSizeMm.toFixed(1)}mm cell → ${font.sizePt}pt ${font.weight}${
     font.isDoubleDigitRisk ? " — extreme risk zone, double-digit numbers may collide" : ""
-  }. Number tint: ${tint.percentBlack}% black (cells stay white; ${
-    current.gridTintPercent >= 100 ? "the canvas background goes rich black in Midnight/Blackout mode" : "background stays paper"
-  }).`;
+  }. Number tint: ${tint.percentBlack}% black (cells always stay white; the page background is controlled separately by Black Book, above).`;
 }
 
 // Cheap, arithmetic-only stat readout (no quantization pass) — safe to recompute on

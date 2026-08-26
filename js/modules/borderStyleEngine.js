@@ -15,10 +15,8 @@ export const BORDER_PRESETS = {
     label: "Midnight Marker",
     borderPt: 4.0,
     gridTintPercent: 100,
-    // Per the Midnight/Blackout Cell & Background Standard: cells stay white and
-    // numbers stay dark — the 100% black is the canvas background, not the text.
     textTint: "dark-gray",
-    note: "100% black canvas background with crisp white cells — a high-contrast, forgiving 'stained glass' marker-bleed buffer.",
+    note: "100% black grid lines around crisp white cells — a bold, forgiving 'stained glass' marker-bleed buffer. Combine with the Black Book page-background control for a fully black page too.",
   },
 };
 

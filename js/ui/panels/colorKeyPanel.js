@@ -1,5 +1,6 @@
-import { state, setState, subscribe } from "../../state.js?v=19";
-import { COLOR_SET_OPTIONS, getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=19";
+import { state, setState, subscribe } from "../../state.js?v=20";
+import { COLOR_SET_OPTIONS, getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=20";
+import { BOOK_COLOR_MODES } from "../../modules/bookThemeEngine.js?v=20";
 
 const PAIR_CHOICES = [
   { id: "12-24", sizes: [12, 24], label: "12 & 24" },
@@ -8,6 +9,8 @@ const PAIR_CHOICES = [
 ];
 
 const el = {
+  bookColorModeOptions: document.getElementById("book-color-mode-options"),
+  bookColorModeHint: document.getElementById("book-color-mode-hint"),
   setSelect: document.getElementById("color-set-select"),
   customPairGroup: document.getElementById("custom-pair-group"),
   customPairOptions: document.getElementById("custom-pair-options"),
@@ -15,6 +18,7 @@ const el = {
 };
 
 export function initColorKeyPanel() {
+  renderBookColorModeOptions();
   renderSetOptions();
   renderPairOptions();
 
@@ -22,6 +26,19 @@ export function initColorKeyPanel() {
 
   subscribe(render);
   render(state);
+}
+
+function renderBookColorModeOptions() {
+  el.bookColorModeOptions.innerHTML = "";
+  BOOK_COLOR_MODES.forEach((mode) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "option-item";
+    btn.dataset.modeId = mode.id;
+    btn.textContent = mode.label;
+    btn.addEventListener("click", () => setState({ bookColorMode: mode.id }));
+    el.bookColorModeOptions.appendChild(btn);
+  });
 }
 
 function renderSetOptions() {
@@ -42,6 +59,12 @@ function renderPairOptions() {
 }
 
 function render(current) {
+  el.bookColorModeOptions.querySelectorAll(".option-item").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.modeId === current.bookColorMode);
+  });
+  const activeColorMode = BOOK_COLOR_MODES.find((m) => m.id === current.bookColorMode);
+  el.bookColorModeHint.textContent = activeColorMode?.note ?? "";
+
   el.setSelect.value = current.colorSetOptionId;
   el.customPairGroup.hidden = current.colorSetOptionId !== "set-custom-pair";
 

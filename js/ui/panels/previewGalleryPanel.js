@@ -1,15 +1,16 @@
 // Module: Stacked Live Preview Gallery + The 3-Second Looping Interface
-import { state, subscribe } from "../../state.js?v=19";
-import { getTrimSizeById } from "../../modules/canvasEngine.js?v=19";
-import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=19";
-import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=19";
-import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=19";
-import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=19";
-import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=19";
-import { normalizeComposition } from "../../modules/layoutCompositionEngine.js?v=19";
-import { getPlaceholderSource, loadImageSource, drawSourceToCanvas, renderMosaicPreview } from "../mosaicRenderer.js?v=19";
-import { createLoopController } from "../../modules/previewLoopEngine.js?v=19";
-import { downloadActiveItemPng, downloadActiveItemPdf } from "../pdfExport.js?v=19";
+import { state, subscribe } from "../../state.js?v=20";
+import { getTrimSizeById } from "../../modules/canvasEngine.js?v=20";
+import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=20";
+import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=20";
+import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=20";
+import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=20";
+import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=20";
+import { normalizeComposition } from "../../modules/layoutCompositionEngine.js?v=20";
+import { getPlaceholderSource, loadImageSource, drawSourceToCanvas, renderMosaicPreview } from "../mosaicRenderer.js?v=20";
+import { createLoopController } from "../../modules/previewLoopEngine.js?v=20";
+import { downloadActiveItemPng, downloadActiveItemPdf } from "../pdfExport.js?v=20";
+import { isContentPageBlack, isBlackWhiteEdition } from "../../modules/bookThemeEngine.js?v=20";
 
 const el = {
   printCanvas: document.getElementById("preview-canvas-print"),
@@ -162,6 +163,8 @@ async function render(current) {
     palette: effective.palette,
     sourceCanvas,
     gridCornerTrim: current.gridCornerTrim,
+    gridPageBlack: isContentPageBlack(current.pageBackgroundMode),
+    blackWhiteEdition: isBlackWhiteEdition(current.bookColorMode),
   };
 
   renderMosaicPreview(el.printCanvas, { ...baseOpts, mode: "print" });

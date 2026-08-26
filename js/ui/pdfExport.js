@@ -4,20 +4,21 @@
 // (honoring each image's own granular overrides), auto-generated solution pages, and
 // back matter — entirely client-side via pdf-lib, no server round-trip.
 
-import { PDFDocument, StandardFonts, rgb } from "../vendor/pdf-lib.esm.min.js?v=19";
-import { getTrimSizeById } from "../modules/canvasEngine.js?v=19";
-import { computeCanvasDimensions } from "../modules/bleedEngine.js?v=19";
-import { computeSafeZone } from "../modules/safeZoneEngine.js?v=19";
-import { getSizesForSelection, buildCombinedPalette } from "../modules/colorKeyEngine.js?v=19";
-import { computePagination, FRONT_MATTER_INTERIOR_PAGES } from "../modules/storyboardEngine.js?v=19";
-import { buildSolutionPages } from "../modules/solutionGenerationEngine.js?v=19";
-import { BORDER_PRESETS } from "../modules/borderStyleEngine.js?v=19";
-import { migratedKeyStyle } from "../modules/layoutEngine.js?v=19";
-import { resolveEffectiveGrid } from "../modules/resolutionScalingEngine.js?v=19";
-import { computeKeyGridLayout } from "../modules/colorKeyLayoutEngine.js?v=19";
-import { normalizeComposition, computeLayout } from "../modules/layoutCompositionEngine.js?v=19";
-import { resolveActiveAsset } from "../modules/assetGalleryEngine.js?v=19";
-import { renderFullMosaicGrid, getPlaceholderSource, loadImageSource, drawSourceToCanvas } from "./mosaicRenderer.js?v=19";
+import { PDFDocument, StandardFonts, rgb } from "../vendor/pdf-lib.esm.min.js?v=20";
+import { getTrimSizeById } from "../modules/canvasEngine.js?v=20";
+import { computeCanvasDimensions } from "../modules/bleedEngine.js?v=20";
+import { computeSafeZone } from "../modules/safeZoneEngine.js?v=20";
+import { getSizesForSelection, buildCombinedPalette } from "../modules/colorKeyEngine.js?v=20";
+import { computePagination, FRONT_MATTER_INTERIOR_PAGES } from "../modules/storyboardEngine.js?v=20";
+import { buildSolutionPages } from "../modules/solutionGenerationEngine.js?v=20";
+import { BORDER_PRESETS } from "../modules/borderStyleEngine.js?v=20";
+import { migratedKeyStyle } from "../modules/layoutEngine.js?v=20";
+import { resolveEffectiveGrid } from "../modules/resolutionScalingEngine.js?v=20";
+import { computeKeyGridLayout } from "../modules/colorKeyLayoutEngine.js?v=20";
+import { normalizeComposition, computeLayout } from "../modules/layoutCompositionEngine.js?v=20";
+import { resolveActiveAsset } from "../modules/assetGalleryEngine.js?v=20";
+import { renderFullMosaicGrid, getPlaceholderSource, loadImageSource, drawSourceToCanvas } from "./mosaicRenderer.js?v=20";
+import { isContentPageBlack, isFacingPageBlack, isBlackWhiteEdition, toGrayscaleRgb } from "../modules/bookThemeEngine.js?v=20";
 
 const PT_PER_IN = 72;
 const inToPt = (inches) => inches * PT_PER_IN;
@@ -86,6 +87,15 @@ function centerText(page, text, font, size, y, color = rgb(0.15, 0.15, 0.15)) {
   page.drawText(text, { x: (page.getWidth() - width) / 2, y, size, font, color });
 }
 
+// Paints a generated page's own background per the Black Book page-background setting
+// and returns the single contrast-appropriate color every text/line element on that
+// page should use — the same "one flipped color for everything" pattern already used
+// for the migrated color-key page, just generalized to every generated page in the book.
+function paintPageBackground(page, w, h, isBlack) {
+  page.drawRectangle({ x: 0, y: 0, width: w, height: h, color: isBlack ? rgb(0, 0, 0) : rgb(1, 1, 1) });
+  return isBlack ? rgb(0.95, 0.95, 0.95) : rgb(0.15, 0.15, 0.15);
+}
+
 async function resolveItemSource(item) {
   try {
     const img = await loadImageSource(item.objectUrl);
@@ -129,15 +139,26 @@ function resolveItemComposition(item, state) {
   return normalizeComposition(state.globalComposition);
 }
 
-// ---- Color key legend (numbered, filled swatches) ----
+// ---- Color key legend (numbered, filled swatches / B&W numbered boxes) ----
 // Shared geometry (computeKeyGridLayout) with the embedded Unified-layout strip and
 // the full Expanded-layout migrated page, so both read as the same design language.
 
-function drawKeyEntries(page, rect, palette, regular, textColor, entryHeightMaxIn) {
-  const { xPt, yPt, widthPt, heightPt } = rect;
-  if (heightPt <= 0 || widthPt <= 0) return;
+const KEY_ENTRY_HEIGHT_IN = 0.24; // Full Color: single-line swatch + name, side by side
+const KEY_ENTRY_HEIGHT_BW_IN = 0.46; // Black & White: box stacked above its name needs more height
+const KEY_ENTRY_WIDTH_BW_IN = 0.85;
 
-  const { cols, entryWidthIn, entryHeightIn } = computeKeyGridLayout(palette.length, widthPt / PT_PER_IN, heightPt / PT_PER_IN, undefined, entryHeightMaxIn);
+function drawKeyEntries(page, rect, palette, regular, textColor, blackWhiteEdition) {
+  if (rect.heightPt <= 0 || rect.widthPt <= 0) return;
+  if (blackWhiteEdition) {
+    drawKeyEntriesBlackWhite(page, rect, palette, regular, textColor);
+  } else {
+    drawKeyEntriesColor(page, rect, palette, regular, textColor);
+  }
+}
+
+function drawKeyEntriesColor(page, rect, palette, regular, textColor) {
+  const { xPt, yPt, widthPt, heightPt } = rect;
+  const { cols, entryWidthIn, entryHeightIn } = computeKeyGridLayout(palette.length, widthPt / PT_PER_IN, heightPt / PT_PER_IN, undefined, KEY_ENTRY_HEIGHT_IN);
   const entryWidthPt = entryWidthIn * PT_PER_IN;
   const entryHeightPt = entryHeightIn * PT_PER_IN;
   const fontSize = Math.max(5.5, Math.min(9, entryHeightPt * 0.42));
@@ -159,8 +180,8 @@ function drawKeyEntries(page, rect, palette, regular, textColor, entryHeightMaxI
       height: swatchSize,
       color: rgb(r / 255, g / 255, b / 255),
       // Outline in the same color as the entry text — stays visible whether this key
-      // sits on a white puzzle-page strip or a Midnight/Blackout black background,
-      // instead of a hardcoded black outline that would vanish on a black page.
+      // sits on a white puzzle-page strip or a black Black Book background, instead of
+      // a hardcoded black outline that would vanish on a black page.
       borderColor: textColor,
       borderWidth: 0.3,
     });
@@ -168,6 +189,60 @@ function drawKeyEntries(page, rect, palette, regular, textColor, entryHeightMaxI
       x: cellX + 3 + swatchSize + 3,
       y: cellY + (entryHeightPt - fontSize) / 2 + 1,
       size: fontSize,
+      font: regular,
+      color: textColor,
+    });
+  });
+}
+
+// Black & White edition: nothing anywhere in the book spends color ink, so each legend
+// entry is a numbered black box (fixed white border + white number — its own identity,
+// independent of the page's own black/white background) stacked above the color's name.
+function drawKeyEntriesBlackWhite(page, rect, palette, regular, textColor) {
+  const { xPt, yPt, widthPt, heightPt } = rect;
+  const { cols, entryWidthIn, entryHeightIn } = computeKeyGridLayout(palette.length, widthPt / PT_PER_IN, heightPt / PT_PER_IN, KEY_ENTRY_WIDTH_BW_IN, KEY_ENTRY_HEIGHT_BW_IN);
+  const entryWidthPt = entryWidthIn * PT_PER_IN;
+  const entryHeightPt = entryHeightIn * PT_PER_IN;
+  const boxSize = Math.max(9, Math.min(entryWidthPt * 0.4, entryHeightPt * 0.55));
+  const numberSize = Math.max(6, Math.min(10, boxSize * 0.55));
+  const nameSize = Math.max(5.5, Math.min(8, entryHeightPt * 0.22));
+
+  palette.forEach((swatch, i) => {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const cellX = xPt + col * entryWidthPt;
+    const cellTop = yPt + heightPt - row * entryHeightPt;
+    const cellY = cellTop - entryHeightPt;
+    if (cellY < yPt - 0.5) return; // palette too large for the available strip height
+
+    const boxX = cellX + (entryWidthPt - boxSize) / 2;
+    const boxY = cellTop - boxSize - 3;
+
+    page.drawRectangle({
+      x: boxX,
+      y: boxY,
+      width: boxSize,
+      height: boxSize,
+      color: rgb(0, 0, 0),
+      borderColor: rgb(1, 1, 1),
+      borderWidth: 0.8,
+    });
+
+    const number = String(i + 1);
+    const numberWidth = regular.widthOfTextAtSize(number, numberSize);
+    page.drawText(number, {
+      x: boxX + (boxSize - numberWidth) / 2,
+      y: boxY + (boxSize - numberSize) / 2 + numberSize * 0.12,
+      size: numberSize,
+      font: regular,
+      color: rgb(1, 1, 1),
+    });
+
+    const nameWidth = regular.widthOfTextAtSize(swatch.name, nameSize);
+    page.drawText(swatch.name, {
+      x: cellX + Math.max(1, (entryWidthPt - nameWidth) / 2),
+      y: boxY - nameSize - 2,
+      size: nameSize,
       font: regular,
       color: textColor,
     });
@@ -212,10 +287,10 @@ const ELEMENT_TEXT_SIZE = { title: 16, subtitle: 11, instruction: 9.5 };
 
 // Draws one placed composition element (color key, or a title/subtitle/instruction text
 // block) into its reserved rect, with contrast-appropriate colors.
-function drawPlacedElement(page, { id, rect, elConfig, state, palette, bold, regular, textColor }, geom) {
+function drawPlacedElement(page, { id, rect, elConfig, state, palette, bold, regular, textColor, blackWhiteEdition = false }, geom) {
   const rectPt = safeLocalRectToPdf(rect, geom);
   if (id === "colorKey") {
-    drawKeyEntries(page, rectPt, palette, regular, textColor, 0.24);
+    drawKeyEntries(page, rectPt, palette, regular, textColor, blackWhiteEdition);
     return;
   }
   const fallback = { title: state.bookTitle, subtitle: state.bookSubtitle, instruction: elConfig.text }[id] || "";
@@ -226,39 +301,39 @@ function drawPlacedElement(page, { id, rect, elConfig, state, palette, bold, reg
   drawBoxedText(page, rectPt, text, font, ELEMENT_TEXT_SIZE[id] ?? 10, textColor, align);
 }
 
-// Composed blank (facing / even) page: paints the background (custom asset, or rich
-// black in Midnight/Blackout, or white), then lays down every element the composition
-// offloaded here — title, subtitle, instruction, and/or the migrated color key —
-// overlaid on that background with contrast-appropriate colors (Smart Integration).
-function drawComposedBlankPage(page, { blankPlacements, comp, state, palette, bold, regular, w, h, backImage, blackoutDefault, geom }) {
+// Composed blank (facing) page: paints the background (custom asset, or the Black Book
+// facing-page choice, or white), then lays down every element the composition offloaded
+// here — title, subtitle, instruction, and/or the migrated color key — overlaid on that
+// background with contrast-appropriate colors (Smart Integration).
+function drawComposedBlankPage(page, { blankPlacements, comp, state, palette, bold, regular, w, h, backImage, facingBlack, blackWhiteEdition, geom }) {
   const hasBackground = Boolean(backImage);
   if (hasBackground) {
     page.drawImage(backImage, { x: 0, y: 0, width: w, height: h });
-  } else if (blackoutDefault) {
+  } else if (facingBlack) {
     page.drawRectangle({ x: 0, y: 0, width: w, height: h, color: rgb(0, 0, 0) });
   } else {
     page.drawRectangle({ x: 0, y: 0, width: w, height: h, color: rgb(1, 1, 1) });
   }
 
-  const style = migratedKeyStyle(hasBackground || blackoutDefault);
+  const style = migratedKeyStyle(hasBackground || facingBlack);
   const textColor = style.textColor === "white" ? rgb(0.97, 0.97, 0.97) : rgb(0.18, 0.18, 0.18);
 
   blankPlacements.forEach(({ id, rect }) => {
-    drawPlacedElement(page, { id, rect, elConfig: comp[id], state, palette, bold, regular, textColor }, geom);
+    drawPlacedElement(page, { id, rect, elConfig: comp[id], state, palette, bold, regular, textColor, blackWhiteEdition }, geom);
   });
 }
 
 // ---- Generated front/back matter pages ----
 
-function drawTitlePage(page, state, bold, regular, w, h) {
-  page.drawRectangle({ x: 0, y: 0, width: w, height: h, color: rgb(1, 1, 1) });
-  centerText(page, state.bookTitle, bold, 26, h * 0.6);
-  if (state.bookSubtitle) centerText(page, state.bookSubtitle, regular, 13, h * 0.6 - 30);
-  if (state.bookAuthor) centerText(page, state.bookAuthor, regular, 12, h * 0.25, rgb(0.35, 0.35, 0.35));
+function drawTitlePage(page, state, bold, regular, w, h, contentBlack) {
+  const textColor = paintPageBackground(page, w, h, contentBlack);
+  centerText(page, state.bookTitle, bold, 26, h * 0.6, textColor);
+  if (state.bookSubtitle) centerText(page, state.bookSubtitle, regular, 13, h * 0.6 - 30, textColor);
+  if (state.bookAuthor) centerText(page, state.bookAuthor, regular, 12, h * 0.25, textColor);
 }
 
-function drawCopyrightPage(page, state, regular, w, h) {
-  page.drawRectangle({ x: 0, y: 0, width: w, height: h, color: rgb(1, 1, 1) });
+function drawCopyrightPage(page, state, regular, w, h, contentBlack) {
+  const textColor = paintPageBackground(page, w, h, contentBlack);
   const year = new Date().getFullYear();
   const isbn = state.bookIsbn.trim();
   const lines = [
@@ -275,14 +350,16 @@ function drawCopyrightPage(page, state, regular, w, h) {
   ];
   let y = h * 0.55;
   lines.forEach((line) => {
-    if (line) centerText(page, line, regular, 10, y, rgb(0.35, 0.35, 0.35));
+    if (line) centerText(page, line, regular, 10, y, textColor);
     y -= 16;
   });
 }
 
 // A row of small, unnumbered mosaic tiles cycling through the book's own active
-// palette — decorative only, never touching the safe-zone content area.
-function drawMosaicBorderRow(page, { y, w, palette, tileSize = 10, gap = 4 }) {
+// palette — decorative only, never touching the safe-zone content area. In a Black &
+// White edition it cycles grayscale luminance tiles instead, so this decoration never
+// spends color ink either.
+function drawMosaicBorderRow(page, { y, w, palette, tileSize = 10, gap = 4, blackWhiteEdition = false }) {
   if (palette.length === 0) return;
   const marginPt = 40;
   const usableWidth = w - marginPt * 2;
@@ -291,7 +368,8 @@ function drawMosaicBorderRow(page, { y, w, palette, tileSize = 10, gap = 4 }) {
   const startX = (w - rowWidth) / 2;
 
   for (let i = 0; i < tileCount; i += 1) {
-    const { r, g, b } = palette[i % palette.length].rgb;
+    const swatchRgb = palette[i % palette.length].rgb;
+    const { r, g, b } = blackWhiteEdition ? toGrayscaleRgb(swatchRgb) : swatchRgb;
     page.drawRectangle({
       x: startX + i * (tileSize + gap),
       y,
@@ -302,31 +380,31 @@ function drawMosaicBorderRow(page, { y, w, palette, tileSize = 10, gap = 4 }) {
   }
 }
 
-function drawBelongsToPage(page, bold, w, h, palette) {
-  page.drawRectangle({ x: 0, y: 0, width: w, height: h, color: rgb(1, 1, 1) });
+function drawBelongsToPage(page, bold, w, h, palette, contentBlack, blackWhiteEdition) {
+  const textColor = paintPageBackground(page, w, h, contentBlack);
 
   // "A small, unnumbered mosaic border... around the edges to match the theme of your
   // book" (Section 2) — built from the book's own active color key, top and bottom.
-  drawMosaicBorderRow(page, { y: h - 54, w, palette });
-  drawMosaicBorderRow(page, { y: 40, w, palette });
+  drawMosaicBorderRow(page, { y: h - 54, w, palette, blackWhiteEdition });
+  drawMosaicBorderRow(page, { y: 40, w, palette, blackWhiteEdition });
 
-  centerText(page, "This Mystery Mosaic Book", bold, 20, h * 0.62);
-  centerText(page, "Belongs To:", bold, 20, h * 0.62 - 26);
+  centerText(page, "This Mystery Mosaic Book", bold, 20, h * 0.62, textColor);
+  centerText(page, "Belongs To:", bold, 20, h * 0.62 - 26, textColor);
   const lineWidth = w * 0.55;
   const lineY = h * 0.42;
   page.drawLine({
     start: { x: (w - lineWidth) / 2, y: lineY },
     end: { x: (w + lineWidth) / 2, y: lineY },
     thickness: 1,
-    color: rgb(0.4, 0.4, 0.4),
+    color: textColor,
   });
 }
 
 // Blank swatch grid — for testing the reader's own markers/pencils, per Section 2.
-function drawColorTestPage(page, paletteLength, bold, regular, w, h) {
-  page.drawRectangle({ x: 0, y: 0, width: w, height: h, color: rgb(1, 1, 1) });
-  centerText(page, "Color Test Page", bold, 18, h - 60);
-  centerText(page, "Test your markers or pencils here before coloring the puzzle pages.", regular, 10, h - 80, rgb(0.4, 0.4, 0.4));
+function drawColorTestPage(page, paletteLength, bold, regular, w, h, contentBlack) {
+  const textColor = paintPageBackground(page, w, h, contentBlack);
+  centerText(page, "Color Test Page", bold, 18, h - 60, textColor);
+  centerText(page, "Test your markers or pencils here before coloring the puzzle pages.", regular, 10, h - 80, textColor);
 
   const marginPt = 54;
   const cols = 6;
@@ -338,7 +416,7 @@ function drawColorTestPage(page, paletteLength, bold, regular, w, h) {
       if (i >= paletteLength) break;
       const x = marginPt + c * (boxSize + 8);
       const y = h - 120 - r * (boxSize + 8) - boxSize;
-      page.drawRectangle({ x, y, width: boxSize, height: boxSize, borderColor: rgb(0.6, 0.6, 0.6), borderWidth: 1, color: rgb(1, 1, 1) });
+      page.drawRectangle({ x, y, width: boxSize, height: boxSize, borderColor: textColor, borderWidth: 1, color: rgb(1, 1, 1) });
       i += 1;
     }
   }
@@ -347,10 +425,10 @@ function drawColorTestPage(page, paletteLength, bold, regular, w, h) {
 // Section 3's "1% top seller" page: printed name + blank box for the reader's own pencil.
 // Distinct from the Color Key: this is for the reader to test-match their physical set,
 // not to decode puzzle numbers.
-function drawMasterPalettePage(page, palette, bold, regular, w, h) {
-  page.drawRectangle({ x: 0, y: 0, width: w, height: h, color: rgb(1, 1, 1) });
-  centerText(page, "Your Master Color Guide", bold, 18, h - 54);
-  centerText(page, `This book utilizes a standard ${palette.length}-color palette.`, regular, 10, h - 74, rgb(0.4, 0.4, 0.4));
+function drawMasterPalettePage(page, palette, bold, regular, w, h, contentBlack) {
+  const textColor = paintPageBackground(page, w, h, contentBlack);
+  centerText(page, "Your Master Color Guide", bold, 18, h - 54, textColor);
+  centerText(page, `This book utilizes a standard ${palette.length}-color palette.`, regular, 10, h - 74, textColor);
 
   const marginPt = 46;
   const rowH = 26;
@@ -363,8 +441,8 @@ function drawMasterPalettePage(page, palette, bold, regular, w, h) {
   palette.forEach((swatch, i) => {
     const x = marginPt + col * colWidth;
     const y = h - 110 - row * rowH;
-    page.drawText(`${i + 1}. ${swatch.name}`, { x, y: y + 4, size: 9, font: regular, color: rgb(0.2, 0.2, 0.2) });
-    page.drawRectangle({ x: x + colWidth - boxSize - 10, y, width: boxSize, height: boxSize, borderColor: rgb(0.5, 0.5, 0.5), borderWidth: 1, color: rgb(1, 1, 1) });
+    page.drawText(`${i + 1}. ${swatch.name}`, { x, y: y + 4, size: 9, font: regular, color: textColor });
+    page.drawRectangle({ x: x + colWidth - boxSize - 10, y, width: boxSize, height: boxSize, borderColor: textColor, borderWidth: 1, color: rgb(1, 1, 1) });
     row += 1;
     if (row >= perCol) {
       row = 0;
@@ -373,9 +451,9 @@ function drawMasterPalettePage(page, palette, bold, regular, w, h) {
   });
 }
 
-function drawInstructionsPage(page, bold, regular, w, h) {
-  page.drawRectangle({ x: 0, y: 0, width: w, height: h, color: rgb(1, 1, 1) });
-  centerText(page, "How to Solve These Mystery Mosaics", bold, 16, h - 60);
+function drawInstructionsPage(page, bold, regular, w, h, contentBlack) {
+  const textColor = paintPageBackground(page, w, h, contentBlack);
+  centerText(page, "How to Solve These Mystery Mosaics", bold, 16, h - 60, textColor);
 
   const paragraphs = [
     { text: "Find Your Number: Look at the numbers inside the tiny grid cells on the puzzle page." },
@@ -400,16 +478,16 @@ function drawInstructionsPage(page, bold, regular, w, h) {
     const font = heading ? bold : regular;
     const size = heading ? 12 : 10.5;
     wrapText(font, text, size, maxWidth).forEach((line) => {
-      page.drawText(line, { x: marginPt, y, size, font, color: rgb(0.2, 0.2, 0.2) });
+      page.drawText(line, { x: marginPt, y, size, font, color: textColor });
       y -= size + 6;
     });
     y -= 6;
   });
 }
 
-function drawReviewRequestPage(page, bold, regular, w, h) {
-  page.drawRectangle({ x: 0, y: 0, width: w, height: h, color: rgb(1, 1, 1) });
-  centerText(page, "Enjoyed This Book?", bold, 20, h * 0.58);
+function drawReviewRequestPage(page, bold, regular, w, h, contentBlack) {
+  const textColor = paintPageBackground(page, w, h, contentBlack);
+  centerText(page, "Enjoyed This Book?", bold, 20, h * 0.58, textColor);
   const lines = [
     "If you had fun solving these mystery mosaics, a quick review on Amazon",
     "would mean the world to us and helps other puzzle lovers find this book.",
@@ -417,28 +495,28 @@ function drawReviewRequestPage(page, bold, regular, w, h) {
   ];
   let y = h * 0.58 - 34;
   lines.forEach((line) => {
-    centerText(page, line, regular, 11, y, rgb(0.35, 0.35, 0.35));
+    centerText(page, line, regular, 11, y, textColor);
     y -= 18;
   });
 }
 
 // Both optional back-matter pages are skipped entirely when left blank — a fabricated
 // bio or promo reads worse than not having the page at all.
-function drawAboutArtistPage(page, state, bold, regular, w, h) {
-  page.drawRectangle({ x: 0, y: 0, width: w, height: h, color: rgb(1, 1, 1) });
-  centerText(page, "About the Artist", bold, 18, h * 0.72);
-  drawParagraphs(page, state.authorBio.trim(), regular, 10.5, 70, h * 0.72 - 34, w, rgb(0.3, 0.3, 0.3));
+function drawAboutArtistPage(page, state, bold, regular, w, h, contentBlack) {
+  const textColor = paintPageBackground(page, w, h, contentBlack);
+  centerText(page, "About the Artist", bold, 18, h * 0.72, textColor);
+  drawParagraphs(page, state.authorBio.trim(), regular, 10.5, 70, h * 0.72 - 34, w, textColor);
 }
 
-function drawSeriesPromoPage(page, state, bold, regular, w, h) {
-  page.drawRectangle({ x: 0, y: 0, width: w, height: h, color: rgb(1, 1, 1) });
-  centerText(page, "Also Available", bold, 18, h * 0.72);
-  drawParagraphs(page, state.seriesPromoText.trim(), regular, 10.5, 70, h * 0.72 - 34, w, rgb(0.3, 0.3, 0.3));
+function drawSeriesPromoPage(page, state, bold, regular, w, h, contentBlack) {
+  const textColor = paintPageBackground(page, w, h, contentBlack);
+  centerText(page, "Also Available", bold, 18, h * 0.72, textColor);
+  drawParagraphs(page, state.seriesPromoText.trim(), regular, 10.5, 70, h * 0.72 - 34, w, textColor);
 }
 
-async function drawSolutionPage(doc, page, solutionPage, solvedCanvasByItemId, bold, regular, w, h) {
-  page.drawRectangle({ x: 0, y: 0, width: w, height: h, color: rgb(1, 1, 1) });
-  centerText(page, "Solutions", bold, 18, h - 50);
+async function drawSolutionPage(doc, page, solutionPage, solvedCanvasByItemId, bold, regular, w, h, contentBlack) {
+  const textColor = paintPageBackground(page, w, h, contentBlack);
+  centerText(page, "Solutions", bold, 18, h - 50, textColor);
 
   const cols = 2;
   const rows = Math.ceil(solutionPage.thumbnails.length / cols) || 1;
@@ -468,13 +546,13 @@ async function drawSolutionPage(doc, page, solutionPage, solvedCanvasByItemId, b
     const drawHeight = drawWidth * (pngImage.height / pngImage.width);
 
     page.drawImage(pngImage, { x: x + (cellW - drawWidth) / 2, y: yTop - cellH + 20, width: drawWidth, height: drawHeight });
-    centerTextInBox(page, `Page ${thumb.puzzlePage}`, regular, 9, x, cellW, yTop - cellH + 4);
+    centerTextInBox(page, `Page ${thumb.puzzlePage}`, regular, 9, x, cellW, yTop - cellH + 4, textColor);
   }
 }
 
-function centerTextInBox(page, text, font, size, boxX, boxW, y) {
+function centerTextInBox(page, text, font, size, boxX, boxW, y, color = rgb(0.3, 0.3, 0.3)) {
   const width = font.widthOfTextAtSize(text, size);
-  page.drawText(text, { x: boxX + (boxW - width) / 2, y, size, font, color: rgb(0.3, 0.3, 0.3) });
+  page.drawText(text, { x: boxX + (boxW - width) / 2, y, size, font, color });
 }
 
 // Every generated front/back-matter page can be swapped for a gallery image assigned to
@@ -497,19 +575,20 @@ async function addGeneratedOrCustomPage(doc, state, categoryId, pageWidthPt, pag
 // Blank back page: a selected background (or plain white), plus — per Section 2's
 // spec for "Blank Backs" — a bleed-through hint and a small color-test strip near the
 // bottom center, so the page stays functionally useful rather than pure filler.
-function drawBlankBackPage(page, { backImage, palette, regular, w, h, blackoutDefault }) {
+function drawBlankBackPage(page, { backImage, palette, regular, w, h, facingBlack }) {
   const hasBackground = Boolean(backImage);
   if (hasBackground) {
     page.drawImage(backImage, { x: 0, y: 0, width: w, height: h });
-  } else if (blackoutDefault) {
-    // No custom asset selected, but Midnight/Blackout is active — default this page to
-    // the same rich-black background rather than a jarring white page mid-blackout book.
+  } else if (facingBlack) {
+    // No custom asset selected, but the Black Book facing-page choice is active —
+    // default this page to the same solid-black background rather than a jarring
+    // white page mid-black-facing-pages book.
     page.drawRectangle({ x: 0, y: 0, width: w, height: h, color: rgb(0, 0, 0) });
   } else {
     page.drawRectangle({ x: 0, y: 0, width: w, height: h, color: rgb(1, 1, 1) });
   }
 
-  const textColor = hasBackground || blackoutDefault ? rgb(0.95, 0.95, 0.95) : rgb(0.5, 0.5, 0.5);
+  const textColor = hasBackground || facingBlack ? rgb(0.95, 0.95, 0.95) : rgb(0.5, 0.5, 0.5);
   centerText(page, "Tip: Slip a scrap sheet of paper behind this page to protect against marker bleed-through.", regular, 7.5, 32, textColor);
 
   const boxSize = 12;
@@ -525,6 +604,13 @@ function drawBlankBackPage(page, { backImage, palette, regular, w, h, blackoutDe
 
 // ---- Main export pipeline ----
 
+// Book-wide, not per-item: the Black Book page-background and Color Edition choices
+// apply to the entire exported PDF, front matter through back matter — see
+// modules/bookThemeEngine.js for exactly what each resolves to.
+function addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack) {
+  doc.addPage([pageWidthPt, pageHeightPt]).drawRectangle({ x: 0, y: 0, width: pageWidthPt, height: pageHeightPt, color: facingBlack ? rgb(0, 0, 0) : rgb(1, 1, 1) });
+}
+
 export async function exportInteriorPdf(state, { onProgress } = {}) {
   const trimSize = getTrimSizeById(state.trimSizeId);
   const canvasDims = computeCanvasDimensions(trimSize, state.dpi, state.bleedEnabled);
@@ -533,6 +619,9 @@ export async function exportInteriorPdf(state, { onProgress } = {}) {
   const globalPalette = buildCombinedPalette(sizes);
   const pageWidthPt = inToPt(canvasDims.widthIn);
   const pageHeightPt = inToPt(canvasDims.heightIn);
+  const contentBlack = isContentPageBlack(state.pageBackgroundMode);
+  const facingBlack = isFacingPageBlack(state.pageBackgroundMode);
+  const blackWhiteEdition = isBlackWhiteEdition(state.bookColorMode);
 
   const doc = await PDFDocument.create();
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
@@ -561,28 +650,28 @@ export async function exportInteriorPdf(state, { onProgress } = {}) {
   };
 
   // ---- Front matter ----
-  await addGeneratedOrCustomPage(doc, state, "title-page", pageWidthPt, pageHeightPt, (page) => drawTitlePage(page, state, bold, regular, pageWidthPt, pageHeightPt));
-  doc.addPage([pageWidthPt, pageHeightPt]).drawRectangle({ x: 0, y: 0, width: pageWidthPt, height: pageHeightPt, color: rgb(1, 1, 1) });
+  await addGeneratedOrCustomPage(doc, state, "title-page", pageWidthPt, pageHeightPt, (page) => drawTitlePage(page, state, bold, regular, pageWidthPt, pageHeightPt, contentBlack));
+  addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
   reportProgress("Title Page");
 
-  await addGeneratedOrCustomPage(doc, state, "copyright-page", pageWidthPt, pageHeightPt, (page) => drawCopyrightPage(page, state, regular, pageWidthPt, pageHeightPt));
-  doc.addPage([pageWidthPt, pageHeightPt]).drawRectangle({ x: 0, y: 0, width: pageWidthPt, height: pageHeightPt, color: rgb(1, 1, 1) });
+  await addGeneratedOrCustomPage(doc, state, "copyright-page", pageWidthPt, pageHeightPt, (page) => drawCopyrightPage(page, state, regular, pageWidthPt, pageHeightPt, contentBlack));
+  addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
   reportProgress("Copyright Page");
 
-  await addGeneratedOrCustomPage(doc, state, "belongs-to-page", pageWidthPt, pageHeightPt, (page) => drawBelongsToPage(page, bold, pageWidthPt, pageHeightPt, globalPalette));
-  doc.addPage([pageWidthPt, pageHeightPt]).drawRectangle({ x: 0, y: 0, width: pageWidthPt, height: pageHeightPt, color: rgb(1, 1, 1) });
+  await addGeneratedOrCustomPage(doc, state, "belongs-to-page", pageWidthPt, pageHeightPt, (page) => drawBelongsToPage(page, bold, pageWidthPt, pageHeightPt, globalPalette, contentBlack, blackWhiteEdition));
+  addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
   reportProgress('"Belongs To" Page');
 
-  await addGeneratedOrCustomPage(doc, state, "color-test-page", pageWidthPt, pageHeightPt, (page) => drawColorTestPage(page, globalPalette.length, bold, regular, pageWidthPt, pageHeightPt));
-  doc.addPage([pageWidthPt, pageHeightPt]).drawRectangle({ x: 0, y: 0, width: pageWidthPt, height: pageHeightPt, color: rgb(1, 1, 1) });
+  await addGeneratedOrCustomPage(doc, state, "color-test-page", pageWidthPt, pageHeightPt, (page) => drawColorTestPage(page, globalPalette.length, bold, regular, pageWidthPt, pageHeightPt, contentBlack));
+  addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
   reportProgress("Color Test Page");
 
-  await addGeneratedOrCustomPage(doc, state, "instructions-page", pageWidthPt, pageHeightPt, (page) => drawInstructionsPage(page, bold, regular, pageWidthPt, pageHeightPt));
-  doc.addPage([pageWidthPt, pageHeightPt]).drawRectangle({ x: 0, y: 0, width: pageWidthPt, height: pageHeightPt, color: rgb(1, 1, 1) });
+  await addGeneratedOrCustomPage(doc, state, "instructions-page", pageWidthPt, pageHeightPt, (page) => drawInstructionsPage(page, bold, regular, pageWidthPt, pageHeightPt, contentBlack));
+  addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
   reportProgress("Instructions Page");
 
-  await addGeneratedOrCustomPage(doc, state, "master-palette-page", pageWidthPt, pageHeightPt, (page) => drawMasterPalettePage(page, globalPalette, bold, regular, pageWidthPt, pageHeightPt));
-  doc.addPage([pageWidthPt, pageHeightPt]).drawRectangle({ x: 0, y: 0, width: pageWidthPt, height: pageHeightPt, color: rgb(1, 1, 1) });
+  await addGeneratedOrCustomPage(doc, state, "master-palette-page", pageWidthPt, pageHeightPt, (page) => drawMasterPalettePage(page, globalPalette, bold, regular, pageWidthPt, pageHeightPt, contentBlack));
+  addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
   reportProgress("Master Palette Page");
 
   // Book spreads only ever pair (even left, odd right) — never (odd, even) — so for
@@ -591,7 +680,7 @@ export async function exportInteriorPdf(state, { onProgress } = {}) {
   // (six content+blank pairs), so one blank filler page is inserted here to shift
   // parity before the puzzle interior begins.
   if (doc.getPageCount() % 2 === 0) {
-    doc.addPage([pageWidthPt, pageHeightPt]).drawRectangle({ x: 0, y: 0, width: pageWidthPt, height: pageHeightPt, color: rgb(1, 1, 1) });
+    addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
   }
 
   // ---- Puzzle interior (storyboard order, per-item overrides applied) ----
@@ -619,6 +708,8 @@ export async function exportInteriorPdf(state, { onProgress } = {}) {
       palette: effective.palette,
       sourceCanvas,
       gridCornerTrim: state.gridCornerTrim,
+      gridPageBlack: contentBlack,
+      blackWhiteEdition,
     };
 
     const printCanvas = document.createElement("canvas");
@@ -643,11 +734,10 @@ export async function exportInteriorPdf(state, { onProgress } = {}) {
     // over the background; otherwise it's a standard blank key page (bleed hint + test strip).
     const keyPage = doc.addPage([pageWidthPt, pageHeightPt]);
     const itemBackImage = resolveItemBackImage(item, backImagesByAssetId, globalBackImage);
-    const blackoutDefault = effective.gridTintPercent >= 100;
     if (layout.blankPlacements.length > 0) {
-      drawComposedBlankPage(keyPage, { blankPlacements: layout.blankPlacements, comp, state, palette: legend, bold, regular, w: pageWidthPt, h: pageHeightPt, backImage: itemBackImage, blackoutDefault, geom });
+      drawComposedBlankPage(keyPage, { blankPlacements: layout.blankPlacements, comp, state, palette: legend, bold, regular, w: pageWidthPt, h: pageHeightPt, backImage: itemBackImage, facingBlack, blackWhiteEdition, geom });
     } else {
-      drawBlankBackPage(keyPage, { backImage: itemBackImage, palette: legend, regular, w: pageWidthPt, h: pageHeightPt, blackoutDefault });
+      drawBlankBackPage(keyPage, { backImage: itemBackImage, palette: legend, regular, w: pageWidthPt, h: pageHeightPt, facingBlack });
     }
 
     const puzzlePage = doc.addPage([pageWidthPt, pageHeightPt]);
@@ -655,10 +745,10 @@ export async function exportInteriorPdf(state, { onProgress } = {}) {
 
     // Draw every element the composition placed ON the grid page as crisp vector content,
     // in the bands renderFullMosaicGrid left reserved and blank. Text flips light on a
-    // Midnight/Blackout background (which the grid raster painted behind the bands).
-    const gridTextColor = effective.gridTintPercent >= 100 ? rgb(0.95, 0.95, 0.95) : rgb(0.18, 0.18, 0.18);
+    // Black Book content-black background (which the grid raster painted behind the bands).
+    const gridTextColor = contentBlack ? rgb(0.95, 0.95, 0.95) : rgb(0.18, 0.18, 0.18);
     layout.gridPlacements.forEach(({ id, rect }) => {
-      drawPlacedElement(puzzlePage, { id, rect, elConfig: comp[id], state, palette: legend, bold, regular, textColor: gridTextColor }, geom);
+      drawPlacedElement(puzzlePage, { id, rect, elConfig: comp[id], state, palette: legend, bold, regular, textColor: gridTextColor, blackWhiteEdition }, geom);
     });
 
     reportProgress(`Puzzle: ${item.name}`);
@@ -670,8 +760,8 @@ export async function exportInteriorPdf(state, { onProgress } = {}) {
   const solutionPages = buildSolutionPages(paginated, state.solutionThumbsPerPage);
   for (const solutionPage of solutionPages) {
     const page = doc.addPage([pageWidthPt, pageHeightPt]);
-    await drawSolutionPage(doc, page, solutionPage, solvedCanvasByItemId, bold, regular, pageWidthPt, pageHeightPt);
-    doc.addPage([pageWidthPt, pageHeightPt]).drawRectangle({ x: 0, y: 0, width: pageWidthPt, height: pageHeightPt, color: rgb(1, 1, 1) });
+    await drawSolutionPage(doc, page, solutionPage, solvedCanvasByItemId, bold, regular, pageWidthPt, pageHeightPt, contentBlack);
+    addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
     reportProgress("Solution Page");
   }
   if (solutionPages.length === 0) reportProgress("Solutions (skipped — no artwork queued)");
@@ -679,27 +769,27 @@ export async function exportInteriorPdf(state, { onProgress } = {}) {
   // ---- Back matter: extra color test pages (2, per Section 2), review, optional pages ----
   for (let i = 0; i < 2; i += 1) {
     const page = doc.addPage([pageWidthPt, pageHeightPt]);
-    drawColorTestPage(page, globalPalette.length, bold, regular, pageWidthPt, pageHeightPt);
-    doc.addPage([pageWidthPt, pageHeightPt]).drawRectangle({ x: 0, y: 0, width: pageWidthPt, height: pageHeightPt, color: rgb(1, 1, 1) });
+    drawColorTestPage(page, globalPalette.length, bold, regular, pageWidthPt, pageHeightPt, contentBlack);
+    addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
   }
   reportProgress("Extra Color Test Pages");
 
   if (hasAboutArtist) {
-    await addGeneratedOrCustomPage(doc, state, "about-artist-page", pageWidthPt, pageHeightPt, (page) => drawAboutArtistPage(page, state, bold, regular, pageWidthPt, pageHeightPt));
-    doc.addPage([pageWidthPt, pageHeightPt]).drawRectangle({ x: 0, y: 0, width: pageWidthPt, height: pageHeightPt, color: rgb(1, 1, 1) });
+    await addGeneratedOrCustomPage(doc, state, "about-artist-page", pageWidthPt, pageHeightPt, (page) => drawAboutArtistPage(page, state, bold, regular, pageWidthPt, pageHeightPt, contentBlack));
+    addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
     reportProgress("About the Artist Page");
   }
 
   // Every content page pairs with a blank facing page (Section 2's single-sided-
   // printing rule) — including these last two, so the interior page count always
   // lands even, which KDP's print pipeline requires.
-  await addGeneratedOrCustomPage(doc, state, "review-request-page", pageWidthPt, pageHeightPt, (page) => drawReviewRequestPage(page, bold, regular, pageWidthPt, pageHeightPt));
-  doc.addPage([pageWidthPt, pageHeightPt]).drawRectangle({ x: 0, y: 0, width: pageWidthPt, height: pageHeightPt, color: rgb(1, 1, 1) });
+  await addGeneratedOrCustomPage(doc, state, "review-request-page", pageWidthPt, pageHeightPt, (page) => drawReviewRequestPage(page, bold, regular, pageWidthPt, pageHeightPt, contentBlack));
+  addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
   reportProgress("Review Request Page");
 
   if (hasSeriesPromo) {
-    await addGeneratedOrCustomPage(doc, state, "series-promo-page", pageWidthPt, pageHeightPt, (page) => drawSeriesPromoPage(page, state, bold, regular, pageWidthPt, pageHeightPt));
-    doc.addPage([pageWidthPt, pageHeightPt]).drawRectangle({ x: 0, y: 0, width: pageWidthPt, height: pageHeightPt, color: rgb(1, 1, 1) });
+    await addGeneratedOrCustomPage(doc, state, "series-promo-page", pageWidthPt, pageHeightPt, (page) => drawSeriesPromoPage(page, state, bold, regular, pageWidthPt, pageHeightPt, contentBlack));
+    addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
     reportProgress("Series Promo Page");
   }
 
@@ -756,6 +846,8 @@ async function renderActiveItemFullPage(state, mode) {
     : { gridPattern: state.gridPattern, borderWeightPt: state.borderWeightPt, gridTintPercent: state.gridTintPercent, cornerRadiusPercent: state.cornerRadiusPercent, palette: globalPalette };
   const comp = activeItem ? resolveItemComposition(activeItem, state) : normalizeComposition(state.globalComposition);
   const { cellSizeMm: effectiveCellSizeMm, gridOverride } = resolveEffectiveGrid(safeZone, state.cellSizeMm, effective.gridPattern, comp, state.resolutionPriority);
+  const contentBlack = isContentPageBlack(state.pageBackgroundMode);
+  const blackWhiteEdition = isBlackWhiteEdition(state.bookColorMode);
 
   const canvas = document.createElement("canvas");
   canvas.width = canvasDims.widthPx;
@@ -776,10 +868,12 @@ async function renderActiveItemFullPage(state, mode) {
     sourceCanvas,
     mode,
     gridCornerTrim: state.gridCornerTrim,
+    gridPageBlack: contentBlack,
+    blackWhiteEdition,
   });
 
   const geom = { canvasDims, safeZone, pageSide: state.pageSide, pageHeightPt };
-  return { canvas, pageWidthPt, pageHeightPt, safeZone, comp, effective, geom, legend };
+  return { canvas, pageWidthPt, pageHeightPt, safeZone, comp, effective, geom, legend, contentBlack, blackWhiteEdition };
 }
 
 // Downloads the active preview panel (mode: 'print' | 'solved') as a standalone PNG at
@@ -794,7 +888,7 @@ export async function downloadActiveItemPng(state, mode) {
 // book export) — same raster + vector-overlay pipeline as exportInteriorPdf's puzzle
 // page, just one page, for quickly proofing or sharing a single image.
 export async function downloadActiveItemPdf(state, mode) {
-  const { canvas, pageWidthPt, pageHeightPt, comp, effective, geom, legend } = await renderActiveItemFullPage(state, mode);
+  const { canvas, pageWidthPt, pageHeightPt, comp, geom, legend, contentBlack, blackWhiteEdition } = await renderActiveItemFullPage(state, mode);
 
   const doc = await PDFDocument.create();
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
@@ -805,9 +899,9 @@ export async function downloadActiveItemPdf(state, mode) {
 
   if (mode === "print") {
     const layout = computeLayout(geom.safeZone, comp);
-    const gridTextColor = effective.gridTintPercent >= 100 ? rgb(0.95, 0.95, 0.95) : rgb(0.18, 0.18, 0.18);
+    const gridTextColor = contentBlack ? rgb(0.95, 0.95, 0.95) : rgb(0.18, 0.18, 0.18);
     layout.gridPlacements.forEach(({ id, rect }) => {
-      drawPlacedElement(page, { id, rect, elConfig: comp[id], state, palette: legend, bold, regular, textColor: gridTextColor }, geom);
+      drawPlacedElement(page, { id, rect, elConfig: comp[id], state, palette: legend, bold, regular, textColor: gridTextColor, blackWhiteEdition }, geom);
     });
   }
 
