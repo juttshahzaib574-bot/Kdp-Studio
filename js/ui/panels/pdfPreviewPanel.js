@@ -5,10 +5,10 @@
 // unlike the small 2-canvas mosaic preview — the same reason the "Export PDF" button
 // itself is a deliberate click, not something that reruns on every keystroke.
 
-import { state, subscribe } from "../../state.js?v=25";
-import { getTrimSizeById } from "../../modules/canvasEngine.js?v=25";
-import { exportInteriorPdf } from "../pdfExport.js?v=25";
-import { loadPdfDocument, renderPdfPageToCanvas } from "../pdfPreview.js?v=25";
+import { state, subscribe } from "../../state.js?v=26";
+import { getTrimSizeById } from "../../modules/canvasEngine.js?v=26";
+import { exportInteriorPdf } from "../pdfExport.js?v=26";
+import { loadPdfDocument, renderPdfPageToCanvas } from "../pdfPreview.js?v=26";
 
 const THUMB_SCALE = 0.22;
 const MAIN_SCALE = 1.4;
