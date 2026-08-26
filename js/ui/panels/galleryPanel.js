@@ -4,7 +4,7 @@
 // page) and free-form user-created "albums" for organizing reference images before they're
 // assigned a role. Drag a thumbnail onto any bucket in the sidebar to move it there.
 
-import { state, setState, subscribe } from "../../state.js?v=6";
+import { state, setState, subscribe } from "../../state.js?v=7";
 import {
   ASSET_CATEGORIES,
   loadGallery,
@@ -18,9 +18,8 @@ import {
   createAlbum,
   renameAlbum,
   deleteAlbum,
-} from "../../modules/assetGalleryEngine.js?v=6";
+} from "../../modules/assetGalleryEngine.js?v=7";
 
-let nextAssetId = 1;
 let activeBucketId = ASSET_CATEGORIES[0].id;
 let dragAssetId = null;
 
@@ -98,7 +97,10 @@ async function handleUpload() {
   const dims = await readImageDimensions(dataUrl);
 
   const asset = {
-    id: `asset-${nextAssetId++}`,
+    // Globally unique and stable across reloads — a session-scoped counter starting
+    // back at 1 every page load would eventually mint an id that collides with one
+    // already sitting in localStorage from an earlier session's uploads.
+    id: `asset-${crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`}`,
     name: file.name,
     dataUrl,
     widthPx: dims.width,
