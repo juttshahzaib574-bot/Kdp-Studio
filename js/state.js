@@ -31,7 +31,6 @@ export const state = {
   // Section 4: Color Key Standards
   colorSetOptionId: "set-24",
   colorSetCustomPair: [12, 24],
-  colorBrand: "crayola",
 
   // High-Capacity Batch Engine + Drag-and-Drop Storyboard Dashboard
   batchItems: [],
