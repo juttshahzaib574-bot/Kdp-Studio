@@ -1,14 +1,14 @@
-import { state, setState, subscribe } from "../../state.js?v=4";
-import { GRID_PATTERNS, computeGridDimensions, isCellInGridSilhouette } from "../../modules/gridPatternEngine.js?v=4";
-import { recommendFont, recommendTextTint } from "../../modules/typographyEngine.js?v=4";
-import { applyPreset, clampBorderWeight } from "../../modules/borderStyleEngine.js?v=4";
-import { CORNER_RADIUS_MIN_PERCENT, CORNER_RADIUS_MAX_PERCENT } from "../../modules/cornerRadiusEngine.js?v=4";
-import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=4";
-import { getTrimSizeById } from "../../modules/canvasEngine.js?v=4";
-import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=4";
-import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=4";
-import { normalizeComposition, computeLayout } from "../../modules/layoutCompositionEngine.js?v=4";
-import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=4";
+import { state, setState, subscribe } from "../../state.js?v=5";
+import { GRID_PATTERNS, computeGridDimensions, isCellInGridSilhouette } from "../../modules/gridPatternEngine.js?v=5";
+import { recommendFont, recommendTextTint } from "../../modules/typographyEngine.js?v=5";
+import { applyPreset, clampBorderWeight } from "../../modules/borderStyleEngine.js?v=5";
+import { CORNER_RADIUS_MIN_PERCENT, CORNER_RADIUS_MAX_PERCENT } from "../../modules/cornerRadiusEngine.js?v=5";
+import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=5";
+import { getTrimSizeById } from "../../modules/canvasEngine.js?v=5";
+import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=5";
+import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=5";
+import { normalizeComposition, computeLayout } from "../../modules/layoutCompositionEngine.js?v=5";
+import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=5";
 
 const el = {
   patternGrid: document.getElementById("grid-pattern-options"),

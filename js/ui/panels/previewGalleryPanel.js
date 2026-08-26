@@ -1,15 +1,15 @@
 // Module: Stacked Live Preview Gallery + The 3-Second Looping Interface
-import { state, subscribe } from "../../state.js?v=4";
-import { getTrimSizeById } from "../../modules/canvasEngine.js?v=4";
-import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=4";
-import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=4";
-import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=4";
-import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=4";
-import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=4";
-import { normalizeComposition } from "../../modules/layoutCompositionEngine.js?v=4";
-import { getPlaceholderSource, loadImageSource, drawSourceToCanvas, renderMosaicPreview } from "../mosaicRenderer.js?v=4";
-import { createLoopController } from "../../modules/previewLoopEngine.js?v=4";
-import { downloadActiveItemPng, downloadActiveItemPdf } from "../pdfExport.js?v=4";
+import { state, subscribe } from "../../state.js?v=5";
+import { getTrimSizeById } from "../../modules/canvasEngine.js?v=5";
+import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=5";
+import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=5";
+import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=5";
+import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=5";
+import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=5";
+import { normalizeComposition } from "../../modules/layoutCompositionEngine.js?v=5";
+import { getPlaceholderSource, loadImageSource, drawSourceToCanvas, renderMosaicPreview } from "../mosaicRenderer.js?v=5";
+import { createLoopController } from "../../modules/previewLoopEngine.js?v=5";
+import { downloadActiveItemPng, downloadActiveItemPdf } from "../pdfExport.js?v=5";
 
 const el = {
   printCanvas: document.getElementById("preview-canvas-print"),

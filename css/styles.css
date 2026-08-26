@@ -1291,12 +1291,25 @@ input[type="file"] {
   border-color: var(--accent);
 }
 
-.pdf-thumb canvas {
+/* Shape of the thumbnail is driven by the selected Trim Size, not by whatever the
+   canvas happens to render at — set inline per page via --trim-aspect-ratio so a
+   thumbnail reads its correct proportions even before the canvas paints. */
+.pdf-thumb-frame {
+  position: relative;
   width: 100%;
-  height: auto;
-  display: block;
+  aspect-ratio: var(--trim-aspect-ratio, 1);
   border-radius: 2px;
+  overflow: hidden;
   background: #fff;
+}
+
+.pdf-thumb-frame canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
 }
 
 .pdf-thumb-label {
@@ -1327,6 +1340,7 @@ input[type="file"] {
 .pdf-viewer-canvas-stage {
   display: flex;
   justify-content: center;
+  align-items: flex-start;
   background: var(--panel-alt);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -1335,8 +1349,25 @@ input[type="file"] {
   overflow: auto;
 }
 
-.pdf-viewer-canvas-stage canvas {
-  max-width: 100%;
-  height: auto;
+/* The page frame's shape is set inline (--trim-aspect-ratio) from the selected KDP
+   Trim Size (e.g. 8.5 / 11) whenever it changes — independent of the canvas's own
+   pixel dimensions — so the box is always a mathematically exact, pixel-perfect stand-in
+   for the physical printed page and scales responsively with the container's width. */
+.pdf-page-frame {
+  position: relative;
+  width: 100%;
+  max-width: min(620px, 100%);
+  aspect-ratio: var(--trim-aspect-ratio, 1);
+  background: #fff;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  flex-shrink: 0;
+}
+
+.pdf-page-frame canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
 }
