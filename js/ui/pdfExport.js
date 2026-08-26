@@ -4,22 +4,22 @@
 // (honoring each image's own granular overrides), auto-generated solution pages, and
 // back matter — entirely client-side via pdf-lib, no server round-trip.
 
-import { PDFDocument, StandardFonts, rgb } from "../vendor/pdf-lib.esm.min.js?v=23";
-import { getTrimSizeById } from "../modules/canvasEngine.js?v=23";
-import { computeCanvasDimensions } from "../modules/bleedEngine.js?v=23";
-import { computeSafeZone } from "../modules/safeZoneEngine.js?v=23";
-import { getSizesForSelection, buildCombinedPalette } from "../modules/colorKeyEngine.js?v=23";
-import { computePagination } from "../modules/storyboardEngine.js?v=23";
-import { FRONT_MATTER_PAGES, isPageEnabled, computeFrontMatterPageCount } from "../modules/frontBackMatterEngine.js?v=23";
-import { buildSolutionPages } from "../modules/solutionGenerationEngine.js?v=23";
-import { BORDER_PRESETS } from "../modules/borderStyleEngine.js?v=23";
-import { migratedKeyStyle } from "../modules/layoutEngine.js?v=23";
-import { resolveEffectiveGrid } from "../modules/resolutionScalingEngine.js?v=23";
-import { computeKeyGridLayout, keyEntryPosition } from "../modules/colorKeyLayoutEngine.js?v=23";
-import { normalizeComposition, computeLayout } from "../modules/layoutCompositionEngine.js?v=23";
-import { resolveActiveAsset } from "../modules/assetGalleryEngine.js?v=23";
-import { renderFullMosaicGrid, getPlaceholderSource, loadImageSource, drawSourceToCanvas } from "./mosaicRenderer.js?v=23";
-import { isContentPageBlack, isFacingPageBlack, isBlackWhiteEdition, toGrayscaleRgb } from "../modules/bookThemeEngine.js?v=23";
+import { PDFDocument, StandardFonts, rgb } from "../vendor/pdf-lib.esm.min.js?v=24";
+import { getTrimSizeById } from "../modules/canvasEngine.js?v=24";
+import { computeCanvasDimensions } from "../modules/bleedEngine.js?v=24";
+import { computeSafeZone } from "../modules/safeZoneEngine.js?v=24";
+import { getSizesForSelection, buildCombinedPalette } from "../modules/colorKeyEngine.js?v=24";
+import { computePagination } from "../modules/storyboardEngine.js?v=24";
+import { isPageEnabled, computeFrontMatterPageCount, orderedFrontMatterPages, orderedBackMatterPages } from "../modules/frontBackMatterEngine.js?v=24";
+import { buildSolutionPages } from "../modules/solutionGenerationEngine.js?v=24";
+import { BORDER_PRESETS } from "../modules/borderStyleEngine.js?v=24";
+import { migratedKeyStyle } from "../modules/layoutEngine.js?v=24";
+import { resolveEffectiveGrid } from "../modules/resolutionScalingEngine.js?v=24";
+import { computeKeyGridLayout, keyEntryPosition } from "../modules/colorKeyLayoutEngine.js?v=24";
+import { normalizeComposition, computeLayout } from "../modules/layoutCompositionEngine.js?v=24";
+import { resolveActiveAsset } from "../modules/assetGalleryEngine.js?v=24";
+import { renderFullMosaicGrid, getPlaceholderSource, loadImageSource, drawSourceToCanvas } from "./mosaicRenderer.js?v=24";
+import { isContentPageBlack, isFacingPageBlack, isBlackWhiteEdition, toGrayscaleRgb } from "../modules/bookThemeEngine.js?v=24";
 
 const PT_PER_IN = 72;
 const inToPt = (inches) => inches * PT_PER_IN;
@@ -643,7 +643,11 @@ export async function exportInteriorPdf(state, { onProgress } = {}) {
   const disabledPages = state.disabledFrontBackMatterPages;
   const isEnabled = (pageId) => isPageEnabled(disabledPages, pageId);
 
-  const frontMatterStepCount = FRONT_MATTER_PAGES.filter((p) => isEnabled(p.id)).length;
+  const orderedFrontMatter = orderedFrontMatterPages(state.frontMatterOrder);
+  const enabledFrontMatter = orderedFrontMatter.filter((p) => isEnabled(p.id));
+  const orderedBackMatter = orderedBackMatterPages(state.backMatterOrder);
+
+  const frontMatterStepCount = enabledFrontMatter.length;
   const solutionsEnabled = isEnabled("solutions");
   const extraColorTestEnabled = isEnabled("extra-color-test-pages");
   const aboutArtistEnabled = hasAboutArtist && isEnabled("about-artist-page");
@@ -668,51 +672,32 @@ export async function exportInteriorPdf(state, { onProgress } = {}) {
   // front-matter page simply skips its own blank facing page: that slot becomes the
   // key page directly. Only applies when there's actually a puzzle to receive it.
   const hasPuzzles = state.batchItems.length > 0;
-  const enabledFrontMatterIds = FRONT_MATTER_PAGES.filter((p) => isEnabled(p.id)).map((p) => p.id);
-  const lastFrontMatterId = enabledFrontMatterIds[enabledFrontMatterIds.length - 1];
+  const lastFrontMatterId = enabledFrontMatter[enabledFrontMatter.length - 1]?.id;
   const addTrailingBlank = (pageId) => {
     if (hasPuzzles && pageId === lastFrontMatterId) return; // reclaimed as the key page below
     addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
   };
 
-  // ---- Front matter ----
-  // Each page here can be individually excluded from the export (see
-  // modules/frontBackMatterEngine.js) — its own generated/custom content and settings
-  // are untouched either way, so re-checking it later brings it right back.
-  if (isEnabled("title-page")) {
-    await addGeneratedOrCustomPage(doc, state, "title-page", pageWidthPt, pageHeightPt, (page) => drawTitlePage(page, state, bold, regular, pageWidthPt, pageHeightPt, contentBlack));
-    addTrailingBlank("title-page");
-    reportProgress("Title Page");
-  }
+  // Draws one front-matter page's generated content by id — dispatch table rather
+  // than a fixed sequence of calls, since the creator can reorder these freely (see
+  // frontMatterOrder in state.js) and the emission loop below just walks that order.
+  const FRONT_MATTER_DRAWERS = {
+    "title-page": (page) => drawTitlePage(page, state, bold, regular, pageWidthPt, pageHeightPt, contentBlack),
+    "copyright-page": (page) => drawCopyrightPage(page, state, regular, pageWidthPt, pageHeightPt, contentBlack),
+    "belongs-to-page": (page) => drawBelongsToPage(page, bold, pageWidthPt, pageHeightPt, globalPalette, contentBlack, blackWhiteEdition),
+    "color-test-page": (page) => drawColorTestPage(page, globalPalette.length, bold, regular, pageWidthPt, pageHeightPt, contentBlack),
+    "instructions-page": (page) => drawInstructionsPage(page, bold, regular, pageWidthPt, pageHeightPt, contentBlack),
+    "master-palette-page": (page) => drawMasterPalettePage(page, globalPalette, bold, regular, pageWidthPt, pageHeightPt, contentBlack),
+  };
 
-  if (isEnabled("copyright-page")) {
-    await addGeneratedOrCustomPage(doc, state, "copyright-page", pageWidthPt, pageHeightPt, (page) => drawCopyrightPage(page, state, regular, pageWidthPt, pageHeightPt, contentBlack));
-    addTrailingBlank("copyright-page");
-    reportProgress("Copyright Page");
-  }
-
-  if (isEnabled("belongs-to-page")) {
-    await addGeneratedOrCustomPage(doc, state, "belongs-to-page", pageWidthPt, pageHeightPt, (page) => drawBelongsToPage(page, bold, pageWidthPt, pageHeightPt, globalPalette, contentBlack, blackWhiteEdition));
-    addTrailingBlank("belongs-to-page");
-    reportProgress('"Belongs To" Page');
-  }
-
-  if (isEnabled("color-test-page")) {
-    await addGeneratedOrCustomPage(doc, state, "color-test-page", pageWidthPt, pageHeightPt, (page) => drawColorTestPage(page, globalPalette.length, bold, regular, pageWidthPt, pageHeightPt, contentBlack));
-    addTrailingBlank("color-test-page");
-    reportProgress("Color Test Page");
-  }
-
-  if (isEnabled("instructions-page")) {
-    await addGeneratedOrCustomPage(doc, state, "instructions-page", pageWidthPt, pageHeightPt, (page) => drawInstructionsPage(page, bold, regular, pageWidthPt, pageHeightPt, contentBlack));
-    addTrailingBlank("instructions-page");
-    reportProgress("Instructions Page");
-  }
-
-  if (isEnabled("master-palette-page")) {
-    await addGeneratedOrCustomPage(doc, state, "master-palette-page", pageWidthPt, pageHeightPt, (page) => drawMasterPalettePage(page, globalPalette, bold, regular, pageWidthPt, pageHeightPt, contentBlack));
-    addTrailingBlank("master-palette-page");
-    reportProgress("Master Palette Page");
+  // ---- Front matter (creator's own order; each page individually excludable) ----
+  // Every page here can be individually excluded from the export, and reordered —
+  // its own generated/custom content and settings are untouched either way, so
+  // re-checking or moving it later brings it right back where it's put.
+  for (const { id, label } of enabledFrontMatter) {
+    await addGeneratedOrCustomPage(doc, state, id, pageWidthPt, pageHeightPt, FRONT_MATTER_DRAWERS[id]);
+    addTrailingBlank(id);
+    reportProgress(label);
   }
 
   // Covers the case front matter didn't supply the parity shift itself — no front-
@@ -798,48 +783,56 @@ export async function exportInteriorPdf(state, { onProgress } = {}) {
     await yieldToUi();
   }
 
-  // ---- Back matter: auto-generated Solutions, synced to storyboard order ----
-  if (solutionsEnabled) {
-    const paginated = computePagination(state.batchItems, computeFrontMatterPageCount(disabledPages, hasPuzzles));
-    const solutionPages = buildSolutionPages(paginated, state.solutionThumbsPerPage);
-    for (const solutionPage of solutionPages) {
-      const page = doc.addPage([pageWidthPt, pageHeightPt]);
-      await drawSolutionPage(doc, page, solutionPage, solvedCanvasByItemId, bold, regular, pageWidthPt, pageHeightPt, contentBlack);
+  // ---- Back matter (creator's own order; each section individually excludable) ----
+  // Unlike front matter, each entry here is a whole SECTION rather than one page —
+  // Solutions and Extra Color Test Pages each add a variable/fixed run of pages, the
+  // rest add exactly one generated/custom page — so each is its own async block that
+  // early-returns when its toggle is off, and the loop below just runs them in the
+  // creator's chosen order.
+  const BACK_MATTER_SECTIONS = {
+    solutions: async () => {
+      if (!solutionsEnabled) return;
+      const paginated = computePagination(state.batchItems, computeFrontMatterPageCount(disabledPages, hasPuzzles));
+      const solutionPages = buildSolutionPages(paginated, state.solutionThumbsPerPage);
+      for (const solutionPage of solutionPages) {
+        const page = doc.addPage([pageWidthPt, pageHeightPt]);
+        await drawSolutionPage(doc, page, solutionPage, solvedCanvasByItemId, bold, regular, pageWidthPt, pageHeightPt, contentBlack);
+        addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
+        reportProgress("Solution Page");
+      }
+      if (solutionPages.length === 0) reportProgress("Solutions (skipped — no artwork queued)");
+    },
+    "extra-color-test-pages": async () => {
+      if (!extraColorTestEnabled) return;
+      for (let i = 0; i < 2; i += 1) {
+        const page = doc.addPage([pageWidthPt, pageHeightPt]);
+        drawColorTestPage(page, globalPalette.length, bold, regular, pageWidthPt, pageHeightPt, contentBlack);
+        addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
+      }
+      reportProgress("Extra Color Test Pages");
+    },
+    "about-artist-page": async () => {
+      if (!aboutArtistEnabled) return;
+      await addGeneratedOrCustomPage(doc, state, "about-artist-page", pageWidthPt, pageHeightPt, (page) => drawAboutArtistPage(page, state, bold, regular, pageWidthPt, pageHeightPt, contentBlack));
       addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
-      reportProgress("Solution Page");
-    }
-    if (solutionPages.length === 0) reportProgress("Solutions (skipped — no artwork queued)");
-  }
-
-  // ---- Back matter: extra color test pages (2, per Section 2), review, optional pages ----
-  if (extraColorTestEnabled) {
-    for (let i = 0; i < 2; i += 1) {
-      const page = doc.addPage([pageWidthPt, pageHeightPt]);
-      drawColorTestPage(page, globalPalette.length, bold, regular, pageWidthPt, pageHeightPt, contentBlack);
+      reportProgress("About the Artist Page");
+    },
+    "review-request-page": async () => {
+      if (!reviewRequestEnabled) return;
+      await addGeneratedOrCustomPage(doc, state, "review-request-page", pageWidthPt, pageHeightPt, (page) => drawReviewRequestPage(page, bold, regular, pageWidthPt, pageHeightPt, contentBlack));
       addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
-    }
-    reportProgress("Extra Color Test Pages");
-  }
+      reportProgress("Review Request Page");
+    },
+    "series-promo-page": async () => {
+      if (!seriesPromoEnabled) return;
+      await addGeneratedOrCustomPage(doc, state, "series-promo-page", pageWidthPt, pageHeightPt, (page) => drawSeriesPromoPage(page, state, bold, regular, pageWidthPt, pageHeightPt, contentBlack));
+      addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
+      reportProgress("Series Promo Page");
+    },
+  };
 
-  if (aboutArtistEnabled) {
-    await addGeneratedOrCustomPage(doc, state, "about-artist-page", pageWidthPt, pageHeightPt, (page) => drawAboutArtistPage(page, state, bold, regular, pageWidthPt, pageHeightPt, contentBlack));
-    addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
-    reportProgress("About the Artist Page");
-  }
-
-  // Every content page pairs with a blank facing page (Section 2's single-sided-
-  // printing rule) — including these last two, so the interior page count always
-  // lands even, which KDP's print pipeline requires.
-  if (reviewRequestEnabled) {
-    await addGeneratedOrCustomPage(doc, state, "review-request-page", pageWidthPt, pageHeightPt, (page) => drawReviewRequestPage(page, bold, regular, pageWidthPt, pageHeightPt, contentBlack));
-    addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
-    reportProgress("Review Request Page");
-  }
-
-  if (seriesPromoEnabled) {
-    await addGeneratedOrCustomPage(doc, state, "series-promo-page", pageWidthPt, pageHeightPt, (page) => drawSeriesPromoPage(page, state, bold, regular, pageWidthPt, pageHeightPt, contentBlack));
-    addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
-    reportProgress("Series Promo Page");
+  for (const { id } of orderedBackMatter) {
+    await BACK_MATTER_SECTIONS[id]();
   }
 
   // Every block above adds pages in pairs except the front-matter/key-page parity

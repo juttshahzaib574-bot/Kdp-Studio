@@ -508,28 +508,72 @@ input[type="file"] {
   white-space: nowrap;
 }
 
-/* --- Selective front/back matter --- */
+/* --- Selective front/back matter (reorderable checklist) --- */
 
 .matter-page-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 6px;
 }
 
 .matter-page-item {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
   background: var(--panel-alt);
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 7px 10px;
   font-size: 0.78rem;
+}
+
+.matter-page-item label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   cursor: pointer;
+  flex: 1;
+  min-width: 0;
 }
 
 .matter-page-item input {
   flex-shrink: 0;
+}
+
+.matter-page-index {
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.matter-page-reorder {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.matter-page-reorder button {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.7rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.matter-page-reorder button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.matter-page-reorder button:disabled {
+  opacity: 0.3;
+  cursor: default;
 }
 
 /* --- Batch / storyboard --- */
