@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>KDP Studio</title>
-  <link rel="stylesheet" href="css/styles.css?v=20" />
+  <link rel="stylesheet" href="css/styles.css?v=21" />
 </head>
 <body>
   <header class="app-header">
@@ -274,6 +274,15 @@
         <h2><span class="step-badge">8</span> Unified Export Pipeline</h2>
 
         <div class="field-group">
+          <label>Front Matter Pages <span class="lock-note">(uncheck to leave a page out of the export — its own content/settings stay put, so re-check it anytime)</span></label>
+          <div class="matter-page-list" id="front-matter-page-list"></div>
+        </div>
+        <div class="field-group">
+          <label>Back Matter Pages <span class="lock-note">(About the Artist / Series Promo still auto-skip when left blank, regardless of this)</span></label>
+          <div class="matter-page-list" id="back-matter-page-list"></div>
+        </div>
+
+        <div class="field-group">
           <label for="book-title-input">Book Title</label>
           <input type="text" id="book-title-input" class="text-input" />
         </div>
@@ -416,6 +425,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="js/main.js?v=20"></script>
+  <script type="module" src="js/main.js?v=21"></script>
 </body>
 </html>

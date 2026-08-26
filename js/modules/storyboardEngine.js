@@ -1,11 +1,5 @@
 // Module: Drag-and-Drop Storyboard Dashboard
 
-// The exported PDF's generated front matter is 6 content pages (Title, Copyright,
-// Belongs-To, Color Test, Instructions, Master Palette), each followed by its single-
-// sided blank facing page — 12 interior pages. Shared with pdfExport.js so the
-// storyboard's displayed page numbers always match the real exported PDF.
-export const FRONT_MATTER_INTERIOR_PAGES = 12;
-
 // Fluid Reordering: move one item from one index to another, immutably.
 export function reorder(items, fromIndex, toIndex) {
   const next = [...items];

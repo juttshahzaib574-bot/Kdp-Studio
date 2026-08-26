@@ -4,21 +4,22 @@
 // (honoring each image's own granular overrides), auto-generated solution pages, and
 // back matter — entirely client-side via pdf-lib, no server round-trip.
 
-import { PDFDocument, StandardFonts, rgb } from "../vendor/pdf-lib.esm.min.js?v=20";
-import { getTrimSizeById } from "../modules/canvasEngine.js?v=20";
-import { computeCanvasDimensions } from "../modules/bleedEngine.js?v=20";
-import { computeSafeZone } from "../modules/safeZoneEngine.js?v=20";
-import { getSizesForSelection, buildCombinedPalette } from "../modules/colorKeyEngine.js?v=20";
-import { computePagination, FRONT_MATTER_INTERIOR_PAGES } from "../modules/storyboardEngine.js?v=20";
-import { buildSolutionPages } from "../modules/solutionGenerationEngine.js?v=20";
-import { BORDER_PRESETS } from "../modules/borderStyleEngine.js?v=20";
-import { migratedKeyStyle } from "../modules/layoutEngine.js?v=20";
-import { resolveEffectiveGrid } from "../modules/resolutionScalingEngine.js?v=20";
-import { computeKeyGridLayout } from "../modules/colorKeyLayoutEngine.js?v=20";
-import { normalizeComposition, computeLayout } from "../modules/layoutCompositionEngine.js?v=20";
-import { resolveActiveAsset } from "../modules/assetGalleryEngine.js?v=20";
-import { renderFullMosaicGrid, getPlaceholderSource, loadImageSource, drawSourceToCanvas } from "./mosaicRenderer.js?v=20";
-import { isContentPageBlack, isFacingPageBlack, isBlackWhiteEdition, toGrayscaleRgb } from "../modules/bookThemeEngine.js?v=20";
+import { PDFDocument, StandardFonts, rgb } from "../vendor/pdf-lib.esm.min.js?v=21";
+import { getTrimSizeById } from "../modules/canvasEngine.js?v=21";
+import { computeCanvasDimensions } from "../modules/bleedEngine.js?v=21";
+import { computeSafeZone } from "../modules/safeZoneEngine.js?v=21";
+import { getSizesForSelection, buildCombinedPalette } from "../modules/colorKeyEngine.js?v=21";
+import { computePagination } from "../modules/storyboardEngine.js?v=21";
+import { FRONT_MATTER_PAGES, isPageEnabled, computeFrontMatterPageCount } from "../modules/frontBackMatterEngine.js?v=21";
+import { buildSolutionPages } from "../modules/solutionGenerationEngine.js?v=21";
+import { BORDER_PRESETS } from "../modules/borderStyleEngine.js?v=21";
+import { migratedKeyStyle } from "../modules/layoutEngine.js?v=21";
+import { resolveEffectiveGrid } from "../modules/resolutionScalingEngine.js?v=21";
+import { computeKeyGridLayout } from "../modules/colorKeyLayoutEngine.js?v=21";
+import { normalizeComposition, computeLayout } from "../modules/layoutCompositionEngine.js?v=21";
+import { resolveActiveAsset } from "../modules/assetGalleryEngine.js?v=21";
+import { renderFullMosaicGrid, getPlaceholderSource, loadImageSource, drawSourceToCanvas } from "./mosaicRenderer.js?v=21";
+import { isContentPageBlack, isFacingPageBlack, isBlackWhiteEdition, toGrayscaleRgb } from "../modules/bookThemeEngine.js?v=21";
 
 const PT_PER_IN = 72;
 const inToPt = (inches) => inches * PT_PER_IN;
@@ -641,8 +642,20 @@ export async function exportInteriorPdf(state, { onProgress } = {}) {
   // image for "About the Artist" wants that page to appear even with no bio text typed.
   const hasAboutArtist = Boolean(state.authorBio.trim()) || (state.assetGallery["about-artist-page"] ?? []).length > 0;
   const hasSeriesPromo = Boolean(state.seriesPromoText.trim()) || (state.assetGallery["series-promo-page"] ?? []).length > 0;
-  const solutionTicks = Math.max(1, Math.ceil(state.batchItems.length / state.solutionThumbsPerPage));
-  const totalSteps = 6 + state.batchItems.length + solutionTicks + 1 + 1 + (hasAboutArtist ? 1 : 0) + (hasSeriesPromo ? 1 : 0);
+  const disabledPages = state.disabledFrontBackMatterPages;
+  const isEnabled = (pageId) => isPageEnabled(disabledPages, pageId);
+
+  const frontMatterStepCount = FRONT_MATTER_PAGES.filter((p) => isEnabled(p.id)).length;
+  const solutionsEnabled = isEnabled("solutions");
+  const extraColorTestEnabled = isEnabled("extra-color-test-pages");
+  const aboutArtistEnabled = hasAboutArtist && isEnabled("about-artist-page");
+  const reviewRequestEnabled = isEnabled("review-request-page");
+  const seriesPromoEnabled = hasSeriesPromo && isEnabled("series-promo-page");
+  const solutionTicks = solutionsEnabled ? Math.max(1, Math.ceil(state.batchItems.length / state.solutionThumbsPerPage)) : 0;
+  const totalSteps = Math.max(
+    1,
+    frontMatterStepCount + state.batchItems.length + solutionTicks + (extraColorTestEnabled ? 1 : 0) + (reviewRequestEnabled ? 1 : 0) + (aboutArtistEnabled ? 1 : 0) + (seriesPromoEnabled ? 1 : 0)
+  );
   let completed = 0;
   const reportProgress = (label) => {
     completed += 1;
@@ -650,29 +663,44 @@ export async function exportInteriorPdf(state, { onProgress } = {}) {
   };
 
   // ---- Front matter ----
-  await addGeneratedOrCustomPage(doc, state, "title-page", pageWidthPt, pageHeightPt, (page) => drawTitlePage(page, state, bold, regular, pageWidthPt, pageHeightPt, contentBlack));
-  addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
-  reportProgress("Title Page");
+  // Each page here can be individually excluded from the export (see
+  // modules/frontBackMatterEngine.js) — its own generated/custom content and settings
+  // are untouched either way, so re-checking it later brings it right back.
+  if (isEnabled("title-page")) {
+    await addGeneratedOrCustomPage(doc, state, "title-page", pageWidthPt, pageHeightPt, (page) => drawTitlePage(page, state, bold, regular, pageWidthPt, pageHeightPt, contentBlack));
+    addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
+    reportProgress("Title Page");
+  }
 
-  await addGeneratedOrCustomPage(doc, state, "copyright-page", pageWidthPt, pageHeightPt, (page) => drawCopyrightPage(page, state, regular, pageWidthPt, pageHeightPt, contentBlack));
-  addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
-  reportProgress("Copyright Page");
+  if (isEnabled("copyright-page")) {
+    await addGeneratedOrCustomPage(doc, state, "copyright-page", pageWidthPt, pageHeightPt, (page) => drawCopyrightPage(page, state, regular, pageWidthPt, pageHeightPt, contentBlack));
+    addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
+    reportProgress("Copyright Page");
+  }
 
-  await addGeneratedOrCustomPage(doc, state, "belongs-to-page", pageWidthPt, pageHeightPt, (page) => drawBelongsToPage(page, bold, pageWidthPt, pageHeightPt, globalPalette, contentBlack, blackWhiteEdition));
-  addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
-  reportProgress('"Belongs To" Page');
+  if (isEnabled("belongs-to-page")) {
+    await addGeneratedOrCustomPage(doc, state, "belongs-to-page", pageWidthPt, pageHeightPt, (page) => drawBelongsToPage(page, bold, pageWidthPt, pageHeightPt, globalPalette, contentBlack, blackWhiteEdition));
+    addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
+    reportProgress('"Belongs To" Page');
+  }
 
-  await addGeneratedOrCustomPage(doc, state, "color-test-page", pageWidthPt, pageHeightPt, (page) => drawColorTestPage(page, globalPalette.length, bold, regular, pageWidthPt, pageHeightPt, contentBlack));
-  addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
-  reportProgress("Color Test Page");
+  if (isEnabled("color-test-page")) {
+    await addGeneratedOrCustomPage(doc, state, "color-test-page", pageWidthPt, pageHeightPt, (page) => drawColorTestPage(page, globalPalette.length, bold, regular, pageWidthPt, pageHeightPt, contentBlack));
+    addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
+    reportProgress("Color Test Page");
+  }
 
-  await addGeneratedOrCustomPage(doc, state, "instructions-page", pageWidthPt, pageHeightPt, (page) => drawInstructionsPage(page, bold, regular, pageWidthPt, pageHeightPt, contentBlack));
-  addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
-  reportProgress("Instructions Page");
+  if (isEnabled("instructions-page")) {
+    await addGeneratedOrCustomPage(doc, state, "instructions-page", pageWidthPt, pageHeightPt, (page) => drawInstructionsPage(page, bold, regular, pageWidthPt, pageHeightPt, contentBlack));
+    addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
+    reportProgress("Instructions Page");
+  }
 
-  await addGeneratedOrCustomPage(doc, state, "master-palette-page", pageWidthPt, pageHeightPt, (page) => drawMasterPalettePage(page, globalPalette, bold, regular, pageWidthPt, pageHeightPt, contentBlack));
-  addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
-  reportProgress("Master Palette Page");
+  if (isEnabled("master-palette-page")) {
+    await addGeneratedOrCustomPage(doc, state, "master-palette-page", pageWidthPt, pageHeightPt, (page) => drawMasterPalettePage(page, globalPalette, bold, regular, pageWidthPt, pageHeightPt, contentBlack));
+    addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
+    reportProgress("Master Palette Page");
+  }
 
   // Book spreads only ever pair (even left, odd right) — never (odd, even) — so for
   // each puzzle's key page (even) to actually face its OWN puzzle's grid page (odd),
@@ -722,11 +750,16 @@ export async function exportInteriorPdf(state, { onProgress } = {}) {
     const { legend } = renderFullMosaicGrid(printCanvas, { ...renderOpts, mode: "print" });
     const printImage = await doc.embedPng(await canvasToPngBytes(printCanvas));
 
-    const solvedCanvas = document.createElement("canvas");
-    solvedCanvas.width = canvasDims.widthPx;
-    solvedCanvas.height = canvasDims.heightPx;
-    renderFullMosaicGrid(solvedCanvas, { ...renderOpts, mode: "solved" });
-    solvedCanvasByItemId.set(item.id, solvedCanvas);
+    // Solutions is itself an excludable back-matter page — skip the entire solved-mode
+    // render when it won't be used for anything, rather than paying for a full second
+    // quantization pass per puzzle just to throw the result away.
+    if (solutionsEnabled) {
+      const solvedCanvas = document.createElement("canvas");
+      solvedCanvas.width = canvasDims.widthPx;
+      solvedCanvas.height = canvasDims.heightPx;
+      renderFullMosaicGrid(solvedCanvas, { ...renderOpts, mode: "solved" });
+      solvedCanvasByItemId.set(item.id, solvedCanvas);
+    }
 
     // Key page comes FIRST (the even/left page of the spread) so it faces this SAME
     // puzzle's grid page, printed second right after it (the odd/right page) — look
@@ -756,25 +789,29 @@ export async function exportInteriorPdf(state, { onProgress } = {}) {
   }
 
   // ---- Back matter: auto-generated Solutions, synced to storyboard order ----
-  const paginated = computePagination(state.batchItems, FRONT_MATTER_INTERIOR_PAGES);
-  const solutionPages = buildSolutionPages(paginated, state.solutionThumbsPerPage);
-  for (const solutionPage of solutionPages) {
-    const page = doc.addPage([pageWidthPt, pageHeightPt]);
-    await drawSolutionPage(doc, page, solutionPage, solvedCanvasByItemId, bold, regular, pageWidthPt, pageHeightPt, contentBlack);
-    addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
-    reportProgress("Solution Page");
+  if (solutionsEnabled) {
+    const paginated = computePagination(state.batchItems, computeFrontMatterPageCount(disabledPages));
+    const solutionPages = buildSolutionPages(paginated, state.solutionThumbsPerPage);
+    for (const solutionPage of solutionPages) {
+      const page = doc.addPage([pageWidthPt, pageHeightPt]);
+      await drawSolutionPage(doc, page, solutionPage, solvedCanvasByItemId, bold, regular, pageWidthPt, pageHeightPt, contentBlack);
+      addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
+      reportProgress("Solution Page");
+    }
+    if (solutionPages.length === 0) reportProgress("Solutions (skipped — no artwork queued)");
   }
-  if (solutionPages.length === 0) reportProgress("Solutions (skipped — no artwork queued)");
 
   // ---- Back matter: extra color test pages (2, per Section 2), review, optional pages ----
-  for (let i = 0; i < 2; i += 1) {
-    const page = doc.addPage([pageWidthPt, pageHeightPt]);
-    drawColorTestPage(page, globalPalette.length, bold, regular, pageWidthPt, pageHeightPt, contentBlack);
-    addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
+  if (extraColorTestEnabled) {
+    for (let i = 0; i < 2; i += 1) {
+      const page = doc.addPage([pageWidthPt, pageHeightPt]);
+      drawColorTestPage(page, globalPalette.length, bold, regular, pageWidthPt, pageHeightPt, contentBlack);
+      addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
+    }
+    reportProgress("Extra Color Test Pages");
   }
-  reportProgress("Extra Color Test Pages");
 
-  if (hasAboutArtist) {
+  if (aboutArtistEnabled) {
     await addGeneratedOrCustomPage(doc, state, "about-artist-page", pageWidthPt, pageHeightPt, (page) => drawAboutArtistPage(page, state, bold, regular, pageWidthPt, pageHeightPt, contentBlack));
     addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
     reportProgress("About the Artist Page");
@@ -783,11 +820,13 @@ export async function exportInteriorPdf(state, { onProgress } = {}) {
   // Every content page pairs with a blank facing page (Section 2's single-sided-
   // printing rule) — including these last two, so the interior page count always
   // lands even, which KDP's print pipeline requires.
-  await addGeneratedOrCustomPage(doc, state, "review-request-page", pageWidthPt, pageHeightPt, (page) => drawReviewRequestPage(page, bold, regular, pageWidthPt, pageHeightPt, contentBlack));
-  addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
-  reportProgress("Review Request Page");
+  if (reviewRequestEnabled) {
+    await addGeneratedOrCustomPage(doc, state, "review-request-page", pageWidthPt, pageHeightPt, (page) => drawReviewRequestPage(page, bold, regular, pageWidthPt, pageHeightPt, contentBlack));
+    addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
+    reportProgress("Review Request Page");
+  }
 
-  if (hasSeriesPromo) {
+  if (seriesPromoEnabled) {
     await addGeneratedOrCustomPage(doc, state, "series-promo-page", pageWidthPt, pageHeightPt, (page) => drawSeriesPromoPage(page, state, bold, regular, pageWidthPt, pageHeightPt, contentBlack));
     addFacingBlankPage(doc, pageWidthPt, pageHeightPt, facingBlack);
     reportProgress("Series Promo Page");

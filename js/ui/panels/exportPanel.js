@@ -1,7 +1,10 @@
-import { state, setState, subscribe } from "../../state.js?v=20";
-import { exportInteriorPdf, downloadPdf } from "../pdfExport.js?v=20";
+import { state, setState, subscribe } from "../../state.js?v=21";
+import { exportInteriorPdf, downloadPdf } from "../pdfExport.js?v=21";
+import { FRONT_MATTER_PAGES, BACK_MATTER_PAGES, isPageEnabled, togglePage } from "../../modules/frontBackMatterEngine.js?v=21";
 
 const el = {
+  frontMatterList: document.getElementById("front-matter-page-list"),
+  backMatterList: document.getElementById("back-matter-page-list"),
   titleInput: document.getElementById("book-title-input"),
   subtitleInput: document.getElementById("book-subtitle-input"),
   authorInput: document.getElementById("book-author-input"),
@@ -15,6 +18,9 @@ const el = {
 };
 
 export function initExportPanel() {
+  renderMatterPageList(el.frontMatterList, FRONT_MATTER_PAGES);
+  renderMatterPageList(el.backMatterList, BACK_MATTER_PAGES);
+
   el.titleInput.addEventListener("change", () => setState({ bookTitle: el.titleInput.value || "Untitled Mystery Mosaic Book" }));
   el.subtitleInput.addEventListener("change", () => setState({ bookSubtitle: el.subtitleInput.value }));
   el.authorInput.addEventListener("change", () => setState({ bookAuthor: el.authorInput.value }));
@@ -25,6 +31,21 @@ export function initExportPanel() {
 
   subscribe(render);
   render(state);
+}
+
+// Built once — each row's checked state is kept in sync by render(), not rebuilt on
+// every state change, so a checkbox never loses focus/mid-click state under the hood.
+function renderMatterPageList(container, pages) {
+  container.innerHTML = "";
+  pages.forEach((page) => {
+    const label = document.createElement("label");
+    label.className = "matter-page-item";
+    label.innerHTML = `<input type="checkbox" data-page-id="${page.id}" /><span>${page.label}</span>`;
+    label.querySelector("input").addEventListener("change", () => {
+      setState({ disabledFrontBackMatterPages: togglePage(state.disabledFrontBackMatterPages, page.id) });
+    });
+    container.appendChild(label);
+  });
 }
 
 async function handleExport() {
@@ -52,6 +73,12 @@ async function handleExport() {
 }
 
 function render(current) {
+  [el.frontMatterList, el.backMatterList].forEach((list) => {
+    list.querySelectorAll("input[data-page-id]").forEach((input) => {
+      input.checked = isPageEnabled(current.disabledFrontBackMatterPages, input.dataset.pageId);
+    });
+  });
+
   if (document.activeElement !== el.titleInput) el.titleInput.value = current.bookTitle;
   if (document.activeElement !== el.subtitleInput) el.subtitleInput.value = current.bookSubtitle;
   if (document.activeElement !== el.authorInput) el.authorInput.value = current.bookAuthor;

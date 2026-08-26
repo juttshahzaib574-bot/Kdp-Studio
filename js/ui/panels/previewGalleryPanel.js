@@ -1,16 +1,16 @@
 // Module: Stacked Live Preview Gallery + The 3-Second Looping Interface
-import { state, subscribe } from "../../state.js?v=20";
-import { getTrimSizeById } from "../../modules/canvasEngine.js?v=20";
-import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=20";
-import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=20";
-import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=20";
-import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=20";
-import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=20";
-import { normalizeComposition } from "../../modules/layoutCompositionEngine.js?v=20";
-import { getPlaceholderSource, loadImageSource, drawSourceToCanvas, renderMosaicPreview } from "../mosaicRenderer.js?v=20";
-import { createLoopController } from "../../modules/previewLoopEngine.js?v=20";
-import { downloadActiveItemPng, downloadActiveItemPdf } from "../pdfExport.js?v=20";
-import { isContentPageBlack } from "../../modules/bookThemeEngine.js?v=20";
+import { state, subscribe } from "../../state.js?v=21";
+import { getTrimSizeById } from "../../modules/canvasEngine.js?v=21";
+import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=21";
+import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=21";
+import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=21";
+import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=21";
+import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=21";
+import { normalizeComposition } from "../../modules/layoutCompositionEngine.js?v=21";
+import { getPlaceholderSource, loadImageSource, drawSourceToCanvas, renderMosaicPreview } from "../mosaicRenderer.js?v=21";
+import { createLoopController } from "../../modules/previewLoopEngine.js?v=21";
+import { downloadActiveItemPng, downloadActiveItemPdf } from "../pdfExport.js?v=21";
+import { isContentPageBlack } from "../../modules/bookThemeEngine.js?v=21";
 
 const el = {
   printCanvas: document.getElementById("preview-canvas-print"),
