@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>KDP Studio</title>
-  <link rel="stylesheet" href="css/styles.css?v=32" />
+  <link rel="stylesheet" href="css/styles.css?v=33" />
 </head>
 <body>
   <header class="app-header">
@@ -182,6 +182,12 @@
             <input type="range" id="corner-trim-size-slider" min="1" max="30" step="1" value="12" />
             <input type="number" id="corner-trim-size-input" min="1" max="30" step="1" value="12" />
           </div>
+        </div>
+
+        <div class="field-group">
+          <label>Grid Frame Margin <span class="lock-note">— a blank border around the whole grid</span></label>
+          <div class="option-list" id="frame-margin-options"></div>
+          <p class="hint">Frames the puzzle like a piece of art instead of filling edge-to-edge. Independent of Grid Corner Trim above — the two combine.</p>
         </div>
 
         <div class="field-group">
@@ -477,6 +483,6 @@
        module scripts below — pdfExport.js needs window.fontkit already set when it
        calls doc.registerFontkit() to embed the custom fonts in js/vendor/fonts/. -->
   <script src="js/vendor/fontkit.umd.min.js"></script>
-  <script type="module" src="js/main.js?v=32"></script>
+  <script type="module" src="js/main.js?v=33"></script>
 </body>
 </html>

@@ -6,14 +6,14 @@
 //   - renderFullMosaicGrid: the entire safe-zone grid at the real chosen print DPI,
 //     used to generate the actual page image embedded into the exported PDF.
 
-import { computeFrameGeometry, drawFrame } from "./preview.js?v=32";
-import { computeGridDimensions, cellCenterIn, cellPolygonIn, mmToIn, isCellInGridSilhouette } from "../modules/gridPatternEngine.js?v=32";
-import { recommendFont, recommendTextTint, adjustForBorderWeight, centerOffsetIn, letterSpacingForLabel } from "../modules/typographyEngine.js?v=32";
-import { gridColorFromTint } from "../modules/borderStyleEngine.js?v=32";
-import { cornerRadiusIn, isFullCircle } from "../modules/cornerRadiusEngine.js?v=32";
-import { nearestPaletteColor } from "../modules/shadeQuantizationEngine.js?v=32";
-import { computeLayout, LAYOUT_ELEMENTS } from "../modules/layoutCompositionEngine.js?v=32";
-import { toGrayscaleHex } from "../modules/bookThemeEngine.js?v=32";
+import { computeFrameGeometry, drawFrame } from "./preview.js?v=33";
+import { computeGridDimensions, cellCenterIn, cellPolygonIn, mmToIn, isCellInGridSilhouette, isCellInFrameMargin } from "../modules/gridPatternEngine.js?v=33";
+import { recommendFont, recommendTextTint, adjustForBorderWeight, centerOffsetIn, letterSpacingForLabel } from "../modules/typographyEngine.js?v=33";
+import { gridColorFromTint } from "../modules/borderStyleEngine.js?v=33";
+import { cornerRadiusIn, isFullCircle } from "../modules/cornerRadiusEngine.js?v=33";
+import { nearestPaletteColor, rgbToLabTriple, labTripleToRgb } from "../modules/shadeQuantizationEngine.js?v=33";
+import { computeLayout, LAYOUT_ELEMENTS } from "../modules/layoutCompositionEngine.js?v=33";
+import { toGrayscaleHex } from "../modules/bookThemeEngine.js?v=33";
 
 const PT_TO_IN = 1 / 72;
 
@@ -99,7 +99,17 @@ function mulberry32(seed) {
   };
 }
 
-const rgbDistance = (a, b) => Math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2);
+// Generic 3-channel Euclidean distance — used on LAB triples below (so this IS a true
+// perceptual Delta E), not RGB. Named for what it computes, not which color space it
+// happens to be fed, since kmeansSeeded/the merge step are channel-agnostic either way.
+const euclidean3 = (a, b) => Math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2);
+
+// Perceptually-close clusters (by CIE76 Delta E, in LAB — see computeQuantization)
+// merge into one before the final palette snap. Chosen well above the ~2.3 JND
+// ("just noticeable difference") threshold: this step exists to collapse redundant
+// near-duplicate k-means clusters, not to distinguish subtly different shades — the
+// final nearestPaletteColor step is what actually decides "closest printed color."
+const CLUSTER_MERGE_DELTA_E = 15;
 
 // Crop to the grid's own aspect ratio (never a stretch), then downscale directly to
 // cols*8 x rows*8 with NEAREST-NEIGHBOR (no smoothing) — matches the reference tool
@@ -278,6 +288,14 @@ function quantizeGridCells(sourceCanvas, cols, rows, targetAspect, palette) {
 // invented average). Returns per-cell palette indices AND the discovered legend
 // itself, since — unlike a fixed palette — this palette is different every time and
 // the caller needs it to draw a matching color key.
+//
+// Clustering and the per-cell majority vote both operate in CIELAB (via
+// rgbToLabTriple), not raw RGB — RGB-space Euclidean distance weighs R/G/B as
+// equally salient to the eye and can group a golden-brown region into a numerically-
+// closer-but-wrong teal/violet cluster; LAB matches human perception, so "nearest
+// cluster" actually means "closest-looking." cellMode (below) is the one exception —
+// it picks the actual, authentic RGB value to display for a cluster, not a distance
+// comparison, so it stays in RGB on purpose.
 function computeQuantization(sourceCanvas, cols, rows, targetAspect, palette) {
   const colorCount = palette.length;
   const cells = sampleGridCellsNearestNeighbor(sourceCanvas, cols, rows, targetAspect);
@@ -301,11 +319,21 @@ function computeQuantization(sourceCanvas, cols, rows, targetAspect, palette) {
     return [((bestKey >> 10) & 31) * 8 + 4, ((bestKey >> 5) & 31) * 8 + 4, (bestKey & 31) * 8 + 4];
   });
 
+  // Converted once per sub-pixel and reused for both clustering and the vote below —
+  // not re-converted per k-means iteration or per candidate cluster.
+  const cellsLab = new Array(cells.length).fill(null);
   const nonEdgePixels = [];
   for (let i = 0; i < cells.length; i += 1) {
     if (edges[i]) continue;
     const px = cells[i];
-    for (let j = 0; j < px.length; j += 1) nonEdgePixels.push(px[j]);
+    const labPx = new Array(px.length);
+    for (let j = 0; j < px.length; j += 1) {
+      const p = px[j];
+      const lab = rgbToLabTriple(p[0], p[1], p[2]);
+      labPx[j] = lab;
+      nonEdgePixels.push(lab);
+    }
+    cellsLab[i] = labPx;
   }
 
   const { cents } = kmeansSeeded(nonEdgePixels, Math.min(Math.max(1, colorCount - 1), nonEdgePixels.length), 20);
@@ -317,35 +345,36 @@ function computeQuantization(sourceCanvas, cols, rows, targetAspect, palette) {
     let bestDist = Infinity;
     for (let a = 0; a < cents.length; a += 1) {
       for (let b = a + 1; b < cents.length; b += 1) {
-        const d = rgbDistance(cents[a], cents[b]);
+        const d = euclidean3(cents[a], cents[b]);
         if (d < bestDist) {
           bestDist = d;
           bj = b;
         }
       }
     }
-    if (bestDist < 45) {
+    if (bestDist < CLUSTER_MERGE_DELTA_E) {
       cents.splice(bj, 1);
       merged = true;
     }
   }
 
   // Outline (label 0) is the default for any sub-pixel not clearly closer to a real
-  // cluster than it already is to pure black, so ambiguous dark pixels bias toward
-  // the unified outline instead of an arbitrary nearby cluster. This is the hottest
-  // loop in the whole engine (cells × 64 sub-pixels × cluster count), so it's written
-  // with plain indexed loops and squared distance (no sqrt, no per-iteration closures)
-  // rather than the more idiomatic .forEach — the closure/callback dispatch and the
-  // sqrt call are both pure overhead here, since only the nearest-cluster ordering
-  // matters and squared distance orders identically to true Euclidean distance. This
-  // also keeps the comparison unit-consistent with `minDist`'s squared-magnitude start.
+  // cluster than it already is to pure black (LAB (0,0,0), same origin as RGB black),
+  // so ambiguous dark pixels bias toward the unified outline instead of an arbitrary
+  // nearby cluster. This is the hottest loop in the whole engine (cells × 64 sub-
+  // pixels × cluster count), so it's written with plain indexed loops and squared
+  // distance (no sqrt, no per-iteration closures) rather than the more idiomatic
+  // .forEach — the closure/callback dispatch and the sqrt call are both pure overhead
+  // here, since only the nearest-cluster ordering matters and squared distance orders
+  // identically to true Euclidean (Delta E) distance. This also keeps the comparison
+  // unit-consistent with `minDist`'s squared-magnitude start.
   const cellLabels = new Array(cols * rows);
   for (let i = 0; i < cells.length; i += 1) {
     if (edges[i]) {
       cellLabels[i] = 0;
       continue;
     }
-    const px = cells[i];
+    const px = cellsLab[i];
     const votes = new Array(cents.length + 1).fill(0);
     for (let s = 0; s < px.length; s += 1) {
       const p = px[s];
@@ -397,7 +426,11 @@ function computeQuantization(sourceCanvas, cols, rows, targetAspect, palette) {
     finalColors.push(
       bestCount / total > 0.4
         ? [((bestKey >> 12) & 63) * 4 + 2, ((bestKey >> 6) & 63) * 4 + 2, (bestKey & 63) * 4 + 2]
-        : cents[c].map((v) => Math.round(v))
+        // No single RGB mode clearly wins this cluster — fall back to the cluster's own
+        // centroid, which is a LAB value (an average of LAB sub-pixels, see kmeansSeeded
+        // above) and needs converting back to RGB before it can be displayed or matched
+        // against the palette below.
+        : labTripleToRgb(cents[c][0], cents[c][1], cents[c][2])
     );
     keptIndexes.push(c + 1);
   }
@@ -605,7 +638,7 @@ export function renderMosaicPreview(canvas, opts) {
     mode, // 'print' | 'solved'
     trimSize, dpi, bleedEnabled, canvasDims, safeZone, pageSide, composition,
     gridPattern, cellSizeMm, gridOverride = null, borderWeightPt, gridTintPercent, cornerRadiusPercent,
-    palette, sourceCanvas, cornerTrimCorners = [], cornerTrimShape = "rounded", cornerTrimSizePercent = 12, gridPageBlack = false, blackWhiteEdition = false,
+    palette, sourceCanvas, cornerTrimCorners = [], cornerTrimShape = "rounded", cornerTrimSizePercent = 12, frameMarginCells = 0, gridPageBlack = false, blackWhiteEdition = false,
   } = opts;
 
   const ctx = canvas.getContext("2d");
@@ -657,7 +690,10 @@ export function renderMosaicPreview(canvas, opts) {
   let index = 0;
   for (let row = 0; row < fullGrid.rows; row += 1) {
     for (let col = 0; col < fullGrid.cols; col += 1) {
-      if (!isCellInGridSilhouette(col, row, fullGrid.cols, fullGrid.rows, cornerTrimCorners, cornerTrimShape, cornerTrimSizePercent)) {
+      if (
+        !isCellInGridSilhouette(col, row, fullGrid.cols, fullGrid.rows, cornerTrimCorners, cornerTrimShape, cornerTrimSizePercent) ||
+        isCellInFrameMargin(col, row, fullGrid.cols, fullGrid.rows, frameMarginCells)
+      ) {
         index += 1;
         continue;
       }
@@ -689,7 +725,7 @@ export function renderFullMosaicGrid(canvas, opts) {
     mode, // 'print' | 'solved'
     dpi, canvasDims, safeZone, pageSide, composition,
     gridPattern, cellSizeMm, gridOverride = null, borderWeightPt, gridTintPercent, cornerRadiusPercent,
-    palette, sourceCanvas, cornerTrimCorners = [], cornerTrimShape = "rounded", cornerTrimSizePercent = 12, gridPageBlack = false, blackWhiteEdition = false,
+    palette, sourceCanvas, cornerTrimCorners = [], cornerTrimShape = "rounded", cornerTrimSizePercent = 12, frameMarginCells = 0, gridPageBlack = false, blackWhiteEdition = false,
   } = opts;
 
   const ctx = canvas.getContext("2d");
@@ -717,7 +753,10 @@ export function renderFullMosaicGrid(canvas, opts) {
   let index = 0;
   for (let row = 0; row < fullGrid.rows; row += 1) {
     for (let col = 0; col < fullGrid.cols; col += 1) {
-      if (!isCellInGridSilhouette(col, row, fullGrid.cols, fullGrid.rows, cornerTrimCorners, cornerTrimShape, cornerTrimSizePercent)) {
+      if (
+        !isCellInGridSilhouette(col, row, fullGrid.cols, fullGrid.rows, cornerTrimCorners, cornerTrimShape, cornerTrimSizePercent) ||
+        isCellInFrameMargin(col, row, fullGrid.cols, fullGrid.rows, frameMarginCells)
+      ) {
         index += 1;
         continue;
       }

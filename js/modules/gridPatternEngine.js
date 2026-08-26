@@ -154,3 +154,21 @@ export function cellPolygonIn(patternId, cellSizeIn) {
     { x: -half, y: half },
   ];
 }
+
+// Grid Frame Margin: leaves a uniform blank border of cells around all four sides of
+// the grid, unselected/undrawn, so the puzzle reads as a framed piece of art rather
+// than filling edge-to-edge like wallpaper. Selectable width, in whole cells; 0 (the
+// default) is the original edge-to-edge behavior. A purely display-time exclusion —
+// same idea as Grid Corner Trim's silhouette, so it composes with it (and with any
+// grid pattern) instead of interacting with the quantization pass at all.
+export const FRAME_MARGIN_OPTIONS = [
+  { id: 0, label: "Off", note: "Fills edge-to-edge, no border." },
+  { id: 1, label: "1 Cell", note: "A thin one-cell blank border." },
+  { id: 2, label: "2 Cells", note: "A moderate blank border." },
+  { id: 3, label: "3 Cells", note: "A wide, gallery-frame-style border." },
+];
+
+export function isCellInFrameMargin(col, row, cols, rows, marginCells) {
+  if (!marginCells || marginCells <= 0) return false;
+  return col < marginCells || row < marginCells || col >= cols - marginCells || row >= rows - marginCells;
+}

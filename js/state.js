@@ -25,6 +25,10 @@ export const state = {
   gridCornerTrimShape: "rounded",
   gridCornerTrimSizePercent: 12,
 
+  // Grid Frame Margin: a selectable blank border (in whole cells) around all four
+  // sides of the grid — 0 is the original edge-to-edge default. See gridPatternEngine.js.
+  gridFrameMarginCells: 0,
+
   // Dual-Page Layout & Key Migration + Adaptive Resolution & Cell Scaling
   layoutMode: "unified", // mirror of globalComposition.colorKey placement (grid=unified/blank=expanded)
   resolutionPriority: "cell-enlargement",
