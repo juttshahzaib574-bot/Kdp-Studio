@@ -66,6 +66,10 @@ export const state = {
   // Back matter: "About the Artist" + "Series Promo" (blank = page is skipped)
   authorBio: "",
   seriesPromoText: "",
+
+  // Selective Front & Back Matter: ids of pages EXCLUDED from the export (see
+  // modules/frontBackMatterEngine.js) — everything defaults to included.
+  disabledFrontBackMatterPages: [],
 };
 
 export function setState(patch) {
