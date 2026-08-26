@@ -10,7 +10,7 @@ import { normalizeComposition } from "../../modules/layoutCompositionEngine.js?v
 import { getPlaceholderSource, loadImageSource, drawSourceToCanvas, renderMosaicPreview } from "../mosaicRenderer.js?v=20";
 import { createLoopController } from "../../modules/previewLoopEngine.js?v=20";
 import { downloadActiveItemPng, downloadActiveItemPdf } from "../pdfExport.js?v=20";
-import { isContentPageBlack, isBlackWhiteEdition } from "../../modules/bookThemeEngine.js?v=20";
+import { isContentPageBlack } from "../../modules/bookThemeEngine.js?v=20";
 
 const el = {
   printCanvas: document.getElementById("preview-canvas-print"),
@@ -164,7 +164,11 @@ async function render(current) {
     sourceCanvas,
     gridCornerTrim: current.gridCornerTrim,
     gridPageBlack: isContentPageBlack(current.pageBackgroundMode),
-    blackWhiteEdition: isBlackWhiteEdition(current.bookColorMode),
+    // Deliberately NOT threading the Black & White book edition through here: this
+    // Solved State panel exists to show the creator the artwork's TRUE colors as a
+    // proofing/reference aid, independent of whatever the printed book's own color
+    // policy is — it never itself becomes a page in the exported interior PDF (unlike
+    // the Solutions back-matter thumbnails, which do respect the edition).
   };
 
   renderMosaicPreview(el.printCanvas, { ...baseOpts, mode: "print" });
