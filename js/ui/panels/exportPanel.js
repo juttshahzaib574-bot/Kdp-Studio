@@ -1,6 +1,6 @@
-import { state, setState, subscribe } from "../../state.js?v=21";
-import { exportInteriorPdf, downloadPdf } from "../pdfExport.js?v=21";
-import { FRONT_MATTER_PAGES, BACK_MATTER_PAGES, isPageEnabled, togglePage } from "../../modules/frontBackMatterEngine.js?v=21";
+import { state, setState, subscribe } from "../../state.js?v=22";
+import { exportInteriorPdf, downloadPdf } from "../pdfExport.js?v=22";
+import { FRONT_MATTER_PAGES, BACK_MATTER_PAGES, isPageEnabled, togglePage } from "../../modules/frontBackMatterEngine.js?v=22";
 
 const el = {
   frontMatterList: document.getElementById("front-matter-page-list"),
