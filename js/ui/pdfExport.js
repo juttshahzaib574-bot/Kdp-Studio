@@ -4,20 +4,20 @@
 // (honoring each image's own granular overrides), auto-generated solution pages, and
 // back matter — entirely client-side via pdf-lib, no server round-trip.
 
-import { PDFDocument, StandardFonts, rgb } from "../vendor/pdf-lib.esm.min.js?v=18";
-import { getTrimSizeById } from "../modules/canvasEngine.js?v=18";
-import { computeCanvasDimensions } from "../modules/bleedEngine.js?v=18";
-import { computeSafeZone } from "../modules/safeZoneEngine.js?v=18";
-import { getSizesForSelection, buildCombinedPalette } from "../modules/colorKeyEngine.js?v=18";
-import { computePagination, FRONT_MATTER_INTERIOR_PAGES } from "../modules/storyboardEngine.js?v=18";
-import { buildSolutionPages } from "../modules/solutionGenerationEngine.js?v=18";
-import { BORDER_PRESETS } from "../modules/borderStyleEngine.js?v=18";
-import { migratedKeyStyle } from "../modules/layoutEngine.js?v=18";
-import { resolveEffectiveGrid } from "../modules/resolutionScalingEngine.js?v=18";
-import { computeKeyGridLayout } from "../modules/colorKeyLayoutEngine.js?v=18";
-import { normalizeComposition, computeLayout } from "../modules/layoutCompositionEngine.js?v=18";
-import { resolveActiveAsset } from "../modules/assetGalleryEngine.js?v=18";
-import { renderFullMosaicGrid, getPlaceholderSource, loadImageSource, drawSourceToCanvas } from "./mosaicRenderer.js?v=18";
+import { PDFDocument, StandardFonts, rgb } from "../vendor/pdf-lib.esm.min.js?v=19";
+import { getTrimSizeById } from "../modules/canvasEngine.js?v=19";
+import { computeCanvasDimensions } from "../modules/bleedEngine.js?v=19";
+import { computeSafeZone } from "../modules/safeZoneEngine.js?v=19";
+import { getSizesForSelection, buildCombinedPalette } from "../modules/colorKeyEngine.js?v=19";
+import { computePagination, FRONT_MATTER_INTERIOR_PAGES } from "../modules/storyboardEngine.js?v=19";
+import { buildSolutionPages } from "../modules/solutionGenerationEngine.js?v=19";
+import { BORDER_PRESETS } from "../modules/borderStyleEngine.js?v=19";
+import { migratedKeyStyle } from "../modules/layoutEngine.js?v=19";
+import { resolveEffectiveGrid } from "../modules/resolutionScalingEngine.js?v=19";
+import { computeKeyGridLayout } from "../modules/colorKeyLayoutEngine.js?v=19";
+import { normalizeComposition, computeLayout } from "../modules/layoutCompositionEngine.js?v=19";
+import { resolveActiveAsset } from "../modules/assetGalleryEngine.js?v=19";
+import { renderFullMosaicGrid, getPlaceholderSource, loadImageSource, drawSourceToCanvas } from "./mosaicRenderer.js?v=19";
 
 const PT_PER_IN = 72;
 const inToPt = (inches) => inches * PT_PER_IN;
@@ -585,6 +585,15 @@ export async function exportInteriorPdf(state, { onProgress } = {}) {
   doc.addPage([pageWidthPt, pageHeightPt]).drawRectangle({ x: 0, y: 0, width: pageWidthPt, height: pageHeightPt, color: rgb(1, 1, 1) });
   reportProgress("Master Palette Page");
 
+  // Book spreads only ever pair (even left, odd right) — never (odd, even) — so for
+  // each puzzle's key page (even) to actually face its OWN puzzle's grid page (odd),
+  // that pair has to start on an even page. The front matter above always ends even
+  // (six content+blank pairs), so one blank filler page is inserted here to shift
+  // parity before the puzzle interior begins.
+  if (doc.getPageCount() % 2 === 0) {
+    doc.addPage([pageWidthPt, pageHeightPt]).drawRectangle({ x: 0, y: 0, width: pageWidthPt, height: pageHeightPt, color: rgb(1, 1, 1) });
+  }
+
   // ---- Puzzle interior (storyboard order, per-item overrides applied) ----
   const solvedCanvasByItemId = new Map();
   const geom = { canvasDims, safeZone, pageSide: state.pageSide, pageHeightPt };
@@ -621,6 +630,26 @@ export async function exportInteriorPdf(state, { onProgress } = {}) {
     // effective.palette is no longer what actually got drawn into the grid.
     const { legend } = renderFullMosaicGrid(printCanvas, { ...renderOpts, mode: "print" });
     const printImage = await doc.embedPng(await canvasToPngBytes(printCanvas));
+
+    const solvedCanvas = document.createElement("canvas");
+    solvedCanvas.width = canvasDims.widthPx;
+    solvedCanvas.height = canvasDims.heightPx;
+    renderFullMosaicGrid(solvedCanvas, { ...renderOpts, mode: "solved" });
+    solvedCanvasByItemId.set(item.id, solvedCanvas);
+
+    // Key page comes FIRST (the even/left page of the spread) so it faces this SAME
+    // puzzle's grid page, printed second right after it (the odd/right page) — look
+    // left, paint right. If the composition offloaded any elements here, compose them
+    // over the background; otherwise it's a standard blank key page (bleed hint + test strip).
+    const keyPage = doc.addPage([pageWidthPt, pageHeightPt]);
+    const itemBackImage = resolveItemBackImage(item, backImagesByAssetId, globalBackImage);
+    const blackoutDefault = effective.gridTintPercent >= 100;
+    if (layout.blankPlacements.length > 0) {
+      drawComposedBlankPage(keyPage, { blankPlacements: layout.blankPlacements, comp, state, palette: legend, bold, regular, w: pageWidthPt, h: pageHeightPt, backImage: itemBackImage, blackoutDefault, geom });
+    } else {
+      drawBlankBackPage(keyPage, { backImage: itemBackImage, palette: legend, regular, w: pageWidthPt, h: pageHeightPt, blackoutDefault });
+    }
+
     const puzzlePage = doc.addPage([pageWidthPt, pageHeightPt]);
     puzzlePage.drawImage(printImage, { x: 0, y: 0, width: pageWidthPt, height: pageHeightPt });
 
@@ -631,23 +660,6 @@ export async function exportInteriorPdf(state, { onProgress } = {}) {
     layout.gridPlacements.forEach(({ id, rect }) => {
       drawPlacedElement(puzzlePage, { id, rect, elConfig: comp[id], state, palette: legend, bold, regular, textColor: gridTextColor }, geom);
     });
-
-    const solvedCanvas = document.createElement("canvas");
-    solvedCanvas.width = canvasDims.widthPx;
-    solvedCanvas.height = canvasDims.heightPx;
-    renderFullMosaicGrid(solvedCanvas, { ...renderOpts, mode: "solved" });
-    solvedCanvasByItemId.set(item.id, solvedCanvas);
-
-    // The facing even page: if the composition offloaded any elements here, compose them
-    // over the background; otherwise it's a standard blank back (bleed hint + test strip).
-    const backPage = doc.addPage([pageWidthPt, pageHeightPt]);
-    const itemBackImage = resolveItemBackImage(item, backImagesByAssetId, globalBackImage);
-    const blackoutDefault = effective.gridTintPercent >= 100;
-    if (layout.blankPlacements.length > 0) {
-      drawComposedBlankPage(backPage, { blankPlacements: layout.blankPlacements, comp, state, palette: legend, bold, regular, w: pageWidthPt, h: pageHeightPt, backImage: itemBackImage, blackoutDefault, geom });
-    } else {
-      drawBlankBackPage(backPage, { backImage: itemBackImage, palette: legend, regular, w: pageWidthPt, h: pageHeightPt, blackoutDefault });
-    }
 
     reportProgress(`Puzzle: ${item.name}`);
     await yieldToUi();

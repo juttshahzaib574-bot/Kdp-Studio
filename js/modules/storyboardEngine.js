@@ -14,15 +14,20 @@ export function reorder(items, fromIndex, toIndex) {
   return next;
 }
 
-// Automated Pagination Syncing: puzzle pages are odd-page-only (right-hand pages),
-// with the corresponding back page on the intervening even page — reordering instantly
-// recalculates every downstream page number.
+// Automated Pagination Syncing: each puzzle's color-key page is the even/left-hand
+// page immediately followed by that SAME puzzle's odd/right-hand grid page, so opening
+// the book to that spread always shows "key on the left, grid to paint on the right."
+// Real book spreads only ever pair (even N, odd N+1) — never (odd N, even N+1) — so
+// the key must PRECEDE its puzzle, not follow it. When the front matter ends on an
+// even page (the normal case), pdfExport.js inserts one blank filler page to shift
+// parity so the first key page lands on an even number; this mirrors that here.
 export function computePagination(items, frontMatterPageCount) {
-  const firstPuzzlePage = frontMatterPageCount % 2 === 0 ? frontMatterPageCount + 1 : frontMatterPageCount + 2;
+  const firstKeyPage = frontMatterPageCount % 2 === 0 ? frontMatterPageCount + 2 : frontMatterPageCount + 1;
 
   return items.map((item, index) => {
-    const puzzlePage = firstPuzzlePage + index * 2;
-    return { ...item, puzzlePage, backPage: puzzlePage + 1 };
+    const keyPage = firstKeyPage + index * 2;
+    const puzzlePage = keyPage + 1;
+    return { ...item, keyPage, puzzlePage };
   });
 }
 
