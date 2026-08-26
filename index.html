@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>KDP Studio</title>
-  <link rel="stylesheet" href="css/styles.css?v=27" />
+  <link rel="stylesheet" href="css/styles.css?v=28" />
 </head>
 <body>
   <header class="app-header">
@@ -249,6 +249,12 @@
         </div>
 
         <div class="field-group">
+          <label>Stack Position <span class="lock-note">— blank facing page only</span></label>
+          <div class="option-list" id="stack-position-options"></div>
+          <p class="hint">Only matters when two or more elements share the blank facing page — where the whole stack starts: at the top edge, centered as one block, or anchored to the bottom edge.</p>
+        </div>
+
+        <div class="field-group">
           <label>Element Controls</label>
           <div class="element-controls" id="element-controls"></div>
         </div>
@@ -445,6 +451,6 @@
        module scripts below — pdfExport.js needs window.fontkit already set when it
        calls doc.registerFontkit() to embed the custom fonts in js/vendor/fonts/. -->
   <script src="js/vendor/fontkit.umd.min.js"></script>
-  <script type="module" src="js/main.js?v=27"></script>
+  <script type="module" src="js/main.js?v=28"></script>
 </body>
 </html>

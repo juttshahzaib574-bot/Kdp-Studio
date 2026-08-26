@@ -4,17 +4,18 @@
 // tray. Edits target the global composition (Global scope) or the active image's own
 // composition (Page-Specific scope). The live preview + PDF recalculate the grid to fit.
 
-import { state, setState, subscribe } from "../../state.js?v=27";
+import { state, setState, subscribe } from "../../state.js?v=28";
 import {
   LAYOUT_ELEMENTS,
   LAYOUT_TARGETS,
   LAYOUT_ZONES,
+  STACK_POSITIONS,
   normalizeComposition,
   layoutModeFromComposition,
   describeComposition,
-} from "../../modules/layoutCompositionEngine.js?v=27";
-import { FONT_CATEGORIES, FONT_LIBRARY, SYSTEM_FONT_ID, getFontById } from "../../modules/fontLibraryEngine.js?v=27";
-import { DRAG_HANDLE_ICON, attachDragHandle } from "../dragReorderList.js?v=27";
+} from "../../modules/layoutCompositionEngine.js?v=28";
+import { FONT_CATEGORIES, FONT_LIBRARY, SYSTEM_FONT_ID, getFontById } from "../../modules/fontLibraryEngine.js?v=28";
+import { DRAG_HANDLE_ICON, attachDragHandle } from "../dragReorderList.js?v=28";
 
 const SCOPES = [
   { id: "global", label: "Global", note: "One layout template applied to every page." },
@@ -41,6 +42,7 @@ const el = {
   scopeHint: document.getElementById("layout-scope-hint"),
   map: document.getElementById("layout-map"),
   orderList: document.getElementById("element-order-list"),
+  stackPositionOptions: document.getElementById("stack-position-options"),
   controls: document.getElementById("element-controls"),
   summary: document.getElementById("composition-summary"),
 };
@@ -127,6 +129,7 @@ function render(current) {
 
   renderMap(comp, current);
   renderStackingOrder(comp);
+  renderStackPositionOptions(comp);
   renderControls(comp, current);
   const summary = describeComposition(comp);
   el.summary.textContent = summary.length ? `Placed: ${summary.join(" · ")}.` : "No elements placed on the page.";
@@ -238,6 +241,22 @@ function applyDrop(id, zone) {
   }
 }
 
+// Whole-stack vertical position on the blank facing page — only matters once 2+
+// elements share it (see computeLayout's "top"/"center"/"bottom" branches).
+function renderStackPositionOptions(comp) {
+  el.stackPositionOptions.innerHTML = "";
+  STACK_POSITIONS.forEach((pos) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "option-item";
+    btn.dataset.positionId = pos.id;
+    btn.classList.toggle("active", pos.id === (comp.stackPosition ?? "top"));
+    btn.innerHTML = `<strong>${pos.label}</strong><span class="size-note">${pos.note}</span>`;
+    btn.addEventListener("click", () => commitComposition({ ...comp, stackPosition: pos.id }));
+    el.stackPositionOptions.appendChild(btn);
+  });
+}
+
 // --- precise per-element controls (accessible fallback for the drag map) ---
 
 function renderControls(comp, current) {
@@ -266,7 +285,7 @@ function renderControls(comp, current) {
       </div>
       <div class="element-row-opts">
         <select class="el-zone" ${effectiveTarget === "grid" ? "" : "hidden"}>${zoneOpts}</select>
-        ${element.isText ? `<select class="el-align">${alignOpts}</select>` : ""}
+        <select class="el-align" title="Horizontal alignment">${alignOpts}</select>
       </div>
       ${element.isText ? `<input type="text" class="el-text text-input" data-text-element="${element.id}" placeholder="${textPlaceholder(element.id, current)}" />` : ""}
       ${element.isText ? `

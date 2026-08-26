@@ -4,23 +4,23 @@
 // (honoring each image's own granular overrides), auto-generated solution pages, and
 // back matter — entirely client-side via pdf-lib, no server round-trip.
 
-import { PDFDocument, StandardFonts, rgb } from "../vendor/pdf-lib.esm.min.js?v=27";
-import { getTrimSizeById } from "../modules/canvasEngine.js?v=27";
-import { computeCanvasDimensions } from "../modules/bleedEngine.js?v=27";
-import { computeSafeZone } from "../modules/safeZoneEngine.js?v=27";
-import { getSizesForSelection, buildCombinedPalette } from "../modules/colorKeyEngine.js?v=27";
-import { computePagination } from "../modules/storyboardEngine.js?v=27";
-import { isPageEnabled, computeFrontMatterPageCount, orderedFrontMatterPages, orderedBackMatterPages } from "../modules/frontBackMatterEngine.js?v=27";
-import { buildSolutionPages } from "../modules/solutionGenerationEngine.js?v=27";
-import { BORDER_PRESETS } from "../modules/borderStyleEngine.js?v=27";
-import { migratedKeyStyle } from "../modules/layoutEngine.js?v=27";
-import { resolveEffectiveGrid } from "../modules/resolutionScalingEngine.js?v=27";
-import { computeKeyGridLayout, keyEntryPosition } from "../modules/colorKeyLayoutEngine.js?v=27";
-import { normalizeComposition, computeLayout } from "../modules/layoutCompositionEngine.js?v=27";
-import { resolveActiveAsset } from "../modules/assetGalleryEngine.js?v=27";
-import { renderFullMosaicGrid, getPlaceholderSource, loadImageSource, drawSourceToCanvas } from "./mosaicRenderer.js?v=27";
-import { isContentPageBlack, isFacingPageBlack, isBlackWhiteEdition, toGrayscaleRgb } from "../modules/bookThemeEngine.js?v=27";
-import { getFontById, fontAssetUrl } from "../modules/fontLibraryEngine.js?v=27";
+import { PDFDocument, StandardFonts, rgb } from "../vendor/pdf-lib.esm.min.js?v=28";
+import { getTrimSizeById } from "../modules/canvasEngine.js?v=28";
+import { computeCanvasDimensions } from "../modules/bleedEngine.js?v=28";
+import { computeSafeZone } from "../modules/safeZoneEngine.js?v=28";
+import { getSizesForSelection, buildCombinedPalette } from "../modules/colorKeyEngine.js?v=28";
+import { computePagination } from "../modules/storyboardEngine.js?v=28";
+import { isPageEnabled, computeFrontMatterPageCount, orderedFrontMatterPages, orderedBackMatterPages } from "../modules/frontBackMatterEngine.js?v=28";
+import { buildSolutionPages } from "../modules/solutionGenerationEngine.js?v=28";
+import { BORDER_PRESETS } from "../modules/borderStyleEngine.js?v=28";
+import { migratedKeyStyle } from "../modules/layoutEngine.js?v=28";
+import { resolveEffectiveGrid } from "../modules/resolutionScalingEngine.js?v=28";
+import { computeKeyGridLayout, keyEntryPosition } from "../modules/colorKeyLayoutEngine.js?v=28";
+import { normalizeComposition, computeLayout } from "../modules/layoutCompositionEngine.js?v=28";
+import { resolveActiveAsset } from "../modules/assetGalleryEngine.js?v=28";
+import { renderFullMosaicGrid, getPlaceholderSource, loadImageSource, drawSourceToCanvas } from "./mosaicRenderer.js?v=28";
+import { isContentPageBlack, isFacingPageBlack, isBlackWhiteEdition, toGrayscaleRgb } from "../modules/bookThemeEngine.js?v=28";
+import { getFontById, fontAssetUrl } from "../modules/fontLibraryEngine.js?v=28";
 
 const PT_PER_IN = 72;
 const inToPt = (inches) => inches * PT_PER_IN;
@@ -187,22 +187,34 @@ const KEY_ENTRY_HEIGHT_IN = 0.24; // Full Color: single-line swatch + name, side
 const KEY_ENTRY_HEIGHT_BW_IN = 0.46; // Black & White: box stacked above its name needs more height
 const KEY_ENTRY_WIDTH_BW_IN = 0.85;
 
-function drawKeyEntries(page, rect, palette, font, textColor, blackWhiteEdition, orientation) {
+// How far to shift the whole key block right within its rect when the block's natural
+// content width is narrower than the space it was given — the same start/center/end
+// horizontal-alignment concept as title/subtitle/instruction text, just applied to the
+// key grid as a unit rather than to each entry's own text individually.
+function keyBlockXOffsetPt(align, contentWidthPt, widthPt) {
+  const slack = Math.max(0, widthPt - contentWidthPt);
+  if (align === "center") return slack / 2;
+  if (align === "end") return slack;
+  return 0;
+}
+
+function drawKeyEntries(page, rect, palette, font, textColor, blackWhiteEdition, orientation, align = "start") {
   if (rect.heightPt <= 0 || rect.widthPt <= 0) return;
   if (blackWhiteEdition) {
-    drawKeyEntriesBlackWhite(page, rect, palette, font, textColor, orientation);
+    drawKeyEntriesBlackWhite(page, rect, palette, font, textColor, orientation, align);
   } else {
-    drawKeyEntriesColor(page, rect, palette, font, textColor, orientation);
+    drawKeyEntriesColor(page, rect, palette, font, textColor, orientation, align);
   }
 }
 
-function drawKeyEntriesColor(page, rect, palette, font, textColor, orientation) {
-  const { xPt, yPt, widthPt, heightPt } = rect;
+function drawKeyEntriesColor(page, rect, palette, font, textColor, orientation, align) {
+  const { xPt: xPtBase, yPt, widthPt, heightPt } = rect;
   const { cols, rows, entryWidthIn, entryHeightIn } = computeKeyGridLayout(palette.length, widthPt / PT_PER_IN, heightPt / PT_PER_IN, undefined, KEY_ENTRY_HEIGHT_IN, orientation);
   const entryWidthPt = entryWidthIn * PT_PER_IN;
   const entryHeightPt = entryHeightIn * PT_PER_IN;
   const fontSize = Math.max(5.5, Math.min(9, entryHeightPt * 0.42));
   const swatchSize = Math.max(4, fontSize * 0.85);
+  const xPt = xPtBase + keyBlockXOffsetPt(align, cols * entryWidthPt, widthPt);
 
   palette.forEach((swatch, i) => {
     const { col, row } = keyEntryPosition(i, cols, rows, orientation);
@@ -237,14 +249,15 @@ function drawKeyEntriesColor(page, rect, palette, font, textColor, orientation) 
 // Black & White edition: nothing anywhere in the book spends color ink, so each legend
 // entry is a numbered black box (fixed white border + white number — its own identity,
 // independent of the page's own black/white background) stacked above the color's name.
-function drawKeyEntriesBlackWhite(page, rect, palette, font, textColor, orientation) {
-  const { xPt, yPt, widthPt, heightPt } = rect;
+function drawKeyEntriesBlackWhite(page, rect, palette, font, textColor, orientation, align) {
+  const { xPt: xPtBase, yPt, widthPt, heightPt } = rect;
   const { cols, rows, entryWidthIn, entryHeightIn } = computeKeyGridLayout(palette.length, widthPt / PT_PER_IN, heightPt / PT_PER_IN, KEY_ENTRY_WIDTH_BW_IN, KEY_ENTRY_HEIGHT_BW_IN, orientation);
   const entryWidthPt = entryWidthIn * PT_PER_IN;
   const entryHeightPt = entryHeightIn * PT_PER_IN;
   const boxSize = Math.max(9, Math.min(entryWidthPt * 0.4, entryHeightPt * 0.55));
   const numberSize = Math.max(6, Math.min(10, boxSize * 0.55));
   const nameSize = Math.max(5.5, Math.min(8, entryHeightPt * 0.22));
+  const xPt = xPtBase + keyBlockXOffsetPt(align, cols * entryWidthPt, widthPt);
 
   palette.forEach((swatch, i) => {
     const { col, row } = keyEntryPosition(i, cols, rows, orientation);
@@ -330,15 +343,15 @@ const ELEMENT_TEXT_SIZE = { title: 16, subtitle: 11, instruction: 9.5 };
 // Library face for that specific element (see embedCompositionFonts above).
 function drawPlacedElement(page, { id, rect, elConfig, state, palette, fonts, textColor, blackWhiteEdition = false }, geom) {
   const rectPt = safeLocalRectToPdf(rect, geom);
+  const align = elConfig.align === "start" ? "start" : elConfig.align === "end" ? "end" : "center";
   if (id === "colorKey") {
-    drawKeyEntries(page, rectPt, palette, fonts.colorKey, textColor, blackWhiteEdition, state.colorKeyOrientation);
+    drawKeyEntries(page, rectPt, palette, fonts.colorKey, textColor, blackWhiteEdition, state.colorKeyOrientation, align);
     return;
   }
   const fallback = { title: state.bookTitle, subtitle: state.bookSubtitle, instruction: elConfig.text }[id] || "";
   const text = (elConfig.text || "").trim() || fallback;
   if (!text) return;
   const font = fonts[id];
-  const align = id === "title" || id === "subtitle" ? (elConfig.align === "start" ? "start" : elConfig.align === "end" ? "end" : "center") : "start";
   drawBoxedText(page, rectPt, text, font, ELEMENT_TEXT_SIZE[id] ?? 10, textColor, align);
 }
 

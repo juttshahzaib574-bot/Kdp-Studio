@@ -8,7 +8,7 @@
 // key onto the grid and the grid shrinks; push it to the blank page and the grid
 // reclaims the space.
 
-import { KEY_STRIP_HEIGHT_RATIO } from "./layoutEngine.js?v=27";
+import { KEY_STRIP_HEIGHT_RATIO } from "./layoutEngine.js?v=28";
 
 export const LAYOUT_ELEMENT_IDS = ["title", "subtitle", "instruction", "colorKey"];
 
@@ -46,6 +46,17 @@ const TEXT_SIDE_WIDTH_IN = 1.6;
 // FONT_LIBRARY, embedded (subset) into the exported PDF via pdf-lib + fontkit.
 const DEFAULT_FONT_ID = "system";
 
+// Whole-stack vertical position on the blank facing page — only takes effect when 2+
+// elements share that page (a single element still uses its own Anchor + offset below).
+// "top" is the original/default behavior: the stack starts at the page's top edge and
+// Color Key (if present) flex-fills whatever's left down to the bottom. "center"/
+// "bottom" move the WHOLE block together — see computeLayout.
+export const STACK_POSITIONS = [
+  { id: "top", label: "Top", note: "Stack starts at the page's top edge." },
+  { id: "center", label: "Center", note: "The whole stack is centered as one block." },
+  { id: "bottom", label: "Bottom", note: "The whole stack is anchored to the page's bottom edge." },
+];
+
 export function defaultComposition() {
   return {
     // Backward-compatible default === the old "Unified" layout: only the color key is
@@ -54,11 +65,16 @@ export function defaultComposition() {
     title: { enabled: false, target: "grid", zone: "top", align: "center", text: "", anchor: "top", offsetIn: 0, fontId: DEFAULT_FONT_ID },
     subtitle: { enabled: false, target: "grid", zone: "top", align: "center", text: "", anchor: "top", offsetIn: 0, fontId: DEFAULT_FONT_ID },
     instruction: { enabled: false, target: "grid", zone: "bottom", align: "start", text: LAYOUT_ELEMENTS[2].defaultText, anchor: "top", offsetIn: 0, fontId: DEFAULT_FONT_ID },
-    colorKey: { enabled: true, target: "grid", zone: "bottom", align: "center", fontId: DEFAULT_FONT_ID },
+    // align defaults to "start" (left) — the color key's `align` field previously
+    // existed but was never actually wired to rendering, which always drew left-
+    // anchored; "start" keeps that exact prior visual output for anyone who never
+    // touches this new control.
+    colorKey: { enabled: true, target: "grid", zone: "bottom", align: "start", fontId: DEFAULT_FONT_ID },
     // Who stacks first (closest to the top/start) when 2+ elements share the same grid
     // zone or the blank facing page — see computeLayout below. Reorder via
     // reorderElement(); a book that never touches this keeps the original fixed order.
     elementOrder: [...LAYOUT_ELEMENT_IDS],
+    stackPosition: "top",
   };
 }
 
@@ -77,6 +93,7 @@ export function normalizeComposition(composition) {
     out[id] = { ...base[id], ...(composition[id] || {}) };
   }
   out.elementOrder = reconcileElementOrder(composition.elementOrder);
+  out.stackPosition = STACK_POSITIONS.some((p) => p.id === composition.stackPosition) ? composition.stackPosition : base.stackPosition;
   return out;
 }
 
@@ -196,19 +213,38 @@ export function computeLayout(safeZone, composition) {
   const STACK_GAP_IN = 0.12;
 
   if (blankOrder.length > 1) {
-    let cursorYIn = 0;
-    blankOrder.forEach((id, i) => {
-      if (id === "colorKey") {
-        const remainingAfterIn = blankOrder.slice(i + 1).reduce((sum, nid) => sum + bandThicknessIn(nid, "top", safeZone) + STACK_GAP_IN, 0);
-        const hIn = Math.max(0.5, safeZone.heightIn - cursorYIn - remainingAfterIn);
+    const stackPosition = comp.stackPosition ?? "top";
+    if (stackPosition === "top") {
+      // Default/legacy behavior: stack from the page's top edge; Color Key is
+      // flexible and fills whatever room its ordered neighbors leave, all the way
+      // down to the page bottom.
+      let cursorYIn = 0;
+      blankOrder.forEach((id, i) => {
+        if (id === "colorKey") {
+          const remainingAfterIn = blankOrder.slice(i + 1).reduce((sum, nid) => sum + bandThicknessIn(nid, "top", safeZone) + STACK_GAP_IN, 0);
+          const hIn = Math.max(0.5, safeZone.heightIn - cursorYIn - remainingAfterIn);
+          blankPlacements.push({ id, target: "blank", rect: { xIn: 0, yIn: cursorYIn, wIn: safeZone.widthIn, hIn } });
+          cursorYIn += hIn + STACK_GAP_IN;
+        } else {
+          const hIn = bandThicknessIn(id, "top", safeZone);
+          blankPlacements.push({ id, target: "blank", rect: { xIn: 0, yIn: cursorYIn, wIn: safeZone.widthIn, hIn } });
+          cursorYIn += hIn + STACK_GAP_IN;
+        }
+      });
+    } else {
+      // Center / Bottom: the whole stack moves together as ONE block, so Color Key
+      // uses its natural (palette-based) estimated height here instead of flex-
+      // filling to the page bottom — otherwise the block could never actually look
+      // centered or bottom-anchored, since Color Key would always reach the edge.
+      const heightFor = (id) => (id === "colorKey" ? safeZone.heightIn * KEY_STRIP_HEIGHT_RATIO : bandThicknessIn(id, "top", safeZone));
+      const totalIn = blankOrder.reduce((sum, id) => sum + heightFor(id), 0) + STACK_GAP_IN * (blankOrder.length - 1);
+      let cursorYIn = stackPosition === "center" ? Math.max(0, (safeZone.heightIn - totalIn) / 2) : Math.max(0, safeZone.heightIn - totalIn);
+      blankOrder.forEach((id) => {
+        const hIn = heightFor(id);
         blankPlacements.push({ id, target: "blank", rect: { xIn: 0, yIn: cursorYIn, wIn: safeZone.widthIn, hIn } });
         cursorYIn += hIn + STACK_GAP_IN;
-      } else {
-        const hIn = bandThicknessIn(id, "top", safeZone);
-        blankPlacements.push({ id, target: "blank", rect: { xIn: 0, yIn: cursorYIn, wIn: safeZone.widthIn, hIn } });
-        cursorYIn += hIn + STACK_GAP_IN;
-      }
-    });
+      });
+    }
   } else {
     let lowestTextBottomIn = 0;
     onBlank.filter((id) => id !== "colorKey").forEach((id) => {
