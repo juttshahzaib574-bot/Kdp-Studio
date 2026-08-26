@@ -6,13 +6,13 @@
 //   - renderFullMosaicGrid: the entire safe-zone grid at the real chosen print DPI,
 //     used to generate the actual page image embedded into the exported PDF.
 
-import { computeFrameGeometry, drawFrame } from "./preview.js?v=10";
-import { computeGridDimensions, cellCenterIn, cellPolygonIn, mmToIn, isCellInGridSilhouette } from "../modules/gridPatternEngine.js?v=10";
-import { recommendFont, recommendTextTint, adjustForBorderWeight, centerOffsetIn, letterSpacingForLabel } from "../modules/typographyEngine.js?v=10";
-import { gridColorFromTint } from "../modules/borderStyleEngine.js?v=10";
-import { cornerRadiusIn, isFullCircle } from "../modules/cornerRadiusEngine.js?v=10";
-import { assignDistinctShades } from "../modules/shadeQuantizationEngine.js?v=10";
-import { computeLayout, LAYOUT_ELEMENTS } from "../modules/layoutCompositionEngine.js?v=10";
+import { computeFrameGeometry, drawFrame } from "./preview.js?v=11";
+import { computeGridDimensions, cellCenterIn, cellPolygonIn, mmToIn, isCellInGridSilhouette } from "../modules/gridPatternEngine.js?v=11";
+import { recommendFont, recommendTextTint, adjustForBorderWeight, centerOffsetIn, letterSpacingForLabel } from "../modules/typographyEngine.js?v=11";
+import { gridColorFromTint } from "../modules/borderStyleEngine.js?v=11";
+import { cornerRadiusIn, isFullCircle } from "../modules/cornerRadiusEngine.js?v=11";
+import { nearestPaletteColor } from "../modules/shadeQuantizationEngine.js?v=11";
+import { computeLayout, LAYOUT_ELEMENTS } from "../modules/layoutCompositionEngine.js?v=11";
 
 const PT_TO_IN = 1 / 72;
 
@@ -54,7 +54,7 @@ export function loadImageSource(url) {
 // force-stretched to a square. Force-stretching here used to warp every photo before it
 // even reached the grid (a portrait dog squashed into a square, then re-stretched onto a
 // wide grid), which is a real cause of "wrong-looking" color-by-number results. The real
-// aspect-ratio fit against the grid's own shape happens later, in sampleGridColors.
+// aspect-ratio fit against the grid's own shape happens later, in quantizeGridCells.
 export function drawSourceToCanvas(source, maxSize = 512) {
   const naturalW = source.naturalWidth || source.width;
   const naturalH = source.naturalHeight || source.height;
@@ -80,9 +80,19 @@ export function drawSourceToCanvas(source, maxSize = 512) {
 
 // Granular Shade Separation starts here, not in the quantizer: this is a cover-crop
 // (center-crop to the grid's own aspect ratio, never a stretch) plus a small per-cell
-// supersampled average — so a single outline-stroke or anti-aliased edge pixel can no
-// longer hijack an entire cell's color, and each cell reads as the region's true average.
-function sampleGridColors(sourceCanvas, cols, rows, targetAspect) {
+// supersample — so a single outline-stroke or anti-aliased edge pixel can no longer
+// hijack an entire cell's color.
+//
+// Each of the 16 sub-samples is snapped to the palette INDIVIDUALLY, then the cell
+// takes whichever palette color the most sub-samples voted for — never the average
+// RGB of the raw sub-samples. Averaging raw pixels across a hard edge (a black
+// outline against a gold fill, or an outline against white background) produces a
+// blended gray/tan that doesn't actually exist anywhere in the source artwork; that
+// blend then gets quantized like it was real data, which is what was showing up as
+// a muddy gray halo traced around every silhouette instead of a crisp line. Voting
+// among already-quantized colors means the result is always a real palette color a
+// majority of the cell's own pixels actually are — never an invented in-between one.
+function quantizeGridCells(sourceCanvas, cols, rows, targetAspect, palette) {
   const sw = sourceCanvas.width;
   const sh = sourceCanvas.height;
   const sourceAspect = sw / sh;
@@ -101,14 +111,13 @@ function sampleGridColors(sourceCanvas, cols, rows, targetAspect) {
   }
 
   const imageData = sourceCanvas.getContext("2d").getImageData(0, 0, sw, sh).data;
-  const SUPERSAMPLE = 4; // 4x4 sub-samples averaged per cell
-  const colors = [];
+  const SUPERSAMPLE = 4; // 4x4 sub-samples voted per cell
+  const votes = new Int32Array(palette.length);
+  const assignments = [];
 
   for (let row = 0; row < rows; row += 1) {
     for (let col = 0; col < cols; col += 1) {
-      let rSum = 0;
-      let gSum = 0;
-      let bSum = 0;
+      votes.fill(0);
       for (let sy = 0; sy < SUPERSAMPLE; sy += 1) {
         for (let sx = 0; sx < SUPERSAMPLE; sx += 1) {
           const u = (col + (sx + 0.5) / SUPERSAMPLE) / cols;
@@ -116,17 +125,23 @@ function sampleGridColors(sourceCanvas, cols, rows, targetAspect) {
           const x = Math.max(0, Math.min(sw - 1, Math.round(cropX + u * cropW)));
           const y = Math.max(0, Math.min(sh - 1, Math.round(cropY + v * cropH)));
           const i = (y * sw + x) * 4;
-          rSum += imageData[i];
-          gSum += imageData[i + 1];
-          bSum += imageData[i + 2];
+          const idx = nearestPaletteColor({ r: imageData[i], g: imageData[i + 1], b: imageData[i + 2] }, palette);
+          votes[idx] += 1;
         }
       }
-      const n = SUPERSAMPLE * SUPERSAMPLE;
-      colors.push({ r: Math.round(rSum / n), g: Math.round(gSum / n), b: Math.round(bSum / n) });
+      let bestIndex = 0;
+      let bestCount = -1;
+      for (let i = 0; i < votes.length; i += 1) {
+        if (votes[i] > bestCount) {
+          bestCount = votes[i];
+          bestIndex = i;
+        }
+      }
+      assignments.push(bestIndex);
     }
   }
 
-  return colors;
+  return assignments;
 }
 
 function polygonToPx(points, centerPx, scalePxPerIn) {
@@ -334,8 +349,7 @@ export function renderMosaicPreview(canvas, opts) {
   const regionWpx = gridZone.widthIn * ppi;
   const regionHpx = gridZone.heightIn * ppi;
 
-  const colors = sampleGridColors(sourceCanvas, fullGrid.cols, fullGrid.rows, gridZone.widthIn / gridZone.heightIn);
-  const assignments = assignDistinctShades(colors, palette);
+  const assignments = quantizeGridCells(sourceCanvas, fullGrid.cols, fullGrid.rows, gridZone.widthIn / gridZone.heightIn, palette);
 
   // Below this cell size a number is unreadable anyway, so cells fall back to a flat
   // fillRect (see drawCell's lowDetail branch) — keeps a dense grid's live preview
@@ -412,8 +426,7 @@ export function renderFullMosaicGrid(canvas, opts) {
   const originYPx = safeYIn * dpi;
 
   const cellSizePx = fullGrid.cellSizeIn * dpi;
-  const colors = sampleGridColors(sourceCanvas, fullGrid.cols, fullGrid.rows, gridZone.widthIn / gridZone.heightIn);
-  const assignments = assignDistinctShades(colors, palette);
+  const assignments = quantizeGridCells(sourceCanvas, fullGrid.cols, fullGrid.rows, gridZone.widthIn / gridZone.heightIn, palette);
 
   let index = 0;
   for (let row = 0; row < fullGrid.rows; row += 1) {
