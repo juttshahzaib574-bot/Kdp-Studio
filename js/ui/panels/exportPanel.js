@@ -1,7 +1,7 @@
-import { state, setState, subscribe } from "../../state.js?v=31";
-import { exportInteriorPdf, downloadPdf } from "../pdfExport.js?v=31";
-import { isPageEnabled, togglePage, orderedFrontMatterPages, orderedBackMatterPages, reorderPage } from "../../modules/frontBackMatterEngine.js?v=31";
-import { DRAG_HANDLE_ICON, attachDragHandle } from "../dragReorderList.js?v=31";
+import { state, setState, subscribe } from "../../state.js?v=32";
+import { exportInteriorPdf, downloadPdf } from "../pdfExport.js?v=32";
+import { isPageEnabled, togglePage, orderedFrontMatterPages, orderedBackMatterPages, reorderPage } from "../../modules/frontBackMatterEngine.js?v=32";
+import { DRAG_HANDLE_ICON, attachDragHandle } from "../dragReorderList.js?v=32";
 
 const el = {
   frontMatterList: document.getElementById("front-matter-page-list"),

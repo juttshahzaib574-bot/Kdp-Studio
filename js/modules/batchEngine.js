@@ -17,6 +17,13 @@ export function createBatchItem(file) {
       colorSetOverride: null,
       backBackgroundAssetId: null,
       composition: null, // Page-Specific layout override (null = inherit the global composition)
+      // Grid Corner Trim per-image overrides — null = inherit the book-wide default for
+      // that field. cornerTrimCorners is the one exception: an override is EITHER null
+      // (inherit) or an array (including []), since [] is itself a meaningful choice
+      // ("this image explicitly has no trim, regardless of the book default").
+      cornerTrimCorners: null,
+      cornerTrimShape: null,
+      cornerTrimSizePercent: null,
     },
   };
 }

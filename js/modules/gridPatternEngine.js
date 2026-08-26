@@ -86,7 +86,7 @@ export const CORNER_TRIM_SHAPES = [
   { id: "notch", label: "Notch", note: "A hard, blocky square cutout." },
 ];
 
-export const CORNER_TRIM_SIZE_MIN_PERCENT = 4;
+export const CORNER_TRIM_SIZE_MIN_PERCENT = 1;
 export const CORNER_TRIM_SIZE_MAX_PERCENT = 30;
 export const CORNER_TRIM_SIZE_DEFAULT_PERCENT = 12;
 
