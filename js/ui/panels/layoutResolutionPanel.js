@@ -1,12 +1,12 @@
-import { state, setState, subscribe } from "../../state.js?v=26";
-import { LAYOUT_MODES } from "../../modules/layoutEngine.js?v=26";
-import { SCALING_PRIORITIES, isAdaptiveScalingUnlocked, resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=26";
-import { getTrimSizeById } from "../../modules/canvasEngine.js?v=26";
-import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=26";
-import { computeGridDimensions } from "../../modules/gridPatternEngine.js?v=26";
-import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=26";
-import { recommendFont } from "../../modules/typographyEngine.js?v=26";
-import { withColorKeyTarget, normalizeComposition, layoutModeFromComposition, isColorKeyOffloaded } from "../../modules/layoutCompositionEngine.js?v=26";
+import { state, setState, subscribe } from "../../state.js?v=27";
+import { LAYOUT_MODES } from "../../modules/layoutEngine.js?v=27";
+import { SCALING_PRIORITIES, isAdaptiveScalingUnlocked, resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=27";
+import { getTrimSizeById } from "../../modules/canvasEngine.js?v=27";
+import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=27";
+import { computeGridDimensions } from "../../modules/gridPatternEngine.js?v=27";
+import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=27";
+import { recommendFont } from "../../modules/typographyEngine.js?v=27";
+import { withColorKeyTarget, normalizeComposition, layoutModeFromComposition, isColorKeyOffloaded } from "../../modules/layoutCompositionEngine.js?v=27";
 
 const el = {
   layoutOptions: document.getElementById("layout-mode-options"),

@@ -1,3 +1,21 @@
+/* --- Font Library: local @font-face declarations for the fonts in js/vendor/fonts/
+   (see fontLibraryEngine.js and js/vendor/fonts/OFL-LICENSE.md) — used both for the
+   Layout Composer's live font-preview hint and, in principle, anywhere else in the UI
+   that wants to render one of these families. Loaded locally, never from a font CDN,
+   consistent with the app's zero-API architecture. */
+@font-face { font-family: "KDP Bungee"; src: url("../js/vendor/fonts/Bungee-Regular.ttf") format("truetype"); font-display: swap; }
+@font-face { font-family: "KDP Press Start 2P"; src: url("../js/vendor/fonts/PressStart2P-Regular.ttf") format("truetype"); font-display: swap; }
+@font-face { font-family: "KDP Anton"; src: url("../js/vendor/fonts/Anton-Regular.ttf") format("truetype"); font-display: swap; }
+@font-face { font-family: "KDP Archivo Black"; src: url("../js/vendor/fonts/ArchivoBlack-Regular.ttf") format("truetype"); font-display: swap; }
+@font-face { font-family: "KDP Poppins Bold"; src: url("../js/vendor/fonts/Poppins-Bold.ttf") format("truetype"); font-weight: 700; font-display: swap; }
+@font-face { font-family: "KDP Oswald"; src: url("../js/vendor/fonts/Oswald-Variable.ttf") format("truetype"); font-display: swap; }
+@font-face { font-family: "KDP Inter"; src: url("../js/vendor/fonts/Inter-Variable.ttf") format("truetype"); font-display: swap; }
+@font-face { font-family: "KDP Playfair Display"; src: url("../js/vendor/fonts/PlayfairDisplay-Variable.ttf") format("truetype"); font-display: swap; }
+@font-face { font-family: "KDP Cormorant Garamond"; src: url("../js/vendor/fonts/CormorantGaramond-Regular.ttf") format("truetype"); font-display: swap; }
+@font-face { font-family: "KDP Alex Brush"; src: url("../js/vendor/fonts/AlexBrush-Regular.ttf") format("truetype"); font-display: swap; }
+@font-face { font-family: "KDP PT Serif"; src: url("../js/vendor/fonts/PTSerif-Regular.ttf") format("truetype"); font-display: swap; }
+@font-face { font-family: "KDP Libre Baskerville"; src: url("../js/vendor/fonts/LibreBaskerville-Variable.ttf") format("truetype"); font-display: swap; }
+
 :root {
   --bg: #0f1115;
   --panel: #171a21;
@@ -928,6 +946,13 @@ input[type="file"] {
   font-size: 0.72rem;
   color: var(--text-dim);
   text-align: right;
+}
+
+.el-font-hint {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.3;
+  color: var(--text-dim);
 }
 
 /* --- Asset gallery --- */

@@ -1,6 +1,7 @@
-import { state, setState, subscribe } from "../../state.js?v=26";
-import { exportInteriorPdf, downloadPdf } from "../pdfExport.js?v=26";
-import { isPageEnabled, togglePage, orderedFrontMatterPages, orderedBackMatterPages, reorderPage } from "../../modules/frontBackMatterEngine.js?v=26";
+import { state, setState, subscribe } from "../../state.js?v=27";
+import { exportInteriorPdf, downloadPdf } from "../pdfExport.js?v=27";
+import { isPageEnabled, togglePage, orderedFrontMatterPages, orderedBackMatterPages, reorderPage } from "../../modules/frontBackMatterEngine.js?v=27";
+import { DRAG_HANDLE_ICON, attachDragHandle } from "../dragReorderList.js?v=27";
 
 const el = {
   frontMatterList: document.getElementById("front-matter-page-list"),
@@ -29,13 +30,6 @@ export function initExportPanel() {
   subscribe(render);
   render(state);
 }
-
-const DRAG_HANDLE_ICON = `
-  <svg viewBox="0 0 12 18" fill="currentColor">
-    <circle cx="3" cy="3" r="1.4"/><circle cx="9" cy="3" r="1.4"/>
-    <circle cx="3" cy="9" r="1.4"/><circle cx="9" cy="9" r="1.4"/>
-    <circle cx="3" cy="15" r="1.4"/><circle cx="9" cy="15" r="1.4"/>
-  </svg>`;
 
 // Rebuilt from scratch on every render (the list is short, so this is cheap) since
 // reordering changes actual DOM position, row numbers, and which arrows are disabled —
@@ -67,76 +61,14 @@ function renderMatterPageList(container, orderedPages, orderStateKey, disabledPa
         setState({ [orderStateKey]: reorderPage(ids, page.id, Number(btn.dataset.dir)) });
       });
     });
-    row.querySelector(".matter-page-drag-handle").addEventListener("pointerdown", (e) => {
-      beginDragReorder(e, container, row, ids, orderStateKey);
+    attachDragHandle(row.querySelector(".matter-page-drag-handle"), {
+      container,
+      row,
+      ids,
+      onReorder: (nextOrder) => setState({ [orderStateKey]: nextOrder }),
     });
     container.appendChild(row);
   });
-}
-
-// Click-and-hold drag reordering (mouse + touch, via Pointer Events) — an alternative
-// to the ▲▼ buttons for grabbing a row and dropping it anywhere in the list in one
-// gesture. Siblings visually shift out of the way via CSS transforms during the drag;
-// the actual order only commits to state on release, which triggers a full re-render
-// (fresh DOM, no leftover inline styles to clean up).
-function beginDragReorder(startEvent, container, row, ids, orderStateKey) {
-  if (startEvent.button !== undefined && startEvent.button !== 0) return;
-  startEvent.preventDefault();
-
-  const handle = startEvent.currentTarget;
-  const pointerId = startEvent.pointerId;
-  const rows = Array.from(container.children);
-  const draggedIndex = rows.indexOf(row);
-  if (draggedIndex === -1 || rows.length < 2) return;
-
-  const tops = rows.map((r) => r.offsetTop);
-  const stepSize = tops[1] - tops[0];
-  const startClientY = startEvent.clientY;
-  const rowHeight = row.offsetHeight;
-  let targetIndex = draggedIndex;
-
-  handle.setPointerCapture(pointerId);
-  row.classList.add("dragging");
-
-  function onMove(e) {
-    const dy = e.clientY - startClientY;
-    row.style.transform = `translateY(${dy}px)`;
-
-    const draggedCenter = tops[draggedIndex] + dy + rowHeight / 2;
-    targetIndex = Math.max(0, Math.min(rows.length - 1, Math.round((draggedCenter - tops[0]) / stepSize)));
-
-    rows.forEach((r, i) => {
-      if (i === draggedIndex) return;
-      let shift = 0;
-      if (draggedIndex < targetIndex && i > draggedIndex && i <= targetIndex) shift = -stepSize;
-      else if (draggedIndex > targetIndex && i >= targetIndex && i < draggedIndex) shift = stepSize;
-      r.style.transform = shift ? `translateY(${shift}px)` : "";
-    });
-  }
-
-  function onUp() {
-    handle.releasePointerCapture(pointerId);
-    handle.removeEventListener("pointermove", onMove);
-    handle.removeEventListener("pointerup", onUp);
-    handle.removeEventListener("pointercancel", onUp);
-
-    if (targetIndex !== draggedIndex) {
-      const nextOrder = ids.slice();
-      nextOrder.splice(draggedIndex, 1);
-      nextOrder.splice(targetIndex, 0, ids[draggedIndex]);
-      setState({ [orderStateKey]: nextOrder });
-    } else {
-      row.classList.remove("dragging");
-      row.style.transform = "";
-      rows.forEach((r) => {
-        r.style.transform = "";
-      });
-    }
-  }
-
-  handle.addEventListener("pointermove", onMove);
-  handle.addEventListener("pointerup", onUp);
-  handle.addEventListener("pointercancel", onUp);
 }
 
 async function handleExport() {
