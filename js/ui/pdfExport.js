@@ -4,20 +4,20 @@
 // (honoring each image's own granular overrides), auto-generated solution pages, and
 // back matter — entirely client-side via pdf-lib, no server round-trip.
 
-import { PDFDocument, StandardFonts, rgb } from "../vendor/pdf-lib.esm.min.js?v=15";
-import { getTrimSizeById } from "../modules/canvasEngine.js?v=15";
-import { computeCanvasDimensions } from "../modules/bleedEngine.js?v=15";
-import { computeSafeZone } from "../modules/safeZoneEngine.js?v=15";
-import { getSizesForSelection, buildCombinedPalette } from "../modules/colorKeyEngine.js?v=15";
-import { computePagination, FRONT_MATTER_INTERIOR_PAGES } from "../modules/storyboardEngine.js?v=15";
-import { buildSolutionPages } from "../modules/solutionGenerationEngine.js?v=15";
-import { BORDER_PRESETS } from "../modules/borderStyleEngine.js?v=15";
-import { migratedKeyStyle } from "../modules/layoutEngine.js?v=15";
-import { resolveEffectiveGrid } from "../modules/resolutionScalingEngine.js?v=15";
-import { computeKeyGridLayout } from "../modules/colorKeyLayoutEngine.js?v=15";
-import { normalizeComposition, computeLayout } from "../modules/layoutCompositionEngine.js?v=15";
-import { resolveActiveAsset } from "../modules/assetGalleryEngine.js?v=15";
-import { renderFullMosaicGrid, getPlaceholderSource, loadImageSource, drawSourceToCanvas } from "./mosaicRenderer.js?v=15";
+import { PDFDocument, StandardFonts, rgb } from "../vendor/pdf-lib.esm.min.js?v=18";
+import { getTrimSizeById } from "../modules/canvasEngine.js?v=18";
+import { computeCanvasDimensions } from "../modules/bleedEngine.js?v=18";
+import { computeSafeZone } from "../modules/safeZoneEngine.js?v=18";
+import { getSizesForSelection, buildCombinedPalette } from "../modules/colorKeyEngine.js?v=18";
+import { computePagination, FRONT_MATTER_INTERIOR_PAGES } from "../modules/storyboardEngine.js?v=18";
+import { buildSolutionPages } from "../modules/solutionGenerationEngine.js?v=18";
+import { BORDER_PRESETS } from "../modules/borderStyleEngine.js?v=18";
+import { migratedKeyStyle } from "../modules/layoutEngine.js?v=18";
+import { resolveEffectiveGrid } from "../modules/resolutionScalingEngine.js?v=18";
+import { computeKeyGridLayout } from "../modules/colorKeyLayoutEngine.js?v=18";
+import { normalizeComposition, computeLayout } from "../modules/layoutCompositionEngine.js?v=18";
+import { resolveActiveAsset } from "../modules/assetGalleryEngine.js?v=18";
+import { renderFullMosaicGrid, getPlaceholderSource, loadImageSource, drawSourceToCanvas } from "./mosaicRenderer.js?v=18";
 
 const PT_PER_IN = 72;
 const inToPt = (inches) => inches * PT_PER_IN;
@@ -615,7 +615,11 @@ export async function exportInteriorPdf(state, { onProgress } = {}) {
     const printCanvas = document.createElement("canvas");
     printCanvas.width = canvasDims.widthPx;
     printCanvas.height = canvasDims.heightPx;
-    renderFullMosaicGrid(printCanvas, { ...renderOpts, mode: "print" });
+    // The mosaic engine now DISCOVERS its own colors per image (k-means on the actual
+    // source pixels) rather than snapping to a fixed palette, so the legend is
+    // different every render and has to come back from renderFullMosaicGrid itself —
+    // effective.palette is no longer what actually got drawn into the grid.
+    const { legend } = renderFullMosaicGrid(printCanvas, { ...renderOpts, mode: "print" });
     const printImage = await doc.embedPng(await canvasToPngBytes(printCanvas));
     const puzzlePage = doc.addPage([pageWidthPt, pageHeightPt]);
     puzzlePage.drawImage(printImage, { x: 0, y: 0, width: pageWidthPt, height: pageHeightPt });
@@ -625,7 +629,7 @@ export async function exportInteriorPdf(state, { onProgress } = {}) {
     // Midnight/Blackout background (which the grid raster painted behind the bands).
     const gridTextColor = effective.gridTintPercent >= 100 ? rgb(0.95, 0.95, 0.95) : rgb(0.18, 0.18, 0.18);
     layout.gridPlacements.forEach(({ id, rect }) => {
-      drawPlacedElement(puzzlePage, { id, rect, elConfig: comp[id], state, palette: effective.palette, bold, regular, textColor: gridTextColor }, geom);
+      drawPlacedElement(puzzlePage, { id, rect, elConfig: comp[id], state, palette: legend, bold, regular, textColor: gridTextColor }, geom);
     });
 
     const solvedCanvas = document.createElement("canvas");
@@ -640,9 +644,9 @@ export async function exportInteriorPdf(state, { onProgress } = {}) {
     const itemBackImage = resolveItemBackImage(item, backImagesByAssetId, globalBackImage);
     const blackoutDefault = effective.gridTintPercent >= 100;
     if (layout.blankPlacements.length > 0) {
-      drawComposedBlankPage(backPage, { blankPlacements: layout.blankPlacements, comp, state, palette: effective.palette, bold, regular, w: pageWidthPt, h: pageHeightPt, backImage: itemBackImage, blackoutDefault, geom });
+      drawComposedBlankPage(backPage, { blankPlacements: layout.blankPlacements, comp, state, palette: legend, bold, regular, w: pageWidthPt, h: pageHeightPt, backImage: itemBackImage, blackoutDefault, geom });
     } else {
-      drawBlankBackPage(backPage, { backImage: itemBackImage, palette: effective.palette, regular, w: pageWidthPt, h: pageHeightPt, blackoutDefault });
+      drawBlankBackPage(backPage, { backImage: itemBackImage, palette: legend, regular, w: pageWidthPt, h: pageHeightPt, blackoutDefault });
     }
 
     reportProgress(`Puzzle: ${item.name}`);
@@ -744,7 +748,7 @@ async function renderActiveItemFullPage(state, mode) {
   const canvas = document.createElement("canvas");
   canvas.width = canvasDims.widthPx;
   canvas.height = canvasDims.heightPx;
-  renderFullMosaicGrid(canvas, {
+  const { legend } = renderFullMosaicGrid(canvas, {
     dpi: state.dpi,
     canvasDims,
     safeZone,
@@ -763,7 +767,7 @@ async function renderActiveItemFullPage(state, mode) {
   });
 
   const geom = { canvasDims, safeZone, pageSide: state.pageSide, pageHeightPt };
-  return { canvas, pageWidthPt, pageHeightPt, safeZone, comp, effective, geom };
+  return { canvas, pageWidthPt, pageHeightPt, safeZone, comp, effective, geom, legend };
 }
 
 // Downloads the active preview panel (mode: 'print' | 'solved') as a standalone PNG at
@@ -778,7 +782,7 @@ export async function downloadActiveItemPng(state, mode) {
 // book export) — same raster + vector-overlay pipeline as exportInteriorPdf's puzzle
 // page, just one page, for quickly proofing or sharing a single image.
 export async function downloadActiveItemPdf(state, mode) {
-  const { canvas, pageWidthPt, pageHeightPt, comp, effective, geom } = await renderActiveItemFullPage(state, mode);
+  const { canvas, pageWidthPt, pageHeightPt, comp, effective, geom, legend } = await renderActiveItemFullPage(state, mode);
 
   const doc = await PDFDocument.create();
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
@@ -791,7 +795,7 @@ export async function downloadActiveItemPdf(state, mode) {
     const layout = computeLayout(geom.safeZone, comp);
     const gridTextColor = effective.gridTintPercent >= 100 ? rgb(0.95, 0.95, 0.95) : rgb(0.18, 0.18, 0.18);
     layout.gridPlacements.forEach(({ id, rect }) => {
-      drawPlacedElement(page, { id, rect, elConfig: comp[id], state, palette: effective.palette, bold, regular, textColor: gridTextColor }, geom);
+      drawPlacedElement(page, { id, rect, elConfig: comp[id], state, palette: legend, bold, regular, textColor: gridTextColor }, geom);
     });
   }
 
