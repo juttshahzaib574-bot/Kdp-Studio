@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>KDP Studio</title>
-  <link rel="stylesheet" href="css/styles.css?v=19" />
+  <link rel="stylesheet" href="css/styles.css?v=20" />
 </head>
 <body>
   <header class="app-header">
@@ -177,6 +177,11 @@
         </div>
 
         <div class="field-group">
+          <label>Black Book — Page Background <span class="lock-note">(independent of the border/tint controls above — paints the actual page background across the whole book)</span></label>
+          <div class="option-list" id="page-background-options"></div>
+        </div>
+
+        <div class="field-group">
           <label for="border-weight-slider">Border Line Weight (pt)</label>
           <div class="dpi-control">
             <input type="range" id="border-weight-slider" min="0.5" max="6" step="0.1" value="0.9" />
@@ -190,7 +195,7 @@
             <input type="range" id="grid-tint-slider" min="0" max="100" step="1" value="35" />
             <input type="number" id="grid-tint-input" min="0" max="100" step="1" value="35" />
           </div>
-          <p class="hint">100% activates Blackout / Midnight mode — the canvas background goes rich black; cells stay white and numbers stay dark.</p>
+          <p class="hint">Controls grid LINE darkness only — cells always stay white. The page background itself is a separate choice: see Black Book, below.</p>
         </div>
 
         <div class="field-group">
@@ -242,6 +247,12 @@
 
       <section class="panel-section" id="color-key-setup">
         <h2><span class="step-badge">7</span> Color Key Standards</h2>
+
+        <div class="field-group">
+          <label>Color Edition <span class="lock-note">(a real KDP print-cost choice — Black &amp; White never follows any other setting)</span></label>
+          <div class="option-list" id="book-color-mode-options"></div>
+          <p class="hint" id="book-color-mode-hint"></p>
+        </div>
 
         <div class="field-group">
           <label for="color-set-select">Color Set</label>
@@ -405,6 +416,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="js/main.js?v=19"></script>
+  <script type="module" src="js/main.js?v=20"></script>
 </body>
 </html>
