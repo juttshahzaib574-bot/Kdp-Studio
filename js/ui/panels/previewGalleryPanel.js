@@ -1,16 +1,16 @@
-// Module: Stacked Live Preview Gallery + The 3-Second Looping Interface
-import { state, subscribe } from "../../state.js?v=24";
-import { getTrimSizeById } from "../../modules/canvasEngine.js?v=24";
-import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=24";
-import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=24";
-import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=24";
-import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=24";
-import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=24";
-import { normalizeComposition } from "../../modules/layoutCompositionEngine.js?v=24";
-import { getPlaceholderSource, loadImageSource, drawSourceToCanvas, renderMosaicPreview } from "../mosaicRenderer.js?v=24";
-import { createLoopController } from "../../modules/previewLoopEngine.js?v=24";
-import { downloadActiveItemPng, downloadActiveItemPdf } from "../pdfExport.js?v=24";
-import { isContentPageBlack } from "../../modules/bookThemeEngine.js?v=24";
+// Module: Stacked Live Preview Gallery + Live Preview Carousel
+import { state, setState, subscribe } from "../../state.js?v=25";
+import { getTrimSizeById } from "../../modules/canvasEngine.js?v=25";
+import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=25";
+import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=25";
+import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=25";
+import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=25";
+import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=25";
+import { normalizeComposition } from "../../modules/layoutCompositionEngine.js?v=25";
+import { getPlaceholderSource, loadImageSource, drawSourceToCanvas, renderMosaicPreview } from "../mosaicRenderer.js?v=25";
+import { createCarouselController } from "../../modules/previewLoopEngine.js?v=25";
+import { downloadActiveItemPng, downloadActiveItemPdf } from "../pdfExport.js?v=25";
+import { isContentPageBlack } from "../../modules/bookThemeEngine.js?v=25";
 
 const el = {
   printCanvas: document.getElementById("preview-canvas-print"),
@@ -18,16 +18,17 @@ const el = {
   printPlaceholder: document.getElementById("preview-placeholder-print"),
   solvedPlaceholder: document.getElementById("preview-placeholder-solved"),
   loopToggle: document.getElementById("preview-loop-toggle"),
-  loopState: document.getElementById("preview-loop-state"),
+  carouselDot: document.getElementById("preview-carousel-dot"),
+  prevBtn: document.getElementById("preview-prev-btn"),
+  nextBtn: document.getElementById("preview-next-btn"),
+  carouselLabel: document.getElementById("preview-carousel-label"),
   downloadPrintPng: document.getElementById("download-print-png"),
   downloadPrintPdf: document.getElementById("download-print-pdf"),
   downloadSolvedPng: document.getElementById("download-solved-png"),
   downloadSolvedPdf: document.getElementById("download-solved-pdf"),
 };
 
-let printStage;
-let solvedStage;
-let loopController;
+let carouselController;
 let cachedSourceCanvas = null;
 let cachedSourceKey = null;
 // Auto-regenerates on every relevant state change (upload, settings, layout edits) — no
@@ -37,27 +38,22 @@ let debounceTimer = null;
 const DEBOUNCE_MS = 180;
 
 export function initPreviewGalleryPanel() {
-  printStage = el.printCanvas.closest(".canvas-stage");
-  solvedStage = el.solvedCanvas.closest(".canvas-stage");
-
-  loopController = createLoopController({
+  carouselController = createCarouselController({
     intervalMs: 3000,
-    onChange: (loopStateValue) => {
-      printStage.classList.toggle("emphasized", loopStateValue === "print");
-      solvedStage.classList.toggle("emphasized", loopStateValue === "solved");
-      el.loopState.textContent = loopStateValue === "print" ? "Emphasizing: Print Asset" : "Emphasizing: Solved State";
-    },
+    onTick: () => advanceActiveItem(1),
   });
 
   el.loopToggle.addEventListener("change", () => {
-    if (el.loopToggle.checked) {
-      loopController.start();
-    } else {
-      loopController.stop();
-      printStage.classList.remove("emphasized");
-      solvedStage.classList.remove("emphasized");
-      el.loopState.textContent = "";
-    }
+    setState({ previewLoopEnabled: el.loopToggle.checked });
+  });
+
+  el.prevBtn.addEventListener("click", () => {
+    advanceActiveItem(-1);
+    if (state.previewLoopEnabled) carouselController.restart();
+  });
+  el.nextBtn.addEventListener("click", () => {
+    advanceActiveItem(1);
+    if (state.previewLoopEnabled) carouselController.restart();
   });
 
   wireDownloadButton(el.downloadPrintPng, () => downloadActiveItemPng(state, "print"));
@@ -65,8 +61,32 @@ export function initPreviewGalleryPanel() {
   wireDownloadButton(el.downloadSolvedPng, () => downloadActiveItemPng(state, "solved"));
   wireDownloadButton(el.downloadSolvedPdf, () => downloadActiveItemPdf(state, "solved"));
 
-  subscribe(scheduleRender);
+  el.loopToggle.checked = state.previewLoopEnabled;
+
+  subscribe((current) => {
+    syncCarouselTimer(current);
+    scheduleRender(current);
+  });
+  syncCarouselTimer(state);
   render(state);
+}
+
+// Moves activeBatchItemId forward/back through the queued batch, wrapping around —
+// mirrors the reference carousel's showPreview(curPrev ± 1) modulo-clamp.
+function advanceActiveItem(step) {
+  const items = state.batchItems;
+  if (items.length === 0) return;
+  const idx = items.findIndex((item) => item.id === state.activeBatchItemId);
+  const nextIndex = (((idx === -1 ? 0 : idx) + step) % items.length + items.length) % items.length;
+  setState({ activeBatchItemId: items[nextIndex].id });
+}
+
+// Auto-advance only ever runs with the toggle on AND more than one puzzle queued —
+// matching the reference's `readyList().length>1` gate for startLoop().
+function syncCarouselTimer(current) {
+  const shouldRun = current.previewLoopEnabled && current.batchItems.length > 1;
+  if (shouldRun) carouselController.start();
+  else carouselController.stop();
 }
 
 function scheduleRender(current) {
@@ -124,6 +144,8 @@ function resolveActiveSettings(current, globalPalette) {
 // Renders automatically for whatever's currently active — no manual step. With nothing
 // queued yet, the placeholder stays up and canvases stay hidden.
 async function render(current) {
+  updateCarouselNav(current);
+
   const activeItem = current.batchItems.find((item) => item.id === current.activeBatchItemId);
   if (!activeItem) {
     el.printCanvas.hidden = true;
@@ -178,6 +200,17 @@ async function render(current) {
   el.solvedCanvas.hidden = false;
   el.printPlaceholder.hidden = true;
   el.solvedPlaceholder.hidden = true;
+}
+
+// Puzzle N of M label + prev/next disabled state + the auto-cycling dot indicator.
+function updateCarouselNav(current) {
+  const items = current.batchItems;
+  const idx = items.findIndex((item) => item.id === current.activeBatchItemId);
+
+  el.prevBtn.disabled = items.length === 0;
+  el.nextBtn.disabled = items.length === 0;
+  el.carouselLabel.textContent = items.length === 0 ? "—" : `Puzzle ${idx === -1 ? 1 : idx + 1} of ${items.length}`;
+  el.carouselDot.classList.toggle("on", current.previewLoopEnabled && items.length > 1);
 }
 
 async function resolveSourceCanvas(current) {

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>KDP Studio</title>
-  <link rel="stylesheet" href="css/styles.css?v=24" />
+  <link rel="stylesheet" href="css/styles.css?v=25" />
 </head>
 <body>
   <header class="app-header">
@@ -45,10 +45,15 @@
 
         <div class="preview-toolbar">
           <label class="loop-toggle">
-            <input type="checkbox" id="preview-loop-toggle" />
-            Auto-loop every 3s (3-Second Looping Interface)
+            <input type="checkbox" id="preview-loop-toggle" checked />
+            Auto-loop every 3s
+            <span class="carousel-dot" id="preview-carousel-dot"></span>
           </label>
-          <span class="hint" id="preview-loop-state"></span>
+          <div class="preview-carousel-nav">
+            <button type="button" class="btn btn-secondary btn-small" id="preview-prev-btn" title="Previous puzzle">◀</button>
+            <span class="preview-carousel-label" id="preview-carousel-label">—</span>
+            <button type="button" class="btn btn-secondary btn-small" id="preview-next-btn" title="Next puzzle">▶</button>
+          </div>
         </div>
         <div class="dual-canvas-row">
           <div class="canvas-stage">
@@ -430,6 +435,6 @@
     </div>
   </dialog>
 
-  <script type="module" src="js/main.js?v=24"></script>
+  <script type="module" src="js/main.js?v=25"></script>
 </body>
 </html>
