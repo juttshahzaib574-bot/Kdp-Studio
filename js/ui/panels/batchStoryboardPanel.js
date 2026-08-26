@@ -1,10 +1,10 @@
-import { state, setState, subscribe } from "../../state.js?v=33";
-import { MAX_BATCH_SIZE, addToBatch, removeFromBatch, updateItemSettings } from "../../modules/batchEngine.js?v=33";
-import { reorder, computePagination, statusBadges } from "../../modules/storyboardEngine.js?v=33";
-import { computeSolutionPageCount } from "../../modules/solutionGenerationEngine.js?v=33";
-import { GRID_PATTERNS, CORNER_TRIM_CORNERS, CORNER_TRIM_SHAPES, CORNER_TRIM_SIZE_MIN_PERCENT, CORNER_TRIM_SIZE_MAX_PERCENT } from "../../modules/gridPatternEngine.js?v=33";
-import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=33";
-import { computeFrontMatterPageCount } from "../../modules/frontBackMatterEngine.js?v=33";
+import { state, setState, subscribe } from "../../state.js?v=34";
+import { MAX_BATCH_SIZE, addToBatch, removeFromBatch, updateItemSettings } from "../../modules/batchEngine.js?v=34";
+import { reorder, computePagination, statusBadges } from "../../modules/storyboardEngine.js?v=34";
+import { computeSolutionPageCount } from "../../modules/solutionGenerationEngine.js?v=34";
+import { GRID_PATTERNS, CORNER_TRIM_CORNERS, CORNER_TRIM_SHAPES, CORNER_TRIM_SIZE_MIN_PERCENT, CORNER_TRIM_SIZE_MAX_PERCENT } from "../../modules/gridPatternEngine.js?v=34";
+import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=34";
+import { computeFrontMatterPageCount } from "../../modules/frontBackMatterEngine.js?v=34";
 
 const CORNER_RADIUS_CHOICES = [0, 25, 50, 75, 100];
 const COLOR_SET_CHOICES = [12, 24, 36];

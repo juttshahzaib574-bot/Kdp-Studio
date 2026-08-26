@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>KDP Studio</title>
-  <link rel="stylesheet" href="css/styles.css?v=33" />
+  <link rel="stylesheet" href="css/styles.css?v=34" />
 </head>
 <body>
   <header class="app-header">
@@ -322,6 +322,12 @@
           <label>Swatch Preview — Universal 36-Color Palette</label>
           <div class="swatch-list" id="color-swatch-list"></div>
         </div>
+
+        <div class="field-group">
+          <label>Blank Colors <span class="lock-note">— optional, off by default</span></label>
+          <div class="option-list" id="blank-color-options"></div>
+          <p class="hint">Pick any color(s) from the active set above — cells assigned that color print with no border and no number, just bare paper. Nothing is picked for you; choose whichever color(s) you want to stay hidden longer to deepen the mystery reveal.</p>
+        </div>
       </section>
 
       <section class="panel-section" id="export-setup">
@@ -483,6 +489,6 @@
        module scripts below — pdfExport.js needs window.fontkit already set when it
        calls doc.registerFontkit() to embed the custom fonts in js/vendor/fonts/. -->
   <script src="js/vendor/fontkit.umd.min.js"></script>
-  <script type="module" src="js/main.js?v=33"></script>
+  <script type="module" src="js/main.js?v=34"></script>
 </body>
 </html>

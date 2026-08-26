@@ -6,14 +6,14 @@
 //   - renderFullMosaicGrid: the entire safe-zone grid at the real chosen print DPI,
 //     used to generate the actual page image embedded into the exported PDF.
 
-import { computeFrameGeometry, drawFrame } from "./preview.js?v=33";
-import { computeGridDimensions, cellCenterIn, cellPolygonIn, mmToIn, isCellInGridSilhouette, isCellInFrameMargin } from "../modules/gridPatternEngine.js?v=33";
-import { recommendFont, recommendTextTint, adjustForBorderWeight, centerOffsetIn, letterSpacingForLabel } from "../modules/typographyEngine.js?v=33";
-import { gridColorFromTint } from "../modules/borderStyleEngine.js?v=33";
-import { cornerRadiusIn, isFullCircle } from "../modules/cornerRadiusEngine.js?v=33";
-import { nearestPaletteColor, rgbToLabTriple, labTripleToRgb } from "../modules/shadeQuantizationEngine.js?v=33";
-import { computeLayout, LAYOUT_ELEMENTS } from "../modules/layoutCompositionEngine.js?v=33";
-import { toGrayscaleHex } from "../modules/bookThemeEngine.js?v=33";
+import { computeFrameGeometry, drawFrame } from "./preview.js?v=34";
+import { computeGridDimensions, cellCenterIn, cellPolygonIn, mmToIn, isCellInGridSilhouette, isCellInFrameMargin } from "../modules/gridPatternEngine.js?v=34";
+import { recommendFont, recommendTextTint, adjustForBorderWeight, centerOffsetIn, letterSpacingForLabel } from "../modules/typographyEngine.js?v=34";
+import { gridColorFromTint } from "../modules/borderStyleEngine.js?v=34";
+import { cornerRadiusIn, isFullCircle } from "../modules/cornerRadiusEngine.js?v=34";
+import { nearestPaletteColor, rgbToLabTriple, labTripleToRgb } from "../modules/shadeQuantizationEngine.js?v=34";
+import { computeLayout, LAYOUT_ELEMENTS } from "../modules/layoutCompositionEngine.js?v=34";
+import { toGrayscaleHex } from "../modules/bookThemeEngine.js?v=34";
 
 const PT_TO_IN = 1 / 72;
 
@@ -455,7 +455,7 @@ function computeQuantization(sourceCanvas, cols, rows, targetAspect, palette) {
 
   const legend = uniquePaletteIndexes.map((paletteIndex) => {
     const entry = palette[paletteIndex];
-    return { hex: entry.hex, rgb: entry.rgb, name: entry.name };
+    return { id: entry.id, hex: entry.hex, rgb: entry.rgb, name: entry.name };
   });
 
   return { assignments, legend };
@@ -535,8 +535,16 @@ function computeCellStyle({ cellSizeMm, cellSizeIn, borderWeightPt, gridTintPerc
 // `lowDetail` skips the polygon path, stroke and number entirely in favor of one flat
 // fillRect — used when a full-page preview packs cells too small to read a number
 // anyway, so the whole grid still renders responsively instead of just a zoomed crop.
-function drawCell(ctx, { centerPx, cellSizeIn, cellSizePx, ppi, gridPattern, mode, paletteIndex, palette, style, cornerRadiusPercent, lowDetail = false, blackWhiteEdition = false }) {
+function drawCell(ctx, { centerPx, cellSizeIn, cellSizePx, ppi, gridPattern, mode, paletteIndex, palette, style, cornerRadiusPercent, lowDetail = false, blackWhiteEdition = false, blankColorIds = [] }) {
   const swatch = palette[paletteIndex];
+
+  // Blank Colors: a creator-picked subset of the palette (never defaulted — off unless
+  // explicitly chosen) renders as bare, undrawn paper on the puzzle page instead of a
+  // bordered, numbered cell — deepens the "mystery" reveal for whichever colors they
+  // choose, not just whichever happens to be white. The Solutions page always shows the
+  // true color regardless, since its only job is to answer the puzzle.
+  if (mode !== "solved" && blankColorIds.includes(swatch.id)) return;
+
   // Black & White edition: nothing anywhere in the book spends real color ink, so the
   // "solved" fill (the only place a cell ever shows a real color) substitutes each
   // color's own grayscale luminance instead — still visually distinguishable, no ink cost.
@@ -638,7 +646,7 @@ export function renderMosaicPreview(canvas, opts) {
     mode, // 'print' | 'solved'
     trimSize, dpi, bleedEnabled, canvasDims, safeZone, pageSide, composition,
     gridPattern, cellSizeMm, gridOverride = null, borderWeightPt, gridTintPercent, cornerRadiusPercent,
-    palette, sourceCanvas, cornerTrimCorners = [], cornerTrimShape = "rounded", cornerTrimSizePercent = 12, frameMarginCells = 0, gridPageBlack = false, blackWhiteEdition = false,
+    palette, sourceCanvas, cornerTrimCorners = [], cornerTrimShape = "rounded", cornerTrimSizePercent = 12, frameMarginCells = 0, gridPageBlack = false, blackWhiteEdition = false, blankColorIds = [],
   } = opts;
 
   const ctx = canvas.getContext("2d");
@@ -701,7 +709,7 @@ export function renderMosaicPreview(canvas, opts) {
       const centerPx = { x: originX + localCenterIn.x * ppi, y: originY + localCenterIn.y * ppi };
       drawCell(ctx, {
         centerPx, cellSizeIn: fullGrid.cellSizeIn, cellSizePx, ppi, gridPattern, mode,
-        paletteIndex: assignments[index], palette: legend, style, cornerRadiusPercent, lowDetail, blackWhiteEdition,
+        paletteIndex: assignments[index], palette: legend, style, cornerRadiusPercent, lowDetail, blackWhiteEdition, blankColorIds,
       });
       index += 1;
     }
@@ -725,7 +733,7 @@ export function renderFullMosaicGrid(canvas, opts) {
     mode, // 'print' | 'solved'
     dpi, canvasDims, safeZone, pageSide, composition,
     gridPattern, cellSizeMm, gridOverride = null, borderWeightPt, gridTintPercent, cornerRadiusPercent,
-    palette, sourceCanvas, cornerTrimCorners = [], cornerTrimShape = "rounded", cornerTrimSizePercent = 12, frameMarginCells = 0, gridPageBlack = false, blackWhiteEdition = false,
+    palette, sourceCanvas, cornerTrimCorners = [], cornerTrimShape = "rounded", cornerTrimSizePercent = 12, frameMarginCells = 0, gridPageBlack = false, blackWhiteEdition = false, blankColorIds = [],
   } = opts;
 
   const ctx = canvas.getContext("2d");
@@ -764,7 +772,7 @@ export function renderFullMosaicGrid(canvas, opts) {
       const centerPx = { x: originXPx + localCenterIn.x * dpi, y: originYPx + localCenterIn.y * dpi };
       drawCell(ctx, {
         centerPx, cellSizeIn: fullGrid.cellSizeIn, cellSizePx, ppi: dpi, gridPattern, mode,
-        paletteIndex: assignments[index], palette: legend, style, cornerRadiusPercent, blackWhiteEdition,
+        paletteIndex: assignments[index], palette: legend, style, cornerRadiusPercent, blackWhiteEdition, blankColorIds,
       });
       index += 1;
     }

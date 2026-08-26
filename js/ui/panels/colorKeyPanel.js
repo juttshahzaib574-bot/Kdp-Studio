@@ -1,7 +1,7 @@
-import { state, setState, subscribe } from "../../state.js?v=33";
-import { COLOR_SET_OPTIONS, getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=33";
-import { BOOK_COLOR_MODES } from "../../modules/bookThemeEngine.js?v=33";
-import { COLOR_KEY_ORIENTATIONS, MAX_ENTRIES_PER_LINE } from "../../modules/colorKeyLayoutEngine.js?v=33";
+import { state, setState, subscribe } from "../../state.js?v=34";
+import { COLOR_SET_OPTIONS, getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=34";
+import { BOOK_COLOR_MODES } from "../../modules/bookThemeEngine.js?v=34";
+import { COLOR_KEY_ORIENTATIONS, MAX_ENTRIES_PER_LINE } from "../../modules/colorKeyLayoutEngine.js?v=34";
 
 const PAIR_CHOICES = [
   { id: "12-24", sizes: [12, 24], label: "12 & 24" },
@@ -19,6 +19,7 @@ const el = {
   entriesPerLineInput: document.getElementById("color-key-entries-per-line"),
   entriesPerLineLabel: document.getElementById("color-key-entries-per-line-axis"),
   swatchList: document.getElementById("color-swatch-list"),
+  blankColorOptions: document.getElementById("blank-color-options"),
 };
 
 export function initColorKeyPanel() {
@@ -118,4 +119,27 @@ function render(current) {
         </div>`
     )
     .join("");
+
+  renderBlankColorOptions(current, palette);
+}
+
+// Rebuilt every render (not just init) because the eligible color list changes
+// whenever the Color Set selection changes — no color is picked by default, and
+// this list is the only source of truth for which ones the creator has chosen.
+function renderBlankColorOptions(current, palette) {
+  el.blankColorOptions.innerHTML = "";
+  palette.forEach((swatch) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "option-item swatch-toggle";
+    btn.dataset.colorId = String(swatch.id);
+    const isActive = current.blankColorIds.includes(swatch.id);
+    btn.classList.toggle("active", isActive);
+    btn.innerHTML = `<span class="swatch-chip" style="background:${swatch.hex}"></span><strong>${swatch.name}</strong>`;
+    btn.addEventListener("click", () => {
+      const next = isActive ? current.blankColorIds.filter((id) => id !== swatch.id) : [...current.blankColorIds, swatch.id];
+      setState({ blankColorIds: next });
+    });
+    el.blankColorOptions.appendChild(btn);
+  });
 }
