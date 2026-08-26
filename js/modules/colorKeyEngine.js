@@ -1,5 +1,5 @@
 // Section 4: Color Key Standards for Mosaic Color-by-Number Books
-import { UNIVERSAL_PALETTE_36 } from "./data/universalPalette.js?v=24";
+import { UNIVERSAL_PALETTE_36 } from "./data/universalPalette.js?v=25";
 
 // The 5 selectable color-COUNT configurations described in the blueprint. There is
 // only one color source now (see universalPalette.js) — every hex value is exact and

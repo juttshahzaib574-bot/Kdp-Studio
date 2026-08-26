@@ -4,22 +4,22 @@
 // (honoring each image's own granular overrides), auto-generated solution pages, and
 // back matter — entirely client-side via pdf-lib, no server round-trip.
 
-import { PDFDocument, StandardFonts, rgb } from "../vendor/pdf-lib.esm.min.js?v=24";
-import { getTrimSizeById } from "../modules/canvasEngine.js?v=24";
-import { computeCanvasDimensions } from "../modules/bleedEngine.js?v=24";
-import { computeSafeZone } from "../modules/safeZoneEngine.js?v=24";
-import { getSizesForSelection, buildCombinedPalette } from "../modules/colorKeyEngine.js?v=24";
-import { computePagination } from "../modules/storyboardEngine.js?v=24";
-import { isPageEnabled, computeFrontMatterPageCount, orderedFrontMatterPages, orderedBackMatterPages } from "../modules/frontBackMatterEngine.js?v=24";
-import { buildSolutionPages } from "../modules/solutionGenerationEngine.js?v=24";
-import { BORDER_PRESETS } from "../modules/borderStyleEngine.js?v=24";
-import { migratedKeyStyle } from "../modules/layoutEngine.js?v=24";
-import { resolveEffectiveGrid } from "../modules/resolutionScalingEngine.js?v=24";
-import { computeKeyGridLayout, keyEntryPosition } from "../modules/colorKeyLayoutEngine.js?v=24";
-import { normalizeComposition, computeLayout } from "../modules/layoutCompositionEngine.js?v=24";
-import { resolveActiveAsset } from "../modules/assetGalleryEngine.js?v=24";
-import { renderFullMosaicGrid, getPlaceholderSource, loadImageSource, drawSourceToCanvas } from "./mosaicRenderer.js?v=24";
-import { isContentPageBlack, isFacingPageBlack, isBlackWhiteEdition, toGrayscaleRgb } from "../modules/bookThemeEngine.js?v=24";
+import { PDFDocument, StandardFonts, rgb } from "../vendor/pdf-lib.esm.min.js?v=25";
+import { getTrimSizeById } from "../modules/canvasEngine.js?v=25";
+import { computeCanvasDimensions } from "../modules/bleedEngine.js?v=25";
+import { computeSafeZone } from "../modules/safeZoneEngine.js?v=25";
+import { getSizesForSelection, buildCombinedPalette } from "../modules/colorKeyEngine.js?v=25";
+import { computePagination } from "../modules/storyboardEngine.js?v=25";
+import { isPageEnabled, computeFrontMatterPageCount, orderedFrontMatterPages, orderedBackMatterPages } from "../modules/frontBackMatterEngine.js?v=25";
+import { buildSolutionPages } from "../modules/solutionGenerationEngine.js?v=25";
+import { BORDER_PRESETS } from "../modules/borderStyleEngine.js?v=25";
+import { migratedKeyStyle } from "../modules/layoutEngine.js?v=25";
+import { resolveEffectiveGrid } from "../modules/resolutionScalingEngine.js?v=25";
+import { computeKeyGridLayout, keyEntryPosition } from "../modules/colorKeyLayoutEngine.js?v=25";
+import { normalizeComposition, computeLayout } from "../modules/layoutCompositionEngine.js?v=25";
+import { resolveActiveAsset } from "../modules/assetGalleryEngine.js?v=25";
+import { renderFullMosaicGrid, getPlaceholderSource, loadImageSource, drawSourceToCanvas } from "./mosaicRenderer.js?v=25";
+import { isContentPageBlack, isFacingPageBlack, isBlackWhiteEdition, toGrayscaleRgb } from "../modules/bookThemeEngine.js?v=25";
 
 const PT_PER_IN = 72;
 const inToPt = (inches) => inches * PT_PER_IN;

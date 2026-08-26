@@ -58,8 +58,9 @@ export const state = {
   activeAssetByCategory: {}, // bucketId -> assetId ("in use" pick when a bucket holds several)
   customAlbums: [], // [{id, name}] — user-created organizational folders, no PDF role
 
-  // 3-Second Looping Interface / Stacked Live Preview Gallery
-  previewLoopEnabled: false,
+  // Live Preview Carousel: auto-advances the active queued puzzle every 3s so both
+  // preview panels cycle through the whole batch in sequence (see previewLoopEngine.js).
+  previewLoopEnabled: true,
 
   // Unified Export Pipeline (book metadata for the generated front matter)
   bookTitle: "Untitled Mystery Mosaic Book",

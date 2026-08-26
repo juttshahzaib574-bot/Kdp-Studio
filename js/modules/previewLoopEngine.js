@@ -1,42 +1,31 @@
-// Module: The 3-Second Looping Interface
-// Auto-toggles between the print-asset state and the solved state so creators don't
-// have to click back and forth to evaluate their work. Manual override pauses it.
+// Module: Live Preview Carousel
+// Auto-advances the active queued puzzle every N ms so a creator watching the Live
+// Preview panel sees the whole batch cycle through in sequence without manual clicks.
+// Manual prev/next restarts the timer so the next auto-advance is always a full
+// interval away, matching the reference carousel's prevBtn/nextBtn behavior.
 
-export function createLoopController({ intervalMs = 3000, onChange } = {}) {
-  let state = "print"; // 'print' | 'solved'
+export function createCarouselController({ intervalMs = 3000, onTick } = {}) {
   let timer = null;
-  let paused = false;
 
-  function tick() {
-    if (paused) return;
-    state = state === "print" ? "solved" : "print";
-    onChange?.(state);
+  function start() {
+    if (timer) return;
+    timer = setInterval(() => onTick?.(), intervalMs);
+  }
+
+  function stop() {
+    clearInterval(timer);
+    timer = null;
   }
 
   return {
-    start() {
-      if (timer) return;
-      timer = setInterval(tick, intervalMs);
+    start,
+    stop,
+    restart() {
+      stop();
+      start();
     },
-    stop() {
-      clearInterval(timer);
-      timer = null;
-    },
-    pause() {
-      paused = true;
-    },
-    resume() {
-      paused = false;
-    },
-    get isPaused() {
-      return paused;
-    },
-    get state() {
-      return state;
-    },
-    setState(next) {
-      state = next;
-      onChange?.(state);
+    get isRunning() {
+      return timer !== null;
     },
   };
 }
