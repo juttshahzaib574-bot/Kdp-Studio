@@ -458,6 +458,42 @@ dialog#alert-dialog p {
   background: var(--accent-dim);
 }
 
+.corner-trim-picker {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 6px;
+  width: 96px;
+  height: 96px;
+}
+
+.corner-trim-btn {
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.corner-trim-btn[data-corner="top-left"] { border-radius: 8px 2px 2px 2px; }
+.corner-trim-btn[data-corner="top-right"] { border-radius: 2px 8px 2px 2px; }
+.corner-trim-btn[data-corner="bottom-left"] { border-radius: 2px 2px 2px 8px; }
+.corner-trim-btn[data-corner="bottom-right"] { border-radius: 2px 2px 8px 2px; }
+
+.corner-trim-btn:hover {
+  border-color: var(--accent);
+}
+
+.corner-trim-btn.active {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  color: var(--text);
+}
+
 .pattern-option .size-note,
 .option-item .size-note {
   display: block;

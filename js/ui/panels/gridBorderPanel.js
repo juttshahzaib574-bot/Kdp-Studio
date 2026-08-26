@@ -1,15 +1,23 @@
-import { state, setState, subscribe } from "../../state.js?v=30";
-import { GRID_PATTERNS, computeGridDimensions, isCellInGridSilhouette } from "../../modules/gridPatternEngine.js?v=30";
-import { recommendFont, recommendTextTint } from "../../modules/typographyEngine.js?v=30";
-import { applyPreset, clampBorderWeight } from "../../modules/borderStyleEngine.js?v=30";
-import { CORNER_RADIUS_MIN_PERCENT, CORNER_RADIUS_MAX_PERCENT } from "../../modules/cornerRadiusEngine.js?v=30";
-import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=30";
-import { getTrimSizeById } from "../../modules/canvasEngine.js?v=30";
-import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=30";
-import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=30";
-import { normalizeComposition, computeLayout } from "../../modules/layoutCompositionEngine.js?v=30";
-import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=30";
-import { PAGE_BACKGROUND_MODES } from "../../modules/bookThemeEngine.js?v=30";
+import { state, setState, subscribe } from "../../state.js?v=31";
+import {
+  GRID_PATTERNS,
+  computeGridDimensions,
+  isCellInGridSilhouette,
+  CORNER_TRIM_CORNERS,
+  CORNER_TRIM_SHAPES,
+  CORNER_TRIM_SIZE_MIN_PERCENT,
+  CORNER_TRIM_SIZE_MAX_PERCENT,
+} from "../../modules/gridPatternEngine.js?v=31";
+import { recommendFont, recommendTextTint } from "../../modules/typographyEngine.js?v=31";
+import { applyPreset, clampBorderWeight } from "../../modules/borderStyleEngine.js?v=31";
+import { CORNER_RADIUS_MIN_PERCENT, CORNER_RADIUS_MAX_PERCENT } from "../../modules/cornerRadiusEngine.js?v=31";
+import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=31";
+import { getTrimSizeById } from "../../modules/canvasEngine.js?v=31";
+import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=31";
+import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=31";
+import { normalizeComposition, computeLayout } from "../../modules/layoutCompositionEngine.js?v=31";
+import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=31";
+import { PAGE_BACKGROUND_MODES } from "../../modules/bookThemeEngine.js?v=31";
 
 const el = {
   patternGrid: document.getElementById("grid-pattern-options"),
@@ -25,7 +33,12 @@ const el = {
   tintInput: document.getElementById("grid-tint-input"),
   radiusSlider: document.getElementById("corner-radius-slider"),
   radiusInput: document.getElementById("corner-radius-input"),
-  cornerTrimToggle: document.getElementById("grid-corner-trim-toggle"),
+  cornerTrimPicker: document.getElementById("corner-trim-picker"),
+  cornerTrimShapeOptions: document.getElementById("corner-trim-shape-options"),
+  cornerTrimSizeSlider: document.getElementById("corner-trim-size-slider"),
+  cornerTrimSizeInput: document.getElementById("corner-trim-size-input"),
+  cornerTrimDetailGroup: document.getElementById("corner-trim-detail-group"),
+  cornerTrimSizeGroup: document.getElementById("corner-trim-size-group"),
   statGridDims: document.getElementById("stat-grid-dims"),
   statCellCount: document.getElementById("stat-cell-count"),
   statOutPx: document.getElementById("stat-out-px"),
@@ -34,15 +47,57 @@ const el = {
 export function initGridBorderPanel() {
   renderPatternOptions();
   renderPageBackgroundOptions();
+  renderCornerTrimPicker();
+  renderCornerTrimShapeOptions();
   bindCellSize();
   bindPresets();
   bindBorderWeight();
   bindGridTint();
   bindCornerRadius();
-  el.cornerTrimToggle.addEventListener("change", () => setState({ gridCornerTrim: el.cornerTrimToggle.checked }));
+  bindCornerTrimSize();
 
   subscribe(render);
   render(state);
+}
+
+function renderCornerTrimPicker() {
+  el.cornerTrimPicker.innerHTML = "";
+  CORNER_TRIM_CORNERS.forEach((corner) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "corner-trim-btn";
+    btn.dataset.corner = corner.id;
+    btn.title = corner.label;
+    btn.textContent = corner.glyph;
+    btn.addEventListener("click", () => {
+      const active = state.gridCornerTrimCorners.includes(corner.id);
+      const next = active ? state.gridCornerTrimCorners.filter((id) => id !== corner.id) : [...state.gridCornerTrimCorners, corner.id];
+      setState({ gridCornerTrimCorners: next });
+    });
+    el.cornerTrimPicker.appendChild(btn);
+  });
+}
+
+function renderCornerTrimShapeOptions() {
+  el.cornerTrimShapeOptions.innerHTML = "";
+  CORNER_TRIM_SHAPES.forEach((shape) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "option-item";
+    btn.dataset.shapeId = shape.id;
+    btn.innerHTML = `<strong>${shape.label}</strong><span class="size-note">${shape.note}</span>`;
+    btn.addEventListener("click", () => setState({ gridCornerTrimShape: shape.id }));
+    el.cornerTrimShapeOptions.appendChild(btn);
+  });
+}
+
+function bindCornerTrimSize() {
+  el.cornerTrimSizeSlider.addEventListener("input", () => setState({ gridCornerTrimSizePercent: Number(el.cornerTrimSizeSlider.value) }));
+  el.cornerTrimSizeInput.addEventListener("change", () => setState({ gridCornerTrimSizePercent: clampCornerTrimSize(Number(el.cornerTrimSizeInput.value)) }));
+}
+
+function clampCornerTrimSize(pct) {
+  return Math.min(CORNER_TRIM_SIZE_MAX_PERCENT, Math.max(CORNER_TRIM_SIZE_MIN_PERCENT, Number.isFinite(pct) ? pct : 12));
 }
 
 function renderPageBackgroundOptions() {
@@ -126,7 +181,17 @@ function render(current) {
   syncPair(el.borderSlider, el.borderInput, current.borderWeightPt);
   syncPair(el.tintSlider, el.tintInput, current.gridTintPercent);
   syncPair(el.radiusSlider, el.radiusInput, current.cornerRadiusPercent);
-  el.cornerTrimToggle.checked = current.gridCornerTrim;
+  syncPair(el.cornerTrimSizeSlider, el.cornerTrimSizeInput, current.gridCornerTrimSizePercent);
+
+  el.cornerTrimPicker.querySelectorAll(".corner-trim-btn").forEach((btn) => {
+    btn.classList.toggle("active", current.gridCornerTrimCorners.includes(btn.dataset.corner));
+  });
+  el.cornerTrimShapeOptions.querySelectorAll(".option-item").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.shapeId === current.gridCornerTrimShape);
+  });
+  const trimActive = current.gridCornerTrimCorners.length > 0;
+  el.cornerTrimDetailGroup.hidden = !trimActive;
+  el.cornerTrimSizeGroup.hidden = !trimActive;
 
   renderLiveStats(current);
 
@@ -155,18 +220,20 @@ function renderLiveStats(current) {
     ? { cols: gridOverride.cols, rows: gridOverride.rows }
     : computeGridDimensions(layout.gridZone.widthIn, layout.gridZone.heightIn, effCellSizeMm, current.gridPattern);
 
-  const trimmed = current.gridCornerTrim ? countTrimmedCells(grid.cols, grid.rows) : grid.cols * grid.rows;
+  const trimmed = current.gridCornerTrimCorners.length > 0
+    ? countTrimmedCells(grid.cols, grid.rows, current.gridCornerTrimCorners, current.gridCornerTrimShape, current.gridCornerTrimSizePercent)
+    : grid.cols * grid.rows;
 
   el.statGridDims.textContent = `${grid.cols} × ${grid.rows}`;
   el.statCellCount.textContent = trimmed.toLocaleString();
   el.statOutPx.textContent = `${canvasDims.widthPx} × ${canvasDims.heightPx}`;
 }
 
-function countTrimmedCells(cols, rows) {
+function countTrimmedCells(cols, rows, corners, shape, sizePercent) {
   let count = 0;
   for (let row = 0; row < rows; row += 1) {
     for (let col = 0; col < cols; col += 1) {
-      if (isCellInGridSilhouette(col, row, cols, rows)) count += 1;
+      if (isCellInGridSilhouette(col, row, cols, rows, corners, shape, sizePercent)) count += 1;
     }
   }
   return count;

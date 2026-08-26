@@ -6,14 +6,14 @@
 //   - renderFullMosaicGrid: the entire safe-zone grid at the real chosen print DPI,
 //     used to generate the actual page image embedded into the exported PDF.
 
-import { computeFrameGeometry, drawFrame } from "./preview.js?v=30";
-import { computeGridDimensions, cellCenterIn, cellPolygonIn, mmToIn, isCellInGridSilhouette } from "../modules/gridPatternEngine.js?v=30";
-import { recommendFont, recommendTextTint, adjustForBorderWeight, centerOffsetIn, letterSpacingForLabel } from "../modules/typographyEngine.js?v=30";
-import { gridColorFromTint } from "../modules/borderStyleEngine.js?v=30";
-import { cornerRadiusIn, isFullCircle } from "../modules/cornerRadiusEngine.js?v=30";
-import { nearestPaletteColor } from "../modules/shadeQuantizationEngine.js?v=30";
-import { computeLayout, LAYOUT_ELEMENTS } from "../modules/layoutCompositionEngine.js?v=30";
-import { toGrayscaleHex } from "../modules/bookThemeEngine.js?v=30";
+import { computeFrameGeometry, drawFrame } from "./preview.js?v=31";
+import { computeGridDimensions, cellCenterIn, cellPolygonIn, mmToIn, isCellInGridSilhouette } from "../modules/gridPatternEngine.js?v=31";
+import { recommendFont, recommendTextTint, adjustForBorderWeight, centerOffsetIn, letterSpacingForLabel } from "../modules/typographyEngine.js?v=31";
+import { gridColorFromTint } from "../modules/borderStyleEngine.js?v=31";
+import { cornerRadiusIn, isFullCircle } from "../modules/cornerRadiusEngine.js?v=31";
+import { nearestPaletteColor } from "../modules/shadeQuantizationEngine.js?v=31";
+import { computeLayout, LAYOUT_ELEMENTS } from "../modules/layoutCompositionEngine.js?v=31";
+import { toGrayscaleHex } from "../modules/bookThemeEngine.js?v=31";
 
 const PT_TO_IN = 1 / 72;
 
@@ -605,7 +605,7 @@ export function renderMosaicPreview(canvas, opts) {
     mode, // 'print' | 'solved'
     trimSize, dpi, bleedEnabled, canvasDims, safeZone, pageSide, composition,
     gridPattern, cellSizeMm, gridOverride = null, borderWeightPt, gridTintPercent, cornerRadiusPercent,
-    palette, sourceCanvas, gridCornerTrim = false, gridPageBlack = false, blackWhiteEdition = false,
+    palette, sourceCanvas, cornerTrimCorners = [], cornerTrimShape = "rounded", cornerTrimSizePercent = 12, gridPageBlack = false, blackWhiteEdition = false,
   } = opts;
 
   const ctx = canvas.getContext("2d");
@@ -657,7 +657,7 @@ export function renderMosaicPreview(canvas, opts) {
   let index = 0;
   for (let row = 0; row < fullGrid.rows; row += 1) {
     for (let col = 0; col < fullGrid.cols; col += 1) {
-      if (gridCornerTrim && !isCellInGridSilhouette(col, row, fullGrid.cols, fullGrid.rows)) {
+      if (!isCellInGridSilhouette(col, row, fullGrid.cols, fullGrid.rows, cornerTrimCorners, cornerTrimShape, cornerTrimSizePercent)) {
         index += 1;
         continue;
       }
@@ -689,7 +689,7 @@ export function renderFullMosaicGrid(canvas, opts) {
     mode, // 'print' | 'solved'
     dpi, canvasDims, safeZone, pageSide, composition,
     gridPattern, cellSizeMm, gridOverride = null, borderWeightPt, gridTintPercent, cornerRadiusPercent,
-    palette, sourceCanvas, gridCornerTrim = false, gridPageBlack = false, blackWhiteEdition = false,
+    palette, sourceCanvas, cornerTrimCorners = [], cornerTrimShape = "rounded", cornerTrimSizePercent = 12, gridPageBlack = false, blackWhiteEdition = false,
   } = opts;
 
   const ctx = canvas.getContext("2d");
@@ -717,7 +717,7 @@ export function renderFullMosaicGrid(canvas, opts) {
   let index = 0;
   for (let row = 0; row < fullGrid.rows; row += 1) {
     for (let col = 0; col < fullGrid.cols; col += 1) {
-      if (gridCornerTrim && !isCellInGridSilhouette(col, row, fullGrid.cols, fullGrid.rows)) {
+      if (!isCellInGridSilhouette(col, row, fullGrid.cols, fullGrid.rows, cornerTrimCorners, cornerTrimShape, cornerTrimSizePercent)) {
         index += 1;
         continue;
       }

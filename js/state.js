@@ -18,7 +18,12 @@ export const state = {
   borderWeightPt: 0.9,
   gridTintPercent: 35,
   cornerRadiusPercent: 0,
-  gridCornerTrim: false,
+
+  // Grid Silhouette Trim: complete control over which corners are cut (any subset of
+  // the 4, [] = off/none), in what shape, and how much — see gridPatternEngine.js.
+  gridCornerTrimCorners: [],
+  gridCornerTrimShape: "rounded",
+  gridCornerTrimSizePercent: 12,
 
   // Dual-Page Layout & Key Migration + Adaptive Resolution & Cell Scaling
   layoutMode: "unified", // mirror of globalComposition.colorKey placement (grid=unified/blank=expanded)
