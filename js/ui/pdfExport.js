@@ -4,20 +4,20 @@
 // (honoring each image's own granular overrides), auto-generated solution pages, and
 // back matter — entirely client-side via pdf-lib, no server round-trip.
 
-import { PDFDocument, StandardFonts, rgb } from "../vendor/pdf-lib.esm.min.js?v=7";
-import { getTrimSizeById } from "../modules/canvasEngine.js?v=7";
-import { computeCanvasDimensions } from "../modules/bleedEngine.js?v=7";
-import { computeSafeZone } from "../modules/safeZoneEngine.js?v=7";
-import { getSizesForSelection, buildCombinedPalette } from "../modules/colorKeyEngine.js?v=7";
-import { computePagination, FRONT_MATTER_INTERIOR_PAGES } from "../modules/storyboardEngine.js?v=7";
-import { buildSolutionPages } from "../modules/solutionGenerationEngine.js?v=7";
-import { BORDER_PRESETS } from "../modules/borderStyleEngine.js?v=7";
-import { migratedKeyStyle } from "../modules/layoutEngine.js?v=7";
-import { resolveEffectiveGrid } from "../modules/resolutionScalingEngine.js?v=7";
-import { computeKeyGridLayout } from "../modules/colorKeyLayoutEngine.js?v=7";
-import { normalizeComposition, computeLayout } from "../modules/layoutCompositionEngine.js?v=7";
-import { resolveActiveAsset } from "../modules/assetGalleryEngine.js?v=7";
-import { renderFullMosaicGrid, getPlaceholderSource, loadImageSource, drawSourceToCanvas } from "./mosaicRenderer.js?v=7";
+import { PDFDocument, StandardFonts, rgb } from "../vendor/pdf-lib.esm.min.js?v=8";
+import { getTrimSizeById } from "../modules/canvasEngine.js?v=8";
+import { computeCanvasDimensions } from "../modules/bleedEngine.js?v=8";
+import { computeSafeZone } from "../modules/safeZoneEngine.js?v=8";
+import { getSizesForSelection, buildCombinedPalette } from "../modules/colorKeyEngine.js?v=8";
+import { computePagination, FRONT_MATTER_INTERIOR_PAGES } from "../modules/storyboardEngine.js?v=8";
+import { buildSolutionPages } from "../modules/solutionGenerationEngine.js?v=8";
+import { BORDER_PRESETS } from "../modules/borderStyleEngine.js?v=8";
+import { migratedKeyStyle } from "../modules/layoutEngine.js?v=8";
+import { resolveEffectiveGrid } from "../modules/resolutionScalingEngine.js?v=8";
+import { computeKeyGridLayout } from "../modules/colorKeyLayoutEngine.js?v=8";
+import { normalizeComposition, computeLayout } from "../modules/layoutCompositionEngine.js?v=8";
+import { resolveActiveAsset } from "../modules/assetGalleryEngine.js?v=8";
+import { renderFullMosaicGrid, getPlaceholderSource, loadImageSource, drawSourceToCanvas } from "./mosaicRenderer.js?v=8";
 
 const PT_PER_IN = 72;
 const inToPt = (inches) => inches * PT_PER_IN;

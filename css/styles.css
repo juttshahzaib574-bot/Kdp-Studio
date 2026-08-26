@@ -326,6 +326,31 @@ dialog#risk-dialog p {
   color: var(--text-dim);
 }
 
+dialog#alert-dialog {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  max-width: 420px;
+  width: 90%;
+}
+
+dialog#alert-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+dialog#alert-dialog h3 {
+  margin-top: 0;
+}
+
+dialog#alert-dialog p {
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--text-dim);
+  white-space: pre-line;
+}
+
 .risk-ack {
   display: flex;
   align-items: flex-start;
