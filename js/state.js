@@ -74,6 +74,12 @@ export const state = {
   // Selective Front & Back Matter: ids of pages EXCLUDED from the export (see
   // modules/frontBackMatterEngine.js) — everything defaults to included.
   disabledFrontBackMatterPages: [],
+
+  // Custom page order — defaults match the pages' natural/catalog order in
+  // modules/frontBackMatterEngine.js. Reordering an id here shifts every page after
+  // it, exactly like reordering the storyboard.
+  frontMatterOrder: ["title-page", "copyright-page", "belongs-to-page", "color-test-page", "instructions-page", "master-palette-page"],
+  backMatterOrder: ["solutions", "extra-color-test-pages", "about-artist-page", "review-request-page", "series-promo-page"],
 };
 
 export function setState(patch) {

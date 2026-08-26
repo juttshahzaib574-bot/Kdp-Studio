@@ -1,6 +1,6 @@
-import { state, setState, subscribe } from "../../state.js?v=23";
-import { exportInteriorPdf, downloadPdf } from "../pdfExport.js?v=23";
-import { FRONT_MATTER_PAGES, BACK_MATTER_PAGES, isPageEnabled, togglePage } from "../../modules/frontBackMatterEngine.js?v=23";
+import { state, setState, subscribe } from "../../state.js?v=24";
+import { exportInteriorPdf, downloadPdf } from "../pdfExport.js?v=24";
+import { isPageEnabled, togglePage, orderedFrontMatterPages, orderedBackMatterPages, reorderPage } from "../../modules/frontBackMatterEngine.js?v=24";
 
 const el = {
   frontMatterList: document.getElementById("front-matter-page-list"),
@@ -18,9 +18,6 @@ const el = {
 };
 
 export function initExportPanel() {
-  renderMatterPageList(el.frontMatterList, FRONT_MATTER_PAGES);
-  renderMatterPageList(el.backMatterList, BACK_MATTER_PAGES);
-
   el.titleInput.addEventListener("change", () => setState({ bookTitle: el.titleInput.value || "Untitled Mystery Mosaic Book" }));
   el.subtitleInput.addEventListener("change", () => setState({ bookSubtitle: el.subtitleInput.value }));
   el.authorInput.addEventListener("change", () => setState({ bookAuthor: el.authorInput.value }));
@@ -33,18 +30,35 @@ export function initExportPanel() {
   render(state);
 }
 
-// Built once — each row's checked state is kept in sync by render(), not rebuilt on
-// every state change, so a checkbox never loses focus/mid-click state under the hood.
-function renderMatterPageList(container, pages) {
+// Rebuilt from scratch on every render (the list is short, so this is cheap) since
+// reordering changes actual DOM position, row numbers, and which arrows are disabled —
+// unlike a simple checked-state sync, that can't be patched in place.
+function renderMatterPageList(container, orderedPages, orderStateKey, disabledPageIds) {
   container.innerHTML = "";
-  pages.forEach((page) => {
-    const label = document.createElement("label");
-    label.className = "matter-page-item";
-    label.innerHTML = `<input type="checkbox" data-page-id="${page.id}" /><span>${page.label}</span>`;
-    label.querySelector("input").addEventListener("change", () => {
+  const ids = orderedPages.map((p) => p.id);
+  orderedPages.forEach((page, index) => {
+    const row = document.createElement("div");
+    row.className = "matter-page-item";
+    row.innerHTML = `
+      <label>
+        <input type="checkbox" data-page-id="${page.id}" ${isPageEnabled(disabledPageIds, page.id) ? "checked" : ""} />
+        <span class="matter-page-index">${index + 1}.</span>
+        <span>${page.label}</span>
+      </label>
+      <span class="matter-page-reorder">
+        <button type="button" data-dir="-1" ${index === 0 ? "disabled" : ""} title="Move earlier">▲</button>
+        <button type="button" data-dir="1" ${index === orderedPages.length - 1 ? "disabled" : ""} title="Move later">▼</button>
+      </span>
+    `;
+    row.querySelector('input[type="checkbox"]').addEventListener("change", () => {
       setState({ disabledFrontBackMatterPages: togglePage(state.disabledFrontBackMatterPages, page.id) });
     });
-    container.appendChild(label);
+    row.querySelectorAll(".matter-page-reorder button").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        setState({ [orderStateKey]: reorderPage(ids, page.id, Number(btn.dataset.dir)) });
+      });
+    });
+    container.appendChild(row);
   });
 }
 
@@ -73,11 +87,8 @@ async function handleExport() {
 }
 
 function render(current) {
-  [el.frontMatterList, el.backMatterList].forEach((list) => {
-    list.querySelectorAll("input[data-page-id]").forEach((input) => {
-      input.checked = isPageEnabled(current.disabledFrontBackMatterPages, input.dataset.pageId);
-    });
-  });
+  renderMatterPageList(el.frontMatterList, orderedFrontMatterPages(current.frontMatterOrder), "frontMatterOrder", current.disabledFrontBackMatterPages);
+  renderMatterPageList(el.backMatterList, orderedBackMatterPages(current.backMatterOrder), "backMatterOrder", current.disabledFrontBackMatterPages);
 
   if (document.activeElement !== el.titleInput) el.titleInput.value = current.bookTitle;
   if (document.activeElement !== el.subtitleInput) el.subtitleInput.value = current.bookSubtitle;

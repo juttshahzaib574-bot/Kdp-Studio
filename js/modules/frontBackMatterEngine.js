@@ -34,6 +34,41 @@ export function togglePage(disabledPageIds, pageId) {
   return disabledPageIds.includes(pageId) ? disabledPageIds.filter((id) => id !== pageId) : [...disabledPageIds, pageId];
 }
 
+// ---- Custom page order ----
+// State stores a permutation of ids per section (frontMatterOrder / backMatterOrder).
+// reconcileOrder defends against a stored order going stale — an id the catalog no
+// longer has is dropped, and any catalog id missing from the stored order (e.g. a
+// page type added after the order was saved) is appended — so a page can never
+// silently vanish from the reorder list or the export.
+function reconcileOrder(storedOrder, catalog) {
+  const catalogIds = catalog.map((p) => p.id);
+  const kept = storedOrder.filter((id) => catalogIds.includes(id));
+  const missing = catalogIds.filter((id) => !kept.includes(id));
+  return [...kept, ...missing];
+}
+
+// Returns the catalog entries (full {id, label} objects) in the creator's current
+// order — this is what both the reorder UI and pdfExport.js's emission loop iterate.
+export function orderedFrontMatterPages(frontMatterOrder) {
+  return reconcileOrder(frontMatterOrder, FRONT_MATTER_PAGES).map((id) => FRONT_MATTER_PAGES.find((p) => p.id === id));
+}
+
+export function orderedBackMatterPages(backMatterOrder) {
+  return reconcileOrder(backMatterOrder, BACK_MATTER_PAGES).map((id) => BACK_MATTER_PAGES.find((p) => p.id === id));
+}
+
+// Moves one id one slot earlier (direction -1) or later (direction +1) within an
+// already-reconciled order array — e.g. pushing Instructions into position 2 shifts
+// Copyright (and everything after it) down by exactly one slot, nothing else changes.
+export function reorderPage(orderedIds, pageId, direction) {
+  const index = orderedIds.indexOf(pageId);
+  const targetIndex = index + direction;
+  if (index === -1 || targetIndex < 0 || targetIndex >= orderedIds.length) return orderedIds;
+  const next = [...orderedIds];
+  [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
+  return next;
+}
+
 // Front matter is emitted as content+blank-facing pairs (2 pages) per enabled item —
 // this replaces the old fixed FRONT_MATTER_INTERIOR_PAGES constant so the storyboard's
 // displayed page numbers, and the real export, always agree on exactly where the
