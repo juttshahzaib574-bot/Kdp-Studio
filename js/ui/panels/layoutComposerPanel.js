@@ -4,7 +4,7 @@
 // tray. Edits target the global composition (Global scope) or the active image's own
 // composition (Page-Specific scope). The live preview + PDF recalculate the grid to fit.
 
-import { state, setState, subscribe } from "../../state.js?v=26";
+import { state, setState, subscribe } from "../../state.js?v=27";
 import {
   LAYOUT_ELEMENTS,
   LAYOUT_TARGETS,
@@ -12,7 +12,9 @@ import {
   normalizeComposition,
   layoutModeFromComposition,
   describeComposition,
-} from "../../modules/layoutCompositionEngine.js?v=26";
+} from "../../modules/layoutCompositionEngine.js?v=27";
+import { FONT_CATEGORIES, FONT_LIBRARY, SYSTEM_FONT_ID, getFontById } from "../../modules/fontLibraryEngine.js?v=27";
+import { DRAG_HANDLE_ICON, attachDragHandle } from "../dragReorderList.js?v=27";
 
 const SCOPES = [
   { id: "global", label: "Global", note: "One layout template applied to every page." },
@@ -38,9 +40,19 @@ const el = {
   scopeOptions: document.getElementById("layout-scope-options"),
   scopeHint: document.getElementById("layout-scope-hint"),
   map: document.getElementById("layout-map"),
+  orderList: document.getElementById("element-order-list"),
   controls: document.getElementById("element-controls"),
   summary: document.getElementById("composition-summary"),
 };
+
+const FONT_OPTIONS_HTML =
+  `<option value="${SYSTEM_FONT_ID}">Default (Helvetica)</option>` +
+  FONT_CATEGORIES.map(
+    (cat) =>
+      `<optgroup label="${cat.label}">${FONT_LIBRARY.filter((f) => f.category === cat.id)
+        .map((f) => `<option value="${f.id}">${f.label}</option>`)
+        .join("")}</optgroup>`
+  ).join("");
 
 let dragId = null;
 
@@ -114,9 +126,36 @@ function render(current) {
   }
 
   renderMap(comp, current);
+  renderStackingOrder(comp);
   renderControls(comp, current);
   const summary = describeComposition(comp);
   el.summary.textContent = summary.length ? `Placed: ${summary.join(" · ")}.` : "No elements placed on the page.";
+}
+
+// Explicit 1st/2nd/3rd/4th stacking order, drag-reorderable — decides which element
+// sits first (closest to the top/start) whenever 2+ of them share a grid zone or the
+// blank facing page. See computeLayout in layoutCompositionEngine.js for how it's used.
+function renderStackingOrder(comp) {
+  el.orderList.innerHTML = "";
+  const order = comp.elementOrder;
+  order.forEach((id, index) => {
+    const label = LAYOUT_ELEMENTS.find((e) => e.id === id).label;
+    const row = document.createElement("div");
+    row.className = "matter-page-item";
+    row.dataset.pageId = id;
+    row.innerHTML = `
+      <span class="matter-page-drag-handle" title="Drag to reorder">${DRAG_HANDLE_ICON}</span>
+      <span class="matter-page-index">${index + 1}.</span>
+      <span>${label}</span>
+    `;
+    attachDragHandle(row.querySelector(".matter-page-drag-handle"), {
+      container: el.orderList,
+      row,
+      ids: order,
+      onReorder: (nextOrder) => commitComposition({ ...comp, elementOrder: nextOrder }),
+    });
+    el.orderList.appendChild(row);
+  });
 }
 
 function chipZoneFor(elConfig) {
@@ -237,6 +276,10 @@ function renderControls(comp, current) {
           <span class="el-offset-readout"></span>
         </div>
       ` : ""}
+      <div class="element-row-opts">
+        <select class="el-font">${FONT_OPTIONS_HTML}</select>
+      </div>
+      <p class="el-font-hint"></p>
     `;
 
     const targetSel = row.querySelector(".el-target");
@@ -253,6 +296,15 @@ function renderControls(comp, current) {
     if (anchorSel) anchorSel.value = cfg.anchor ?? "top";
     if (offsetSlider) offsetSlider.value = String(cfg.offsetIn ?? 0);
     if (offsetReadout) offsetReadout.textContent = `${(cfg.offsetIn ?? 0).toFixed(1)}"`;
+
+    const fontSel = row.querySelector(".el-font");
+    const fontHint = row.querySelector(".el-font-hint");
+    fontSel.value = cfg.fontId ?? SYSTEM_FONT_ID;
+    updateFontHint(fontHint, fontSel.value);
+    fontSel.addEventListener("change", (e) => {
+      updateFontHint(fontHint, e.target.value);
+      setElement(element.id, { fontId: e.target.value });
+    });
 
     row.querySelector(".el-enabled").addEventListener("change", (e) => setElement(element.id, { enabled: e.target.checked }));
     targetSel.addEventListener("change", (e) => {
@@ -278,6 +330,25 @@ function renderControls(comp, current) {
     const restored = el.controls.querySelector(`[data-text-element="${activeId}"]`);
     if (restored) restored.focus();
   }
+}
+
+// Renders the hint IN the selected font itself (a real @font-face, not a canvas
+// rasterization — see css/styles.css) so picking a font is a genuine live preview,
+// not just a name in a plain list.
+function updateFontHint(hintEl, fontId) {
+  if (!fontId || fontId === SYSTEM_FONT_ID) {
+    hintEl.textContent = "Default book font (Helvetica).";
+    hintEl.style.fontFamily = "";
+    return;
+  }
+  const font = getFontById(fontId);
+  if (!font) {
+    hintEl.textContent = "";
+    hintEl.style.fontFamily = "";
+    return;
+  }
+  hintEl.textContent = `${font.label} — ${font.note}`;
+  hintEl.style.fontFamily = `'${font.family}', sans-serif`;
 }
 
 function textPlaceholder(id, current) {

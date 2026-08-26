@@ -8,7 +8,7 @@
 // key onto the grid and the grid shrinks; push it to the blank page and the grid
 // reclaims the space.
 
-import { KEY_STRIP_HEIGHT_RATIO } from "./layoutEngine.js?v=26";
+import { KEY_STRIP_HEIGHT_RATIO } from "./layoutEngine.js?v=27";
 
 export const LAYOUT_ELEMENT_IDS = ["title", "subtitle", "instruction", "colorKey"];
 
@@ -41,16 +41,32 @@ const TEXT_SIDE_WIDTH_IN = 1.6;
 // center" is just anchor: "center", offsetIn: -0.4. Only meaningful for target: "blank" —
 // on-grid placement stays the existing top/bottom/left/right zone-band system, since
 // that page has too little spare room for free positioning to make sense.
+// Font choice per element — "system" is the unchanged default (pdf-lib's built-in
+// Helvetica/Helvetica-Bold); any other id names an entry in fontLibraryEngine.js's
+// FONT_LIBRARY, embedded (subset) into the exported PDF via pdf-lib + fontkit.
+const DEFAULT_FONT_ID = "system";
+
 export function defaultComposition() {
   return {
     // Backward-compatible default === the old "Unified" layout: only the color key is
     // shown, embedded in a bottom strip on the puzzle page. Text elements are off, so a
     // book that never touches the composer exports exactly as it did before this module.
-    title: { enabled: false, target: "grid", zone: "top", align: "center", text: "", anchor: "top", offsetIn: 0 },
-    subtitle: { enabled: false, target: "grid", zone: "top", align: "center", text: "", anchor: "top", offsetIn: 0 },
-    instruction: { enabled: false, target: "grid", zone: "bottom", align: "start", text: LAYOUT_ELEMENTS[2].defaultText, anchor: "top", offsetIn: 0 },
-    colorKey: { enabled: true, target: "grid", zone: "bottom", align: "center" },
+    title: { enabled: false, target: "grid", zone: "top", align: "center", text: "", anchor: "top", offsetIn: 0, fontId: DEFAULT_FONT_ID },
+    subtitle: { enabled: false, target: "grid", zone: "top", align: "center", text: "", anchor: "top", offsetIn: 0, fontId: DEFAULT_FONT_ID },
+    instruction: { enabled: false, target: "grid", zone: "bottom", align: "start", text: LAYOUT_ELEMENTS[2].defaultText, anchor: "top", offsetIn: 0, fontId: DEFAULT_FONT_ID },
+    colorKey: { enabled: true, target: "grid", zone: "bottom", align: "center", fontId: DEFAULT_FONT_ID },
+    // Who stacks first (closest to the top/start) when 2+ elements share the same grid
+    // zone or the blank facing page — see computeLayout below. Reorder via
+    // reorderElement(); a book that never touches this keeps the original fixed order.
+    elementOrder: [...LAYOUT_ELEMENT_IDS],
   };
+}
+
+function reconcileElementOrder(order) {
+  if (!Array.isArray(order)) return [...LAYOUT_ELEMENT_IDS];
+  const kept = order.filter((id) => LAYOUT_ELEMENT_IDS.includes(id));
+  const missing = LAYOUT_ELEMENT_IDS.filter((id) => !kept.includes(id));
+  return [...kept, ...missing];
 }
 
 export function normalizeComposition(composition) {
@@ -60,7 +76,20 @@ export function normalizeComposition(composition) {
   for (const id of LAYOUT_ELEMENT_IDS) {
     out[id] = { ...base[id], ...(composition[id] || {}) };
   }
+  out.elementOrder = reconcileElementOrder(composition.elementOrder);
   return out;
+}
+
+// Swaps element `id` one slot earlier (direction -1) or later (+1) in a stacking order
+// array — the same up/down semantics as frontBackMatterEngine's reorderPage, and also
+// what the Stacking Order list's drag handle ultimately produces.
+export function reorderElement(order, id, direction) {
+  const index = order.indexOf(id);
+  const targetIndex = index + direction;
+  if (index === -1 || targetIndex < 0 || targetIndex >= order.length) return order;
+  const next = [...order];
+  [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
+  return next;
 }
 
 // Maps the legacy Unified/Expanded toggle onto a composition's color-key placement,
@@ -107,8 +136,12 @@ export function computeLayout(safeZone, composition) {
   const onGrid = LAYOUT_ELEMENT_IDS.filter((id) => comp[id].enabled && comp[id].target === "grid");
   const onBlank = LAYOUT_ELEMENT_IDS.filter((id) => comp[id].enabled && comp[id].target === "blank");
 
+  const order = comp.elementOrder;
   const byZone = { top: [], bottom: [], left: [], right: [] };
   onGrid.forEach((id) => byZone[comp[id].zone].push(id));
+  // When 2+ elements share a zone, the explicit Stacking Order decides which one is
+  // drawn first (closest to the zone's leading edge) instead of a fixed id order.
+  Object.keys(byZone).forEach((zone) => byZone[zone].sort((a, b) => order.indexOf(a) - order.indexOf(b)));
 
   // Top/bottom strips stack vertically (band = sum of heights); side bands stack within
   // the middle height and the band width = the widest member.
@@ -150,27 +183,49 @@ export function computeLayout(safeZone, composition) {
     gridPlacements.push({ id, target: "grid", rect: { xIn: safeZone.widthIn - rightBand, yIn: midTop + i * per, wIn: rightBand, hIn: per } });
   });
 
-  // Blank facing page: text elements position independently via anchor + offsetIn (top
-  // edge / page center / bottom edge, plus a fine nudge) instead of an automatic stack —
-  // a creator places title, then nudges subtitle to sit just under it, entirely by hand.
-  // The color key is the exception: it still auto-fills whatever vertical room is left
-  // below the lowest-reaching text element, since its size depends on the palette.
+  // Blank facing page. With zero or one element there, its own anchor + offsetIn (top
+  // edge / page center / bottom edge, plus a fine nudge) gives free, precise manual
+  // placement — there's nothing to stack against. With 2+ elements sharing the page,
+  // per-element anchor math would need fiddly manual offsets to avoid overlap, so the
+  // explicit Stacking Order takes over instead: elements simply stack top to bottom in
+  // that order. The color key is the one flexible-height member — wherever it falls in
+  // the order, it fills whatever room is left after its ordered neighbors (its own size
+  // depends on the palette, unlike the fixed-height text elements).
   const blankPlacements = [];
-  let lowestTextBottomIn = 0;
-  onBlank.filter((id) => id !== "colorKey").forEach((id) => {
-    const hIn = bandThicknessIn(id, "top", safeZone);
-    const anchor = comp[id].anchor ?? "top";
-    const offsetIn = comp[id].offsetIn ?? 0;
-    let yIn;
-    if (anchor === "center") yIn = safeZone.heightIn / 2 + offsetIn - hIn / 2;
-    else if (anchor === "bottom") yIn = safeZone.heightIn - offsetIn - hIn;
-    else yIn = offsetIn;
-    yIn = Math.max(0, Math.min(safeZone.heightIn - hIn, yIn));
-    blankPlacements.push({ id, target: "blank", rect: { xIn: 0, yIn, wIn: safeZone.widthIn, hIn } });
-    lowestTextBottomIn = Math.max(lowestTextBottomIn, yIn + hIn);
-  });
-  if (onBlank.includes("colorKey")) {
-    blankPlacements.push({ id: "colorKey", target: "blank", rect: { xIn: 0, yIn: lowestTextBottomIn, wIn: safeZone.widthIn, hIn: Math.max(0.5, safeZone.heightIn - lowestTextBottomIn) } });
+  const blankOrder = order.filter((id) => onBlank.includes(id));
+  const STACK_GAP_IN = 0.12;
+
+  if (blankOrder.length > 1) {
+    let cursorYIn = 0;
+    blankOrder.forEach((id, i) => {
+      if (id === "colorKey") {
+        const remainingAfterIn = blankOrder.slice(i + 1).reduce((sum, nid) => sum + bandThicknessIn(nid, "top", safeZone) + STACK_GAP_IN, 0);
+        const hIn = Math.max(0.5, safeZone.heightIn - cursorYIn - remainingAfterIn);
+        blankPlacements.push({ id, target: "blank", rect: { xIn: 0, yIn: cursorYIn, wIn: safeZone.widthIn, hIn } });
+        cursorYIn += hIn + STACK_GAP_IN;
+      } else {
+        const hIn = bandThicknessIn(id, "top", safeZone);
+        blankPlacements.push({ id, target: "blank", rect: { xIn: 0, yIn: cursorYIn, wIn: safeZone.widthIn, hIn } });
+        cursorYIn += hIn + STACK_GAP_IN;
+      }
+    });
+  } else {
+    let lowestTextBottomIn = 0;
+    onBlank.filter((id) => id !== "colorKey").forEach((id) => {
+      const hIn = bandThicknessIn(id, "top", safeZone);
+      const anchor = comp[id].anchor ?? "top";
+      const offsetIn = comp[id].offsetIn ?? 0;
+      let yIn;
+      if (anchor === "center") yIn = safeZone.heightIn / 2 + offsetIn - hIn / 2;
+      else if (anchor === "bottom") yIn = safeZone.heightIn - offsetIn - hIn;
+      else yIn = offsetIn;
+      yIn = Math.max(0, Math.min(safeZone.heightIn - hIn, yIn));
+      blankPlacements.push({ id, target: "blank", rect: { xIn: 0, yIn, wIn: safeZone.widthIn, hIn } });
+      lowestTextBottomIn = Math.max(lowestTextBottomIn, yIn + hIn);
+    });
+    if (onBlank.includes("colorKey")) {
+      blankPlacements.push({ id: "colorKey", target: "blank", rect: { xIn: 0, yIn: lowestTextBottomIn, wIn: safeZone.widthIn, hIn: Math.max(0.5, safeZone.heightIn - lowestTextBottomIn) } });
+    }
   }
 
   return { gridZone, gridPlacements, blankPlacements };

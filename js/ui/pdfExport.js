@@ -4,22 +4,23 @@
 // (honoring each image's own granular overrides), auto-generated solution pages, and
 // back matter — entirely client-side via pdf-lib, no server round-trip.
 
-import { PDFDocument, StandardFonts, rgb } from "../vendor/pdf-lib.esm.min.js?v=26";
-import { getTrimSizeById } from "../modules/canvasEngine.js?v=26";
-import { computeCanvasDimensions } from "../modules/bleedEngine.js?v=26";
-import { computeSafeZone } from "../modules/safeZoneEngine.js?v=26";
-import { getSizesForSelection, buildCombinedPalette } from "../modules/colorKeyEngine.js?v=26";
-import { computePagination } from "../modules/storyboardEngine.js?v=26";
-import { isPageEnabled, computeFrontMatterPageCount, orderedFrontMatterPages, orderedBackMatterPages } from "../modules/frontBackMatterEngine.js?v=26";
-import { buildSolutionPages } from "../modules/solutionGenerationEngine.js?v=26";
-import { BORDER_PRESETS } from "../modules/borderStyleEngine.js?v=26";
-import { migratedKeyStyle } from "../modules/layoutEngine.js?v=26";
-import { resolveEffectiveGrid } from "../modules/resolutionScalingEngine.js?v=26";
-import { computeKeyGridLayout, keyEntryPosition } from "../modules/colorKeyLayoutEngine.js?v=26";
-import { normalizeComposition, computeLayout } from "../modules/layoutCompositionEngine.js?v=26";
-import { resolveActiveAsset } from "../modules/assetGalleryEngine.js?v=26";
-import { renderFullMosaicGrid, getPlaceholderSource, loadImageSource, drawSourceToCanvas } from "./mosaicRenderer.js?v=26";
-import { isContentPageBlack, isFacingPageBlack, isBlackWhiteEdition, toGrayscaleRgb } from "../modules/bookThemeEngine.js?v=26";
+import { PDFDocument, StandardFonts, rgb } from "../vendor/pdf-lib.esm.min.js?v=27";
+import { getTrimSizeById } from "../modules/canvasEngine.js?v=27";
+import { computeCanvasDimensions } from "../modules/bleedEngine.js?v=27";
+import { computeSafeZone } from "../modules/safeZoneEngine.js?v=27";
+import { getSizesForSelection, buildCombinedPalette } from "../modules/colorKeyEngine.js?v=27";
+import { computePagination } from "../modules/storyboardEngine.js?v=27";
+import { isPageEnabled, computeFrontMatterPageCount, orderedFrontMatterPages, orderedBackMatterPages } from "../modules/frontBackMatterEngine.js?v=27";
+import { buildSolutionPages } from "../modules/solutionGenerationEngine.js?v=27";
+import { BORDER_PRESETS } from "../modules/borderStyleEngine.js?v=27";
+import { migratedKeyStyle } from "../modules/layoutEngine.js?v=27";
+import { resolveEffectiveGrid } from "../modules/resolutionScalingEngine.js?v=27";
+import { computeKeyGridLayout, keyEntryPosition } from "../modules/colorKeyLayoutEngine.js?v=27";
+import { normalizeComposition, computeLayout } from "../modules/layoutCompositionEngine.js?v=27";
+import { resolveActiveAsset } from "../modules/assetGalleryEngine.js?v=27";
+import { renderFullMosaicGrid, getPlaceholderSource, loadImageSource, drawSourceToCanvas } from "./mosaicRenderer.js?v=27";
+import { isContentPageBlack, isFacingPageBlack, isBlackWhiteEdition, toGrayscaleRgb } from "../modules/bookThemeEngine.js?v=27";
+import { getFontById, fontAssetUrl } from "../modules/fontLibraryEngine.js?v=27";
 
 const PT_PER_IN = 72;
 const inToPt = (inches) => inches * PT_PER_IN;
@@ -140,6 +141,44 @@ function resolveItemComposition(item, state) {
   return normalizeComposition(state.globalComposition);
 }
 
+// ---- Font Library: custom-font embedding ----
+// Gathers every distinct custom fontId actually referenced across the compositions
+// that will actually be used, embeds each one exactly once — subset, so only the
+// glyphs actually drawn end up in the PDF, satisfying KDP's "every font must be
+// embedded" requirement — via pdf-lib + fontkit, and returns a resolver that turns any
+// one composition into a concrete {title, subtitle, instruction, colorKey} PDFFont set,
+// falling back to the book's bold/regular Helvetica for "system" or an unknown id.
+async function embedCompositionFonts(doc, bold, regular, compositions) {
+  const usedIds = new Set();
+  compositions.forEach((comp) => {
+    ["title", "subtitle", "instruction", "colorKey"].forEach((id) => {
+      const fontId = comp?.[id]?.fontId;
+      if (fontId && fontId !== "system") usedIds.add(fontId);
+    });
+  });
+
+  const embedded = new Map();
+  if (usedIds.size > 0) {
+    doc.registerFontkit(window.fontkit);
+    await Promise.all(
+      [...usedIds].map(async (fontId) => {
+        const font = getFontById(fontId);
+        if (!font) return;
+        const bytes = await fetch(fontAssetUrl(font)).then((r) => r.arrayBuffer());
+        embedded.set(fontId, await doc.embedFont(bytes, { subset: true }));
+      })
+    );
+  }
+
+  return function fontsForComposition(comp) {
+    const pick = (id, fallback) => {
+      const fontId = comp?.[id]?.fontId;
+      return (fontId && fontId !== "system" && embedded.get(fontId)) || fallback;
+    };
+    return { title: pick("title", bold), subtitle: pick("subtitle", regular), instruction: pick("instruction", regular), colorKey: pick("colorKey", regular) };
+  };
+}
+
 // ---- Color key legend (numbered, filled swatches / B&W numbered boxes) ----
 // Shared geometry (computeKeyGridLayout) with the embedded Unified-layout strip and
 // the full Expanded-layout migrated page, so both read as the same design language.
@@ -148,16 +187,16 @@ const KEY_ENTRY_HEIGHT_IN = 0.24; // Full Color: single-line swatch + name, side
 const KEY_ENTRY_HEIGHT_BW_IN = 0.46; // Black & White: box stacked above its name needs more height
 const KEY_ENTRY_WIDTH_BW_IN = 0.85;
 
-function drawKeyEntries(page, rect, palette, regular, textColor, blackWhiteEdition, orientation) {
+function drawKeyEntries(page, rect, palette, font, textColor, blackWhiteEdition, orientation) {
   if (rect.heightPt <= 0 || rect.widthPt <= 0) return;
   if (blackWhiteEdition) {
-    drawKeyEntriesBlackWhite(page, rect, palette, regular, textColor, orientation);
+    drawKeyEntriesBlackWhite(page, rect, palette, font, textColor, orientation);
   } else {
-    drawKeyEntriesColor(page, rect, palette, regular, textColor, orientation);
+    drawKeyEntriesColor(page, rect, palette, font, textColor, orientation);
   }
 }
 
-function drawKeyEntriesColor(page, rect, palette, regular, textColor, orientation) {
+function drawKeyEntriesColor(page, rect, palette, font, textColor, orientation) {
   const { xPt, yPt, widthPt, heightPt } = rect;
   const { cols, rows, entryWidthIn, entryHeightIn } = computeKeyGridLayout(palette.length, widthPt / PT_PER_IN, heightPt / PT_PER_IN, undefined, KEY_ENTRY_HEIGHT_IN, orientation);
   const entryWidthPt = entryWidthIn * PT_PER_IN;
@@ -189,7 +228,7 @@ function drawKeyEntriesColor(page, rect, palette, regular, textColor, orientatio
       x: cellX + 3 + swatchSize + 3,
       y: cellY + (entryHeightPt - fontSize) / 2 + 1,
       size: fontSize,
-      font: regular,
+      font,
       color: textColor,
     });
   });
@@ -198,7 +237,7 @@ function drawKeyEntriesColor(page, rect, palette, regular, textColor, orientatio
 // Black & White edition: nothing anywhere in the book spends color ink, so each legend
 // entry is a numbered black box (fixed white border + white number — its own identity,
 // independent of the page's own black/white background) stacked above the color's name.
-function drawKeyEntriesBlackWhite(page, rect, palette, regular, textColor, orientation) {
+function drawKeyEntriesBlackWhite(page, rect, palette, font, textColor, orientation) {
   const { xPt, yPt, widthPt, heightPt } = rect;
   const { cols, rows, entryWidthIn, entryHeightIn } = computeKeyGridLayout(palette.length, widthPt / PT_PER_IN, heightPt / PT_PER_IN, KEY_ENTRY_WIDTH_BW_IN, KEY_ENTRY_HEIGHT_BW_IN, orientation);
   const entryWidthPt = entryWidthIn * PT_PER_IN;
@@ -228,21 +267,21 @@ function drawKeyEntriesBlackWhite(page, rect, palette, regular, textColor, orien
     });
 
     const number = String(i + 1);
-    const numberWidth = regular.widthOfTextAtSize(number, numberSize);
+    const numberWidth = font.widthOfTextAtSize(number, numberSize);
     page.drawText(number, {
       x: boxX + (boxSize - numberWidth) / 2,
       y: boxY + (boxSize - numberSize) / 2 + numberSize * 0.12,
       size: numberSize,
-      font: regular,
+      font,
       color: rgb(1, 1, 1),
     });
 
-    const nameWidth = regular.widthOfTextAtSize(swatch.name, nameSize);
+    const nameWidth = font.widthOfTextAtSize(swatch.name, nameSize);
     page.drawText(swatch.name, {
       x: cellX + Math.max(1, (entryWidthPt - nameWidth) / 2),
       y: boxY - nameSize - 2,
       size: nameSize,
-      font: regular,
+      font,
       color: textColor,
     });
   });
@@ -285,17 +324,20 @@ function drawBoxedText(page, rectPt, text, font, size, color, align = "center") 
 const ELEMENT_TEXT_SIZE = { title: 16, subtitle: 11, instruction: 9.5 };
 
 // Draws one placed composition element (color key, or a title/subtitle/instruction text
-// block) into its reserved rect, with contrast-appropriate colors.
-function drawPlacedElement(page, { id, rect, elConfig, state, palette, bold, regular, textColor, blackWhiteEdition = false }, geom) {
+// block) into its reserved rect, with contrast-appropriate colors. `fonts` is the
+// {title, subtitle, instruction, colorKey} PDFFont set resolved for THIS composition —
+// each defaults to the book's regular/bold Helvetica unless the creator picked a Font
+// Library face for that specific element (see embedCompositionFonts above).
+function drawPlacedElement(page, { id, rect, elConfig, state, palette, fonts, textColor, blackWhiteEdition = false }, geom) {
   const rectPt = safeLocalRectToPdf(rect, geom);
   if (id === "colorKey") {
-    drawKeyEntries(page, rectPt, palette, regular, textColor, blackWhiteEdition, state.colorKeyOrientation);
+    drawKeyEntries(page, rectPt, palette, fonts.colorKey, textColor, blackWhiteEdition, state.colorKeyOrientation);
     return;
   }
   const fallback = { title: state.bookTitle, subtitle: state.bookSubtitle, instruction: elConfig.text }[id] || "";
   const text = (elConfig.text || "").trim() || fallback;
   if (!text) return;
-  const font = id === "title" ? bold : regular;
+  const font = fonts[id];
   const align = id === "title" || id === "subtitle" ? (elConfig.align === "start" ? "start" : elConfig.align === "end" ? "end" : "center") : "start";
   drawBoxedText(page, rectPt, text, font, ELEMENT_TEXT_SIZE[id] ?? 10, textColor, align);
 }
@@ -304,7 +346,7 @@ function drawPlacedElement(page, { id, rect, elConfig, state, palette, bold, reg
 // facing-page choice, or white), then lays down every element the composition offloaded
 // here — title, subtitle, instruction, and/or the migrated color key — overlaid on that
 // background with contrast-appropriate colors (Smart Integration).
-function drawComposedBlankPage(page, { blankPlacements, comp, state, palette, bold, regular, w, h, backImage, facingBlack, blackWhiteEdition, geom }) {
+function drawComposedBlankPage(page, { blankPlacements, comp, state, palette, fonts, w, h, backImage, facingBlack, blackWhiteEdition, geom }) {
   const hasBackground = Boolean(backImage);
   if (hasBackground) {
     page.drawImage(backImage, { x: 0, y: 0, width: w, height: h });
@@ -318,7 +360,7 @@ function drawComposedBlankPage(page, { blankPlacements, comp, state, palette, bo
   const textColor = style.textColor === "white" ? rgb(0.97, 0.97, 0.97) : rgb(0.18, 0.18, 0.18);
 
   blankPlacements.forEach(({ id, rect }) => {
-    drawPlacedElement(page, { id, rect, elConfig: comp[id], state, palette, bold, regular, textColor, blackWhiteEdition }, geom);
+    drawPlacedElement(page, { id, rect, elConfig: comp[id], state, palette, fonts, textColor, blackWhiteEdition }, geom);
   });
 }
 
@@ -626,6 +668,14 @@ export async function exportInteriorPdf(state, { onProgress } = {}) {
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
   const regular = await doc.embedFont(StandardFonts.Helvetica);
 
+  // Font Library: embed only the custom fonts actually referenced across every
+  // composition this export will touch (global, or each item's own page-specific
+  // override) — once each, up front, rather than re-embedding per puzzle.
+  const compositionsInUse = state.batchItems.length > 0
+    ? state.batchItems.map((item) => resolveItemComposition(item, state))
+    : [normalizeComposition(state.globalComposition)];
+  const fontsForComposition = await embedCompositionFonts(doc, bold, regular, compositionsInUse);
+
   // Embed every saved back-page-background asset once, up front, so both the global
   // default and any per-item override can reference them without re-embedding.
   const backgroundAssets = state.assetGallery["back-page-background"] ?? [];
@@ -712,6 +762,7 @@ export async function exportInteriorPdf(state, { onProgress } = {}) {
   for (const item of state.batchItems) {
     const effective = resolveItemEffectiveSettings(item, state, globalPalette);
     const comp = resolveItemComposition(item, state);
+    const fonts = fontsForComposition(comp);
     const layout = computeLayout(safeZone, comp);
     const sourceCanvas = await resolveItemSource(item);
     const { cellSizeMm: effectiveCellSizeMm, gridOverride } = resolveEffectiveGrid(safeZone, state.cellSizeMm, effective.gridPattern, comp, state.resolutionPriority);
@@ -763,7 +814,7 @@ export async function exportInteriorPdf(state, { onProgress } = {}) {
     const keyPage = doc.addPage([pageWidthPt, pageHeightPt]);
     const itemBackImage = resolveItemBackImage(item, backImagesByAssetId, globalBackImage);
     if (layout.blankPlacements.length > 0) {
-      drawComposedBlankPage(keyPage, { blankPlacements: layout.blankPlacements, comp, state, palette: legend, bold, regular, w: pageWidthPt, h: pageHeightPt, backImage: itemBackImage, facingBlack, blackWhiteEdition, geom });
+      drawComposedBlankPage(keyPage, { blankPlacements: layout.blankPlacements, comp, state, palette: legend, fonts, w: pageWidthPt, h: pageHeightPt, backImage: itemBackImage, facingBlack, blackWhiteEdition, geom });
     } else {
       drawBlankBackPage(keyPage, { backImage: itemBackImage, palette: legend, regular, w: pageWidthPt, h: pageHeightPt, facingBlack });
     }
@@ -776,7 +827,7 @@ export async function exportInteriorPdf(state, { onProgress } = {}) {
     // Black Book content-black background (which the grid raster painted behind the bands).
     const gridTextColor = contentBlack ? rgb(0.95, 0.95, 0.95) : rgb(0.18, 0.18, 0.18);
     layout.gridPlacements.forEach(({ id, rect }) => {
-      drawPlacedElement(puzzlePage, { id, rect, elConfig: comp[id], state, palette: legend, bold, regular, textColor: gridTextColor, blackWhiteEdition }, geom);
+      drawPlacedElement(puzzlePage, { id, rect, elConfig: comp[id], state, palette: legend, fonts, textColor: gridTextColor, blackWhiteEdition }, geom);
     });
 
     reportProgress(`Puzzle: ${item.name}`);
@@ -955,10 +1006,11 @@ export async function downloadActiveItemPdf(state, mode) {
   page.drawImage(pngImage, { x: 0, y: 0, width: pageWidthPt, height: pageHeightPt });
 
   if (mode === "print") {
+    const fontsForComposition = await embedCompositionFonts(doc, bold, regular, [comp]);
     const layout = computeLayout(geom.safeZone, comp);
     const gridTextColor = contentBlack ? rgb(0.95, 0.95, 0.95) : rgb(0.18, 0.18, 0.18);
     layout.gridPlacements.forEach(({ id, rect }) => {
-      drawPlacedElement(page, { id, rect, elConfig: comp[id], state, palette: legend, bold, regular, textColor: gridTextColor, blackWhiteEdition }, geom);
+      drawPlacedElement(page, { id, rect, elConfig: comp[id], state, palette: legend, fonts: fontsForComposition(comp), textColor: gridTextColor, blackWhiteEdition }, geom);
     });
   }
 

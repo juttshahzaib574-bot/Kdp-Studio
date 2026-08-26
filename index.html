@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>KDP Studio</title>
-  <link rel="stylesheet" href="css/styles.css?v=26" />
+  <link rel="stylesheet" href="css/styles.css?v=27" />
 </head>
 <body>
   <header class="app-header">
@@ -243,6 +243,12 @@
         </div>
 
         <div class="field-group">
+          <label>Stacking Order <span class="lock-note">— drag to reorder, or grab and hold</span></label>
+          <div class="matter-page-list" id="element-order-list"></div>
+          <p class="hint">Only matters when two or more elements share the same zone or page — decides who sits first (closest to the top/start). A single element on its own still uses that element's own Anchor + offset below.</p>
+        </div>
+
+        <div class="field-group">
           <label>Element Controls</label>
           <div class="element-controls" id="element-controls"></div>
         </div>
@@ -435,6 +441,10 @@
     </div>
   </dialog>
 
-  <script type="module" src="js/main.js?v=26"></script>
+  <!-- Classic script (not type=module) so it runs synchronously, before the deferred
+       module scripts below — pdfExport.js needs window.fontkit already set when it
+       calls doc.registerFontkit() to embed the custom fonts in js/vendor/fonts/. -->
+  <script src="js/vendor/fontkit.umd.min.js"></script>
+  <script type="module" src="js/main.js?v=27"></script>
 </body>
 </html>
