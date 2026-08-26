@@ -5,9 +5,10 @@
 // unlike the small 2-canvas mosaic preview — the same reason the "Export PDF" button
 // itself is a deliberate click, not something that reruns on every keystroke.
 
-import { state } from "../../state.js?v=4";
-import { exportInteriorPdf } from "../pdfExport.js?v=4";
-import { loadPdfDocument, renderPdfPageToCanvas } from "../pdfPreview.js?v=4";
+import { state, subscribe } from "../../state.js?v=5";
+import { getTrimSizeById } from "../../modules/canvasEngine.js?v=5";
+import { exportInteriorPdf } from "../pdfExport.js?v=5";
+import { loadPdfDocument, renderPdfPageToCanvas } from "../pdfPreview.js?v=5";
 
 const THUMB_SCALE = 0.22;
 const MAIN_SCALE = 1.4;
@@ -20,6 +21,7 @@ const el = {
   viewer: document.getElementById("pdf-viewer"),
   placeholder: document.getElementById("pdf-viewer-placeholder"),
   pagesRail: document.getElementById("pdf-viewer-pages"),
+  pageFrame: document.getElementById("pdf-page-frame"),
   mainCanvas: document.getElementById("pdf-viewer-canvas"),
   pageLabel: document.getElementById("pdf-page-label"),
   prevBtn: document.getElementById("pdf-prev-btn"),
@@ -29,11 +31,33 @@ const el = {
 let pdfDoc = null;
 let pageCount = 0;
 let activePage = 1;
+let lastTrimSizeId = null;
 
 export function initPdfPreviewPanel() {
   el.refreshBtn.addEventListener("click", refreshPreview);
   el.prevBtn.addEventListener("click", () => goToPage(activePage - 1));
   el.nextBtn.addEventListener("click", () => goToPage(activePage + 1));
+
+  applyTrimAspectRatio();
+  subscribe((current) => {
+    if (current.trimSizeId !== lastTrimSizeId) applyTrimAspectRatio(current);
+  });
+}
+
+// Every preview page container's shape is driven by the selected physical Trim Size —
+// e.g. `aspect-ratio: 8.5 / 11` for the 8.5"x11" trim — not by whatever the canvas
+// happens to render at. Updates the moment the trim size changes in Module 1, even
+// before the next Refresh, and reapplies to every already-rendered thumbnail so a
+// mid-session trim change never leaves a stale-shaped page box on screen.
+function applyTrimAspectRatio(current = state) {
+  lastTrimSizeId = current.trimSizeId;
+  const trimSize = getTrimSizeById(current.trimSizeId);
+  const ratio = `${trimSize.widthIn} / ${trimSize.heightIn}`;
+
+  el.pageFrame.style.setProperty("--trim-aspect-ratio", ratio);
+  el.pagesRail.querySelectorAll(".pdf-thumb-frame").forEach((frame) => {
+    frame.style.setProperty("--trim-aspect-ratio", ratio);
+  });
 }
 
 async function refreshPreview() {
@@ -75,14 +99,22 @@ async function refreshPreview() {
 
 async function renderThumbnailRail() {
   el.pagesRail.innerHTML = "";
+  const trimSize = getTrimSizeById(state.trimSizeId);
+  const ratio = `${trimSize.widthIn} / ${trimSize.heightIn}`;
+
   for (let i = 1; i <= pageCount; i += 1) {
     const cell = document.createElement("button");
     cell.type = "button";
     cell.className = "pdf-thumb";
     cell.dataset.page = String(i);
 
+    const frame = document.createElement("div");
+    frame.className = "pdf-thumb-frame";
+    frame.style.setProperty("--trim-aspect-ratio", ratio);
     const canvas = document.createElement("canvas");
-    cell.appendChild(canvas);
+    frame.appendChild(canvas);
+    cell.appendChild(frame);
+
     const label = document.createElement("span");
     label.className = "pdf-thumb-label";
     label.textContent = String(i);

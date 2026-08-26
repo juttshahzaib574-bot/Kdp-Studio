@@ -1,5 +1,5 @@
-import { state, setState, subscribe } from "../../state.js?v=4";
-import { exportInteriorPdf, downloadPdf } from "../pdfExport.js?v=4";
+import { state, setState, subscribe } from "../../state.js?v=5";
+import { exportInteriorPdf, downloadPdf } from "../pdfExport.js?v=5";
 
 const el = {
   titleInput: document.getElementById("book-title-input"),
