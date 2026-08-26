@@ -528,6 +528,43 @@ input[type="file"] {
   font-size: 0.78rem;
 }
 
+.matter-page-item.dragging {
+  position: relative;
+  z-index: 20;
+  border-color: var(--accent);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+  cursor: grabbing;
+}
+
+.matter-page-item:not(.dragging) {
+  transition: transform 150ms ease;
+}
+
+.matter-page-drag-handle {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.matter-page-drag-handle:active {
+  cursor: grabbing;
+  color: var(--accent);
+}
+
+.matter-page-drag-handle svg {
+  width: 12px;
+  height: 18px;
+  pointer-events: none;
+}
+
 .matter-page-item label {
   display: flex;
   align-items: center;
