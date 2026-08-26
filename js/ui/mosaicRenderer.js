@@ -6,13 +6,13 @@
 //   - renderFullMosaicGrid: the entire safe-zone grid at the real chosen print DPI,
 //     used to generate the actual page image embedded into the exported PDF.
 
-import { computeFrameGeometry, drawFrame } from "./preview.js?v=8";
-import { computeGridDimensions, cellCenterIn, cellPolygonIn, mmToIn, isCellInGridSilhouette } from "../modules/gridPatternEngine.js?v=8";
-import { recommendFont, recommendTextTint, adjustForBorderWeight, centerOffsetIn, letterSpacingForLabel } from "../modules/typographyEngine.js?v=8";
-import { gridColorFromTint } from "../modules/borderStyleEngine.js?v=8";
-import { cornerRadiusIn, isFullCircle } from "../modules/cornerRadiusEngine.js?v=8";
-import { assignDistinctShades } from "../modules/shadeQuantizationEngine.js?v=8";
-import { computeLayout, LAYOUT_ELEMENTS } from "../modules/layoutCompositionEngine.js?v=8";
+import { computeFrameGeometry, drawFrame } from "./preview.js?v=9";
+import { computeGridDimensions, cellCenterIn, cellPolygonIn, mmToIn, isCellInGridSilhouette } from "../modules/gridPatternEngine.js?v=9";
+import { recommendFont, recommendTextTint, adjustForBorderWeight, centerOffsetIn, letterSpacingForLabel } from "../modules/typographyEngine.js?v=9";
+import { gridColorFromTint } from "../modules/borderStyleEngine.js?v=9";
+import { cornerRadiusIn, isFullCircle } from "../modules/cornerRadiusEngine.js?v=9";
+import { assignDistinctShades } from "../modules/shadeQuantizationEngine.js?v=9";
+import { computeLayout, LAYOUT_ELEMENTS } from "../modules/layoutCompositionEngine.js?v=9";
 
 const PT_TO_IN = 1 / 72;
 
@@ -64,7 +64,17 @@ export function drawSourceToCanvas(source, maxSize = 512) {
   const c = document.createElement("canvas");
   c.width = Math.max(1, w);
   c.height = Math.max(1, h);
-  c.getContext("2d").drawImage(source, 0, 0, c.width, c.height);
+  const ctx = c.getContext("2d");
+  // Flatten transparency onto a solid white matte before any pixel is ever sampled —
+  // an un-composited transparent pixel's RGB channels are meaningless (browsers store
+  // whatever they want under alpha=0, often black), and without this step those
+  // meaningless values get quantized exactly like real image data, scattering random
+  // unrelated palette colors across every soft/anti-aliased edge of a cutout-style
+  // source image. White matches the book page itself, so it also reads correctly as
+  // "no ink here" wherever a transparent background genuinely should stay blank.
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, c.width, c.height);
+  ctx.drawImage(source, 0, 0, c.width, c.height);
   return c;
 }
 
