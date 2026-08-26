@@ -1,14 +1,14 @@
-import { state, setState, subscribe } from "../../state.js?v=11";
-import { GRID_PATTERNS, computeGridDimensions, isCellInGridSilhouette } from "../../modules/gridPatternEngine.js?v=11";
-import { recommendFont, recommendTextTint } from "../../modules/typographyEngine.js?v=11";
-import { applyPreset, clampBorderWeight } from "../../modules/borderStyleEngine.js?v=11";
-import { CORNER_RADIUS_MIN_PERCENT, CORNER_RADIUS_MAX_PERCENT } from "../../modules/cornerRadiusEngine.js?v=11";
-import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=11";
-import { getTrimSizeById } from "../../modules/canvasEngine.js?v=11";
-import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=11";
-import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=11";
-import { normalizeComposition, computeLayout } from "../../modules/layoutCompositionEngine.js?v=11";
-import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=11";
+import { state, setState, subscribe } from "../../state.js?v=12";
+import { GRID_PATTERNS, computeGridDimensions, isCellInGridSilhouette } from "../../modules/gridPatternEngine.js?v=12";
+import { recommendFont, recommendTextTint } from "../../modules/typographyEngine.js?v=12";
+import { applyPreset, clampBorderWeight } from "../../modules/borderStyleEngine.js?v=12";
+import { CORNER_RADIUS_MIN_PERCENT, CORNER_RADIUS_MAX_PERCENT } from "../../modules/cornerRadiusEngine.js?v=12";
+import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=12";
+import { getTrimSizeById } from "../../modules/canvasEngine.js?v=12";
+import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=12";
+import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=12";
+import { normalizeComposition, computeLayout } from "../../modules/layoutCompositionEngine.js?v=12";
+import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=12";
 
 const el = {
   patternGrid: document.getElementById("grid-pattern-options"),
