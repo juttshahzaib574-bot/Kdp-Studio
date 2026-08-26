@@ -6,13 +6,12 @@
 //   - renderFullMosaicGrid: the entire safe-zone grid at the real chosen print DPI,
 //     used to generate the actual page image embedded into the exported PDF.
 
-import { computeFrameGeometry, drawFrame } from "./preview.js?v=15";
-import { computeGridDimensions, cellCenterIn, cellPolygonIn, mmToIn, isCellInGridSilhouette } from "../modules/gridPatternEngine.js?v=15";
-import { recommendFont, recommendTextTint, adjustForBorderWeight, centerOffsetIn, letterSpacingForLabel } from "../modules/typographyEngine.js?v=15";
-import { gridColorFromTint } from "../modules/borderStyleEngine.js?v=15";
-import { cornerRadiusIn, isFullCircle } from "../modules/cornerRadiusEngine.js?v=15";
-import { nearestPaletteColor, rgbToLab } from "../modules/shadeQuantizationEngine.js?v=15";
-import { computeLayout, LAYOUT_ELEMENTS } from "../modules/layoutCompositionEngine.js?v=15";
+import { computeFrameGeometry, drawFrame } from "./preview.js?v=18";
+import { computeGridDimensions, cellCenterIn, cellPolygonIn, mmToIn, isCellInGridSilhouette } from "../modules/gridPatternEngine.js?v=18";
+import { recommendFont, recommendTextTint, adjustForBorderWeight, centerOffsetIn, letterSpacingForLabel } from "../modules/typographyEngine.js?v=18";
+import { gridColorFromTint } from "../modules/borderStyleEngine.js?v=18";
+import { cornerRadiusIn, isFullCircle } from "../modules/cornerRadiusEngine.js?v=18";
+import { computeLayout, LAYOUT_ELEMENTS } from "../modules/layoutCompositionEngine.js?v=18";
 
 const PT_TO_IN = 1 / 72;
 
@@ -75,183 +74,61 @@ export function drawSourceToCanvas(source, maxSize = 512) {
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, c.width, c.height);
   ctx.drawImage(source, 0, 0, c.width, c.height);
-
-  // Edge-preserving smoothing, not a plain blur: a plain gaussian/box blur softens
-  // real silhouette edges right along with noise, which is backwards for this job.
-  // A bilateral filter only averages a pixel with neighbors that are BOTH spatially
-  // close AND already similar in color, so a hard boundary (black outline against a
-  // gold fill) stays hard, while fine same-region texture (anti-aliasing, a thin
-  // shading stroke a pixel or two wide) gets smoothed into its surrounding dominant
-  // color instead of surviving as an inconsistent fragment. This is the standard
-  // preprocessing step in "cartoonization" pipelines (bilateral filter → color
-  // quantization → edge detection) for exactly this reason.
-  const imageData = ctx.getImageData(0, 0, c.width, c.height);
-  ctx.putImageData(bilateralFilter(imageData), 0, 0);
   return c;
 }
 
-// radius 2 (5x5 taps), sigmaSpace 2, sigmaColor 30: smooths within roughly a
-// palette-swatch's worth of color difference, preserves anything bigger (a real
-// edge between two genuinely different colors).
-function bilateralFilter(imageData, radius = 2, sigmaSpace = 2, sigmaColor = 30) {
-  const { data: src, width: w, height: h } = imageData;
-  const out = new Uint8ClampedArray(src.length);
+// ---- Mosaic color engine ----
+// A direct, faithful port of a working reference paint-by-number generator's actual
+// technique, replacing every part of the previous fixed-palette engine: sample the
+// source at 8x8 sub-pixels per cell with NO smoothing (sharp source pixels stay
+// sharp all the way through), find true outline cells by comparing each cell's own
+// brightness against its neighbors, run K-means clustering restricted to non-outline
+// pixels to DISCOVER the image's own actual colors (not snap to any fixed/generic
+// palette), merge near-duplicate discovered clusters, then assign every non-outline
+// cell to whichever discovered color the majority of its sub-pixels are closest to.
 
-  const spatialWeights = [];
-  for (let dy = -radius; dy <= radius; dy += 1) {
-    for (let dx = -radius; dx <= radius; dx += 1) {
-      spatialWeights.push(Math.exp(-(dx * dx + dy * dy) / (2 * sigmaSpace * sigmaSpace)));
-    }
-  }
-  const colorWeightLUT = new Float32Array(766); // max possible |dr|+|dg|+|db| is 255*3
-  for (let d = 0; d < colorWeightLUT.length; d += 1) {
-    colorWeightLUT[d] = Math.exp(-(d * d) / (2 * sigmaColor * sigmaColor));
-  }
-
-  for (let y = 0; y < h; y += 1) {
-    for (let x = 0; x < w; x += 1) {
-      const ci = (y * w + x) * 4;
-      const cr = src[ci];
-      const cg = src[ci + 1];
-      const cb = src[ci + 2];
-      let rSum = 0;
-      let gSum = 0;
-      let bSum = 0;
-      let wSum = 0;
-      let tapIndex = 0;
-      for (let dy = -radius; dy <= radius; dy += 1) {
-        const ny = Math.min(h - 1, Math.max(0, y + dy));
-        for (let dx = -radius; dx <= radius; dx += 1, tapIndex += 1) {
-          const nx = Math.min(w - 1, Math.max(0, x + dx));
-          const ni = (ny * w + nx) * 4;
-          const nr = src[ni];
-          const ng = src[ni + 1];
-          const nb = src[ni + 2];
-          const colorDist = Math.abs(nr - cr) + Math.abs(ng - cg) + Math.abs(nb - cb);
-          const weight = spatialWeights[tapIndex] * colorWeightLUT[colorDist];
-          rSum += nr * weight;
-          gSum += ng * weight;
-          bSum += nb * weight;
-          wSum += weight;
-        }
-      }
-      out[ci] = rSum / wSum;
-      out[ci + 1] = gSum / wSum;
-      out[ci + 2] = bSum / wSum;
-      out[ci + 3] = src[ci + 3];
-    }
-  }
-
-  return new ImageData(out, w, h);
+function mulberry32(seed) {
+  return function rand() {
+    let a = (seed |= 0);
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
-// A true line-art outline stroke is dark AND essentially colorless (near-neutral
-// black/gray), which is what actually distinguishes it from a dark but SATURATED
-// palette color — lightness alone can't tell them apart. Navy Blue (#000080) is
-// darker (LAB L≈13) than Charcoal Black (#36454F, L≈28), but it's a real, intended
-// color; the difference is chroma (√(a²+b²)): Navy Blue's is ≈80, Charcoal
-// Black's is ≈9. Every genuinely dark-and-saturated entry in the Universal 36 sits
-// well clear of these thresholds (checked directly: Dark Walnut L≈22/chroma≈22,
-// Deep Violet L≈21/chroma≈74, Forest Green L≈51/chroma≈67), so this only ever
-// catches pixels that are actually near-black-and-neutral.
-const OUTLINE_LIGHTNESS_MAX = 20;
-const OUTLINE_CHROMA_MAX = 12;
+const rgbDistance = (a, b) => Math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2);
 
-function isOutlinePixel(rgb) {
-  const lab = rgbToLab(rgb);
-  const chroma = Math.hypot(lab.a, lab.b);
-  return lab.l < OUTLINE_LIGHTNESS_MAX && chroma < OUTLINE_CHROMA_MAX;
-}
+const NAMED_COLORS = [
+  ["Black", 0, 0, 0], ["White", 255, 255, 255], ["Gray", 128, 128, 128], ["Dark Gray", 70, 70, 70],
+  ["Light Gray", 205, 205, 205], ["Red", 225, 45, 40], ["Dark Red", 140, 20, 20], ["Orange", 240, 145, 45],
+  ["Brown", 145, 85, 45], ["Dark Brown", 80, 50, 25], ["Tan", 212, 170, 110], ["Beige", 235, 222, 195],
+  ["Cream", 250, 242, 218], ["Yellow", 245, 220, 85], ["Gold", 212, 170, 60], ["Green", 60, 140, 70],
+  ["Dark Green", 25, 90, 45], ["Light Green", 150, 200, 140], ["Teal", 60, 150, 140], ["Olive", 120, 120, 50],
+  ["Blue", 50, 100, 200], ["Light Blue", 160, 200, 230], ["Navy", 25, 35, 85], ["Purple", 130, 80, 170],
+  ["Pink", 240, 160, 180], ["Peach", 250, 200, 160],
+];
 
-// The single darkest entry in the active palette (always resolves to true black —
-// every set size includes one) — every pixel isOutlinePixel flags gets forced onto
-// this ONE index directly, skipping the normal all-palette vote entirely. Without
-// this, a near-black pixel competing normally could split votes between this and
-// a second near-black entry (e.g. Jet Black vs Charcoal Black), fragmenting what
-// should read as one continuous, unified outline into two different numbers
-// zig-zagging along the same line.
-function darkestPaletteIndex(palette) {
-  let bestIndex = 0;
-  let bestL = Infinity;
-  palette.forEach((entry, index) => {
-    const l = rgbToLab(entry.rgb).l;
-    if (l < bestL) {
-      bestL = l;
-      bestIndex = index;
+function nameForColor(r, g, b) {
+  let best = "Color";
+  let bestDist = Infinity;
+  NAMED_COLORS.forEach(([name, nr, ng, nb]) => {
+    const d = (r - nr) ** 2 + (g - ng) ** 2 + (b - nb) ** 2;
+    if (d < bestDist) {
+      bestDist = d;
+      best = name;
     }
   });
-  return bestIndex;
+  return best;
 }
 
-// True background is a fact about the SOURCE image, not something to infer through
-// per-cell color voting — a cell outside the subject's silhouette is not "the color
-// closest to white in the palette", it's blank paper. Flood-fill from the canvas's
-// own outer border through connected near-white pixels (the standard "magic wand
-// from the edges" every real background-removal/pattern-generator tool uses, with a
-// tolerance for anti-aliased near-white edges); anything the fill reaches is real
-// background, everything else is the subject, however light its own colors are.
-// This is what actually stops a stray gray/navy cell from floating in open space
-// outside the silhouette — that cell is never handed to the palette vote at all.
-const BACKGROUND_LIGHTNESS_MIN = 92;
-const BACKGROUND_CHROMA_MAX = 8;
-export const BACKGROUND_CELL = -1;
-
-function computeBackgroundMask(imageData, w, h) {
-  const mask = new Uint8Array(w * h);
-  const isNearWhite = (i) => {
-    const lab = rgbToLab({ r: imageData[i], g: imageData[i + 1], b: imageData[i + 2] });
-    return lab.l > BACKGROUND_LIGHTNESS_MIN && Math.hypot(lab.a, lab.b) < BACKGROUND_CHROMA_MAX;
-  };
-
-  const stack = [];
-  const seed = (x, y) => {
-    const p = y * w + x;
-    if (mask[p]) return;
-    if (!isNearWhite(p * 4)) return;
-    mask[p] = 1;
-    stack.push(p);
-  };
-  for (let x = 0; x < w; x += 1) {
-    seed(x, 0);
-    seed(x, h - 1);
-  }
-  for (let y = 0; y < h; y += 1) {
-    seed(0, y);
-    seed(w - 1, y);
-  }
-
-  while (stack.length) {
-    const p = stack.pop();
-    const x = p % w;
-    const y = Math.floor(p / w);
-    if (x > 0) seed(x - 1, y);
-    if (x < w - 1) seed(x + 1, y);
-    if (y > 0) seed(x, y - 1);
-    if (y < h - 1) seed(x, y + 1);
-  }
-
-  return mask;
-}
-
-// Granular Shade Separation starts here, not in the quantizer: this is a cover-crop
-// (center-crop to the grid's own aspect ratio, never a stretch) plus a small per-cell
-// supersample — so a single outline-stroke or anti-aliased edge pixel can no longer
-// hijack an entire cell's color.
-//
-// Each of the 16 sub-samples is snapped to the palette INDIVIDUALLY, then the cell
-// takes whichever palette color the most sub-samples voted for — never the average
-// RGB of the raw sub-samples. Averaging raw pixels across a hard edge (a black
-// outline against a gold fill, or an outline against white background) produces a
-// blended gray/tan that doesn't actually exist anywhere in the source artwork; that
-// blend then gets quantized like it was real data, which is what was showing up as
-// a muddy gray halo traced around every silhouette instead of a crisp line. Voting
-// among already-quantized colors means the result is always a real palette color a
-// majority of the cell's own pixels actually are — never an invented in-between one.
-function quantizeGridCells(sourceCanvas, cols, rows, targetAspect, palette) {
+// Crop to the grid's own aspect ratio (never a stretch), then downscale directly to
+// cols*8 x rows*8 with NEAREST-NEIGHBOR (no smoothing) — matches the reference tool
+// exactly, keeping every source pixel sharp all the way to the per-cell sample.
+function sampleGridCellsNearestNeighbor(sourceCanvas, cols, rows, targetAspect) {
   const sw = sourceCanvas.width;
   const sh = sourceCanvas.height;
   const sourceAspect = sw / sh;
-
   let cropW, cropH, cropX, cropY;
   if (sourceAspect > targetAspect) {
     cropH = sh;
@@ -265,138 +142,272 @@ function quantizeGridCells(sourceCanvas, cols, rows, targetAspect, palette) {
     cropY = (sh - cropH) / 2;
   }
 
-  const imageData = sourceCanvas.getContext("2d").getImageData(0, 0, sw, sh).data;
-  const backgroundMask = computeBackgroundMask(imageData, sw, sh);
-  const SUPERSAMPLE = 4; // 4x4 sub-samples voted per cell
-  const votes = new Int32Array(palette.length);
-  const assignments = [];
-  const outlineIndex = darkestPaletteIndex(palette);
+  const S = 8;
+  const sampleW = cols * S;
+  const sampleH = rows * S;
+  const sampleCanvas = document.createElement("canvas");
+  sampleCanvas.width = sampleW;
+  sampleCanvas.height = sampleH;
+  const sctx = sampleCanvas.getContext("2d");
+  sctx.imageSmoothingEnabled = false;
+  sctx.drawImage(sourceCanvas, cropX, cropY, cropW, cropH, 0, 0, sampleW, sampleH);
+  const data = sctx.getImageData(0, 0, sampleW, sampleH).data;
 
+  const cells = [];
   for (let row = 0; row < rows; row += 1) {
     for (let col = 0; col < cols; col += 1) {
-      votes.fill(0);
-      let backgroundVotes = 0;
-      for (let sy = 0; sy < SUPERSAMPLE; sy += 1) {
-        for (let sx = 0; sx < SUPERSAMPLE; sx += 1) {
-          const u = (col + (sx + 0.5) / SUPERSAMPLE) / cols;
-          const v = (row + (sy + 0.5) / SUPERSAMPLE) / rows;
-          const x = Math.max(0, Math.min(sw - 1, Math.round(cropX + u * cropW)));
-          const y = Math.max(0, Math.min(sh - 1, Math.round(cropY + v * cropH)));
-          if (backgroundMask[y * sw + x]) {
-            backgroundVotes += 1;
-            continue;
-          }
-          const i = (y * sw + x) * 4;
-          const rgb = { r: imageData[i], g: imageData[i + 1], b: imageData[i + 2] };
-          const idx = isOutlinePixel(rgb) ? outlineIndex : nearestPaletteColor(rgb, palette);
-          votes[idx] += 1;
+      const px = [];
+      for (let y = 0; y < S; y += 1) {
+        for (let x = 0; x < S; x += 1) {
+          const i = ((row * S + y) * sampleW + (col * S + x)) * 4;
+          px.push([data[i], data[i + 1], data[i + 2]]);
         }
       }
-      let bestIndex = BACKGROUND_CELL;
-      let bestCount = backgroundVotes;
-      for (let i = 0; i < votes.length; i += 1) {
-        if (votes[i] > bestCount) {
-          bestCount = votes[i];
-          bestIndex = i;
-        }
-      }
-      assignments.push(bestIndex);
+      cells.push(px);
     }
   }
-
-  return mergeSmallRegions(assignments, cols, rows);
+  return cells;
 }
 
-// A cell-by-cell "majority vote" (above) removes invented blend colors, but it does
-// nothing about a single cell — or a small handful of them — landing on a real,
-// correctly-nearest palette color that still isn't what the region around it is.
-// That's confetti: a fleck of "Amber Gold" alone inside a big field of "Golden
-// Yellow", each individually a valid closest-match, together reading as muddy
-// noise instead of one bold, printable block. Every professional paint-by-number /
-// cross-stitch generator runs a region-merging cleanup pass for exactly this reason
-// (the open-source paintbynumbersgenerator calls it facet removal; commercial
-// converters expose it as a "Min Area" setting) — find every contiguous same-color
-// region, and any region smaller than MIN_REGION_CELLS gets absorbed into whichever
-// neighboring region borders it the most, smallest region first.
-const MIN_REGION_CELLS = 2;
-
-function mergeSmallRegions(assignments, cols, rows) {
-  const total = cols * rows;
-  const regionId = new Int32Array(total).fill(-1);
-  const regions = []; // { colorIndex, cells: number[] } | null once absorbed
-
-  const gridNeighborsOf = (cellIndex) => {
-    const r = Math.floor(cellIndex / cols);
-    const c = cellIndex % cols;
-    const out = [];
-    if (r > 0) out.push(cellIndex - cols);
-    if (r < rows - 1) out.push(cellIndex + cols);
-    if (c > 0) out.push(cellIndex - 1);
-    if (c < cols - 1) out.push(cellIndex + 1);
-    return out;
-  };
-
-  // Connected-component labeling: flood-fill every maximal group of orthogonally
-  // touching cells that already share the same palette index.
-  for (let start = 0; start < total; start += 1) {
-    if (regionId[start] !== -1) continue;
-    const color = assignments[start];
-    const id = regions.length;
-    const cells = [start];
-    regionId[start] = id;
-    const stack = [start];
-    while (stack.length) {
-      const cur = stack.pop();
-      gridNeighborsOf(cur).forEach((n) => {
-        if (regionId[n] === -1 && assignments[n] === color) {
-          regionId[n] = id;
-          cells.push(n);
-          stack.push(n);
-        }
-      });
+// A cell is a true outline stroke if it's darker than its brightest neighbor by a
+// real margin AND dark overall — spatial context, not an absolute color threshold.
+function detectOutlineCells(cells, cols, rows) {
+  const edges = new Array(cols * rows).fill(false);
+  const lums = cells.map((px) => {
+    let sum = 0;
+    px.forEach((p) => {
+      sum += 0.299 * p[0] + 0.587 * p[1] + 0.114 * p[2];
+    });
+    return sum / px.length;
+  });
+  for (let row = 0; row < rows; row += 1) {
+    for (let col = 0; col < cols; col += 1) {
+      const i = row * cols + col;
+      let jump = 0;
+      if (row > 0) jump = Math.max(jump, Math.abs(lums[i] - lums[i - cols]));
+      if (row < rows - 1) jump = Math.max(jump, Math.abs(lums[i] - lums[i + cols]));
+      if (col > 0) jump = Math.max(jump, Math.abs(lums[i] - lums[i - 1]));
+      if (col < cols - 1) jump = Math.max(jump, Math.abs(lums[i] - lums[i + 1]));
+      if (jump > 40 && lums[i] < 100) edges[i] = true;
     }
-    regions.push({ colorIndex: color, cells });
+  }
+  return edges;
+}
+
+// K-means++-seeded clustering (fixed seed — deterministic, so the print and solved
+// renders of the same puzzle always discover the identical palette) with Lloyd
+// iteration, restricted to whatever pixel data the caller hands in (non-outline only).
+function kmeansSeeded(data, k, iters) {
+  const n = data.length;
+  if (!n) return { cents: [] };
+  const clusterCount = Math.min(k, n);
+  const rnd = mulberry32(4242);
+  const cents = [[...data[Math.floor(rnd() * n)]]];
+  for (let c = 1; c < clusterCount; c += 1) {
+    const distSq = new Float32Array(n);
+    let total = 0;
+    for (let i = 0; i < n; i += 1) {
+      let minDist = Infinity;
+      cents.forEach((ct) => {
+        const d = (data[i][0] - ct[0]) ** 2 + (data[i][1] - ct[1]) ** 2 + (data[i][2] - ct[2]) ** 2;
+        if (d < minDist) minDist = d;
+      });
+      distSq[i] = minDist;
+      total += minDist;
+    }
+    let r = rnd() * total;
+    let chosen = 0;
+    for (let i = 0; i < n; i += 1) {
+      r -= distSq[i];
+      if (r <= 0) {
+        chosen = i;
+        break;
+      }
+    }
+    cents.push([...data[chosen]]);
   }
 
-  // Smallest region first, mirroring how these tools describe the process ("smallest
-  // cells are merged with their respective largest neighbour until only N are left").
-  const order = regions.map((_, id) => id).sort((a, b) => regions[a].cells.length - regions[b].cells.length);
+  const labels = new Uint16Array(n);
+  for (let iter = 0; iter < iters; iter += 1) {
+    let changed = false;
+    for (let i = 0; i < n; i += 1) {
+      let minDist = Infinity;
+      let best = 0;
+      for (let c = 0; c < cents.length; c += 1) {
+        const d = (data[i][0] - cents[c][0]) ** 2 + (data[i][1] - cents[c][1]) ** 2 + (data[i][2] - cents[c][2]) ** 2;
+        if (d < minDist) {
+          minDist = d;
+          best = c;
+        }
+      }
+      if (labels[i] !== best) {
+        labels[i] = best;
+        changed = true;
+      }
+    }
+    const sums = Array.from({ length: cents.length }, () => [0, 0, 0]);
+    const counts = new Uint32Array(cents.length);
+    for (let i = 0; i < n; i += 1) {
+      const l = labels[i];
+      counts[l] += 1;
+      sums[l][0] += data[i][0];
+      sums[l][1] += data[i][1];
+      sums[l][2] += data[i][2];
+    }
+    for (let c = 0; c < cents.length; c += 1) {
+      if (counts[c]) cents[c] = [sums[c][0] / counts[c], sums[c][1] / counts[c], sums[c][2] / counts[c]];
+    }
+    if (!changed) break;
+  }
+  return { cents };
+}
 
-  order.forEach((id) => {
-    const region = regions[id];
-    if (!region || region.cells.length >= MIN_REGION_CELLS) return;
+// The actual quantization pass: crop+sample, detect outline cells, cluster the rest
+// into `colorCount - 1` discovered colors (plus outline = colorCount total), merge
+// near-duplicate clusters, label every cell, and pick each cluster's final displayed
+// color (a real, dominant, actually-present color when one clearly wins — never an
+// invented average). Returns per-cell palette indices AND the discovered legend
+// itself, since — unlike a fixed palette — this palette is different every time and
+// the caller needs it to draw a matching color key.
+function quantizeGridCells(sourceCanvas, cols, rows, targetAspect, colorCount) {
+  const cells = sampleGridCellsNearestNeighbor(sourceCanvas, cols, rows, targetAspect);
+  const edges = detectOutlineCells(cells, cols, rows);
 
-    const neighborIds = new Set();
-    region.cells.forEach((cellIndex) => {
-      gridNeighborsOf(cellIndex).forEach((n) => {
-        if (regionId[n] !== id) neighborIds.add(regionId[n]);
-      });
+  const cellMode = cells.map((px) => {
+    const counts = new Map();
+    px.forEach((p) => {
+      const key = ((p[0] >> 3) << 10) | ((p[1] >> 3) << 5) | (p[2] >> 3);
+      counts.set(key, (counts.get(key) || 0) + 1);
     });
-    if (neighborIds.size === 0) return; // the whole grid is one region — nothing to merge into
-
-    let bestId = null;
-    let bestSize = -1;
-    neighborIds.forEach((nid) => {
-      const size = regions[nid].cells.length;
-      if (size > bestSize) {
-        bestSize = size;
-        bestId = nid;
+    let bestKey = 0;
+    let bestCount = 0;
+    counts.forEach((count, key) => {
+      if (count > bestCount) {
+        bestCount = count;
+        bestKey = key;
       }
     });
-
-    const target = regions[bestId];
-    region.cells.forEach((cellIndex) => {
-      regionId[cellIndex] = bestId;
-      target.cells.push(cellIndex);
-    });
-    regions[id] = null;
+    return [((bestKey >> 10) & 31) * 8 + 4, ((bestKey >> 5) & 31) * 8 + 4, (bestKey & 31) * 8 + 4];
   });
 
-  const cleaned = new Array(total);
-  for (let i = 0; i < total; i += 1) {
-    cleaned[i] = regions[regionId[i]].colorIndex;
+  const nonEdgePixels = [];
+  cells.forEach((px, i) => {
+    if (!edges[i]) nonEdgePixels.push(...px);
+  });
+
+  const { cents } = kmeansSeeded(nonEdgePixels, Math.min(Math.max(1, colorCount - 1), nonEdgePixels.length), 20);
+
+  let merged = true;
+  while (merged && cents.length > 2) {
+    merged = false;
+    let bj = 1;
+    let bestDist = Infinity;
+    for (let a = 0; a < cents.length; a += 1) {
+      for (let b = a + 1; b < cents.length; b += 1) {
+        const d = rgbDistance(cents[a], cents[b]);
+        if (d < bestDist) {
+          bestDist = d;
+          bj = b;
+        }
+      }
+    }
+    if (bestDist < 45) {
+      cents.splice(bj, 1);
+      merged = true;
+    }
   }
-  return cleaned;
+
+  // Outline (label 0) is the default for any sub-pixel not clearly closer to a real
+  // cluster than it already is to pure black, so ambiguous dark pixels bias toward
+  // the unified outline instead of an arbitrary nearby cluster.
+  const cellLabels = new Array(cols * rows);
+  for (let i = 0; i < cells.length; i += 1) {
+    if (edges[i]) {
+      cellLabels[i] = 0;
+      continue;
+    }
+    const votes = new Array(cents.length + 1).fill(0);
+    cells[i].forEach((p) => {
+      let minDist = p[0] ** 2 + p[1] ** 2 + p[2] ** 2;
+      let best = 0;
+      cents.forEach((c, ci) => {
+        const d = rgbDistance(p, c);
+        if (d < minDist) {
+          minDist = d;
+          best = ci + 1;
+        }
+      });
+      votes[best] += 1;
+    });
+    let maxVotes = 0;
+    let bestLabel = 0;
+    votes.forEach((v, c) => {
+      if (v > maxVotes) {
+        maxVotes = v;
+        bestLabel = c;
+      }
+    });
+    cellLabels[i] = bestLabel;
+  }
+
+  const finalColors = [[0, 0, 0]];
+  const keptIndexes = [0];
+  for (let c = 0; c < cents.length; c += 1) {
+    const counts = new Map();
+    let total = 0;
+    for (let i = 0; i < cells.length; i += 1) {
+      if (cellLabels[i] === c + 1) {
+        total += 1;
+        const mode = cellMode[i];
+        const key = ((mode[0] >> 2) << 12) | ((mode[1] >> 2) << 6) | (mode[2] >> 2);
+        counts.set(key, (counts.get(key) || 0) + 1);
+      }
+    }
+    if (!total) continue;
+    let bestKey = 0;
+    let bestCount = 0;
+    counts.forEach((count, key) => {
+      if (count > bestCount) {
+        bestCount = count;
+        bestKey = key;
+      }
+    });
+    finalColors.push(
+      bestCount / total > 0.4
+        ? [((bestKey >> 12) & 63) * 4 + 2, ((bestKey >> 6) & 63) * 4 + 2, (bestKey & 63) * 4 + 2]
+        : cents[c].map((v) => Math.round(v))
+    );
+    keptIndexes.push(c + 1);
+  }
+
+  const remap = new Map();
+  keptIndexes.forEach((oldIndex, newIndex) => remap.set(oldIndex, newIndex));
+  const remappedLabels = cellLabels.map((l) => remap.get(l) ?? 0);
+
+  const legendEntries = finalColors.map((color) => ({ color }));
+  const outlineEntry = legendEntries[0];
+  const restSorted = legendEntries
+    .slice(1)
+    .sort(
+      (a, b) =>
+        0.299 * a.color[0] + 0.587 * a.color[1] + 0.114 * a.color[2] - (0.299 * b.color[0] + 0.587 * b.color[1] + 0.114 * b.color[2])
+    );
+  const sortedLegend = [outlineEntry, ...restSorted];
+
+  const finalOrderMap = new Map();
+  sortedLegend.forEach((entry, newIndex) => {
+    const oldIndex = finalColors.findIndex((c) => c[0] === entry.color[0] && c[1] === entry.color[1] && c[2] === entry.color[2]);
+    finalOrderMap.set(oldIndex, newIndex);
+  });
+  const assignments = remappedLabels.map((l) => finalOrderMap.get(l) ?? 0);
+
+  const legend = sortedLegend.map(({ color }) => {
+    const clamped = color.map((v) => Math.max(0, Math.min(255, Math.round(v))));
+    const hex = `#${clamped.map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+    return { hex, rgb: { r: clamped[0], g: clamped[1], b: clamped[2] }, name: nameForColor(...clamped) };
+  });
+
+  return { assignments, legend };
 }
 
 function polygonToPx(points, centerPx, scalePxPerIn) {
@@ -604,7 +615,7 @@ export function renderMosaicPreview(canvas, opts) {
   const regionWpx = gridZone.widthIn * ppi;
   const regionHpx = gridZone.heightIn * ppi;
 
-  const assignments = quantizeGridCells(sourceCanvas, fullGrid.cols, fullGrid.rows, gridZone.widthIn / gridZone.heightIn, palette);
+  const { assignments, legend } = quantizeGridCells(sourceCanvas, fullGrid.cols, fullGrid.rows, gridZone.widthIn / gridZone.heightIn, palette.length);
 
   // Below this cell size a number is unreadable anyway, so cells fall back to a flat
   // fillRect (see drawCell's lowDetail branch) — keeps a dense grid's live preview
@@ -616,13 +627,6 @@ export function renderMosaicPreview(canvas, opts) {
   ctx.rect(originX, originY, regionWpx, regionHpx);
   ctx.clip();
 
-  // The real page background, not just a loading placeholder: background cells (see
-  // quantizeGridCells) are now genuinely skipped rather than drawn, so this fill is
-  // what actually shows through the silhouette's negative space — it has to match
-  // renderFullMosaicGrid's real export background or the preview would show a dark
-  // void around the subject that the real PDF never has. Solved mode always reads
-  // as a normal finished page (white), matching the real export; print mode goes
-  // rich black only in Blackout mode, same as the export.
   ctx.fillStyle = mode === "solved" ? "#ffffff" : style.blackoutMode ? "#000000" : "#f5f3ee";
   ctx.fillRect(originX, originY, regionWpx, regionHpx);
 
@@ -633,18 +637,11 @@ export function renderMosaicPreview(canvas, opts) {
         index += 1;
         continue;
       }
-      // A cell the background flood-fill claimed (see quantizeGridCells) is blank
-      // paper outside the subject's silhouette — not a color, so nothing gets drawn
-      // for it at all, same as a corner-trimmed cell.
-      if (assignments[index] === BACKGROUND_CELL) {
-        index += 1;
-        continue;
-      }
       const localCenterIn = cellCenterIn(gridPattern, col, row, fullGrid.cellSizeIn);
       const centerPx = { x: originX + localCenterIn.x * ppi, y: originY + localCenterIn.y * ppi };
       drawCell(ctx, {
         centerPx, cellSizeIn: fullGrid.cellSizeIn, cellSizePx, ppi, gridPattern, mode,
-        paletteIndex: assignments[index], palette, style, cornerRadiusPercent, lowDetail,
+        paletteIndex: assignments[index], palette: legend, style, cornerRadiusPercent, lowDetail,
       });
       index += 1;
     }
@@ -657,7 +654,7 @@ export function renderMosaicPreview(canvas, opts) {
   ctx.textAlign = "left";
   ctx.fillText(`Full page: ${fullGrid.cols}×${fullGrid.rows} cells @ ${cellSizeMm.toFixed(1)}mm`, 12, canvas.height - 12);
 
-  return { fullGrid, font: style.font, borderPx: style.borderPx };
+  return { fullGrid, font: style.font, borderPx: style.borderPx, legend };
 }
 
 // Renders the ENTIRE safe-zone grid onto `canvas` at the real chosen print DPI —
@@ -678,9 +675,6 @@ export function renderFullMosaicGrid(canvas, opts) {
   const style = computeCellStyle({ cellSizeMm, cellSizeIn: fullGrid.cellSizeIn, borderWeightPt, gridTintPercent, cornerRadiusPercent, palette, ppi: dpi });
 
   // True K:100% solid Rich Black canvas background per the Midnight/Blackout standard.
-  // This is also what shows through wherever a background cell is skipped (see
-  // quantizeGridCells/BACKGROUND_CELL) — white here, so the trimmed-to-silhouette
-  // negative space around the subject reads as ordinary blank page, not a void.
   ctx.fillStyle = mode === "solved" ? "#ffffff" : style.blackoutMode ? "#000000" : "#ffffff";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -694,7 +688,7 @@ export function renderFullMosaicGrid(canvas, opts) {
   const originYPx = safeYIn * dpi;
 
   const cellSizePx = fullGrid.cellSizeIn * dpi;
-  const assignments = quantizeGridCells(sourceCanvas, fullGrid.cols, fullGrid.rows, gridZone.widthIn / gridZone.heightIn, palette);
+  const { assignments, legend } = quantizeGridCells(sourceCanvas, fullGrid.cols, fullGrid.rows, gridZone.widthIn / gridZone.heightIn, palette.length);
 
   let index = 0;
   for (let row = 0; row < fullGrid.rows; row += 1) {
@@ -703,19 +697,15 @@ export function renderFullMosaicGrid(canvas, opts) {
         index += 1;
         continue;
       }
-      if (assignments[index] === BACKGROUND_CELL) {
-        index += 1;
-        continue;
-      }
       const localCenterIn = cellCenterIn(gridPattern, col, row, fullGrid.cellSizeIn);
       const centerPx = { x: originXPx + localCenterIn.x * dpi, y: originYPx + localCenterIn.y * dpi };
       drawCell(ctx, {
         centerPx, cellSizeIn: fullGrid.cellSizeIn, cellSizePx, ppi: dpi, gridPattern, mode,
-        paletteIndex: assignments[index], palette, style, cornerRadiusPercent,
+        paletteIndex: assignments[index], palette: legend, style, cornerRadiusPercent,
       });
       index += 1;
     }
   }
 
-  return { fullGrid, gridZone, layout };
+  return { fullGrid, gridZone, layout, legend };
 }
