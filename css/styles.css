@@ -919,21 +919,27 @@ input[type="file"] {
 }
 
 .gallery-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: grab;
+}
+
+.gallery-item.dragging {
+  opacity: 0.4;
+}
+
+.gallery-item-thumb {
   position: relative;
   border: 2px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
   aspect-ratio: 3/4;
   background: var(--panel-alt);
-  cursor: grab;
 }
 
-.gallery-item.active-asset {
+.gallery-item.active-asset .gallery-item-thumb {
   border-color: var(--accent);
-}
-
-.gallery-item.dragging {
-  opacity: 0.4;
 }
 
 .gallery-item img {
@@ -941,6 +947,12 @@ input[type="file"] {
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+.asset-dims {
+  font-size: 0.66rem;
+  color: var(--text-dim);
+  text-align: center;
 }
 
 .gallery-item .remove-btn {

@@ -4,14 +4,13 @@
 // page) and free-form user-created "albums" for organizing reference images before they're
 // assigned a role. Drag a thumbnail onto any bucket in the sidebar to move it there.
 
-import { state, setState, subscribe } from "../../state.js?v=5";
+import { state, setState, subscribe } from "../../state.js?v=6";
 import {
   ASSET_CATEGORIES,
   loadGallery,
   saveAsset,
   removeAsset,
   moveAsset,
-  checkFormatCompliance,
   loadActiveAssetMap,
   setActiveAsset,
   resolveActiveAsset,
@@ -19,9 +18,7 @@ import {
   createAlbum,
   renameAlbum,
   deleteAlbum,
-} from "../../modules/assetGalleryEngine.js?v=5";
-import { getTrimSizeById } from "../../modules/canvasEngine.js?v=5";
-import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=5";
+} from "../../modules/assetGalleryEngine.js?v=6";
 
 let nextAssetId = 1;
 let activeBucketId = ASSET_CATEGORIES[0].id;
@@ -39,7 +36,6 @@ const el = {
   fileInput: document.getElementById("asset-file-input"),
   renameBtn: document.getElementById("rename-album-btn"),
   deleteBtn: document.getElementById("delete-album-btn"),
-  formatHint: document.getElementById("asset-format-hint"),
   grid: document.getElementById("asset-list"),
 };
 
@@ -90,6 +86,10 @@ function confirmNewAlbum() {
   setState({ customAlbums: albums });
 }
 
+// Unrestricted uploads: any image, any pixel size, into any bucket — no dimension
+// gate. Each bucket already holds an unlimited array of candidates (saveAsset just
+// appends); which one is actually embedded into the PDF is a separate, explicit
+// "In Use" choice via resolveActiveAsset, not a constraint on what can be uploaded.
 async function handleUpload() {
   const file = el.fileInput.files[0];
   if (!file) return;
@@ -97,26 +97,12 @@ async function handleUpload() {
   const dataUrl = await readFileAsDataUrl(file);
   const dims = await readImageDimensions(dataUrl);
 
-  const isRole = ASSET_CATEGORIES.some((c) => c.id === activeBucketId);
-  let compliant = true;
-  if (isRole) {
-    const trimSize = getTrimSizeById(state.trimSizeId);
-    const expectedCanvasDims = computeCanvasDimensions(trimSize, state.dpi, state.bleedEnabled);
-    const compliance = checkFormatCompliance({ widthPx: dims.width, heightPx: dims.height }, expectedCanvasDims);
-    compliant = compliance.ok;
-    el.formatHint.textContent = compliance.message;
-    el.formatHint.style.color = compliance.ok ? "#3ad19a" : "#fca5a5";
-  } else {
-    el.formatHint.textContent = "";
-  }
-
   const asset = {
     id: `asset-${nextAssetId++}`,
     name: file.name,
     dataUrl,
     widthPx: dims.width,
     heightPx: dims.height,
-    compliant,
   };
 
   const gallery = saveAsset(state.assetGallery, activeBucketId, asset);
@@ -200,10 +186,13 @@ function renderGrid(current) {
     item.className = "gallery-item" + (isActive ? " active-asset" : "");
     item.dataset.assetId = asset.id;
     item.innerHTML = `
-      ${isActive ? '<span class="active-tag">In Use</span>' : ""}
-      <img src="${asset.dataUrl}" alt="${asset.name}" />
-      <button type="button" class="remove-btn" title="Remove">×</button>
-      ${isRole ? `<button type="button" class="use-badge">${isActive ? "In Use — This Page" : "Use for This Page"}</button>` : ""}
+      <div class="gallery-item-thumb">
+        ${isActive ? '<span class="active-tag">In Use</span>' : ""}
+        <img src="${asset.dataUrl}" alt="${asset.name}" />
+        <button type="button" class="remove-btn" title="Remove">×</button>
+        ${isRole ? `<button type="button" class="use-badge">${isActive ? "In Use — This Page" : "Use for This Page"}</button>` : ""}
+      </div>
+      <span class="asset-dims">${asset.widthPx} × ${asset.heightPx} px</span>
     `;
 
     item.querySelector(".remove-btn").addEventListener("mousedown", (e) => e.stopPropagation());
@@ -213,14 +202,18 @@ function renderGrid(current) {
       setState({ assetGallery: gallery });
     });
 
-    const useBadge = item.querySelector(".use-badge");
-    if (useBadge) {
-      useBadge.addEventListener("mousedown", (e) => e.stopPropagation());
-      useBadge.addEventListener("click", (e) => {
+    // Click-to-select: clicking any image in a role bucket makes it the active "In
+    // Use" asset for that page, automatically taking the badge off whichever image
+    // held it before (there's only ever one active per bucket — see resolveActiveAsset).
+    if (isRole) {
+      const selectThisAsset = (e) => {
         e.stopPropagation();
         if (isActive) return;
         setState({ activeAssetByCategory: setActiveAsset(state.activeAssetByCategory, activeBucketId, asset.id) });
-      });
+      };
+      item.querySelector("img").addEventListener("click", selectThisAsset);
+      item.querySelector(".use-badge").addEventListener("mousedown", (e) => e.stopPropagation());
+      item.querySelector(".use-badge").addEventListener("click", selectThisAsset);
     }
 
     item.addEventListener("mousedown", (e) => startDrag(e, item, asset.id));
