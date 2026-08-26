@@ -7,6 +7,15 @@ requirement, and no restriction that would ever cause a KDP print-review
 rejection**. The full license text applies identically to every font below;
 only the copyright line differs per family.
 
+`Poppins-Regular.ttf` and `Poppins-Bold.ttf` are also the app's book-wide
+DEFAULT font — used for every page whose composition element is left on
+"Default" in the Font Library picker (title pages, copyright/instructions/
+etc. front-and-back matter, and any Title/Subtitle/Instruction/Color Key
+never explicitly assigned a different font). Every export therefore embeds
+a real font for 100% of its text, satisfying KDP's "every font must be
+embedded" requirement with no exceptions — see js/ui/pdfExport.js's
+embedBaseFonts.
+
 ## Fonts and their copyright holders
 
 | Font file | Family | Copyright |
@@ -15,7 +24,7 @@ only the copyright line differs per family.
 | `PressStart2P-Regular.ttf` | Press Start 2P | Copyright 2012 The Press Start 2P Project Authors (cody@zone38.net), with Reserved Font Name "Press Start 2P" |
 | `Anton-Regular.ttf` | Anton | Copyright 2020 The Anton Project Authors (https://github.com/googlefonts/AntonFont.git) |
 | `ArchivoBlack-Regular.ttf` | Archivo Black | Copyright 2017 The Archivo Black Project Authors (https://github.com/Omnibus-Type/ArchivoBlack) |
-| `Poppins-Bold.ttf` | Poppins | Copyright 2020 The Poppins Project Authors (https://github.com/itfoundry/Poppins) |
+| `Poppins-Regular.ttf`, `Poppins-Bold.ttf` | Poppins | Copyright 2020 The Poppins Project Authors (https://github.com/itfoundry/Poppins) |
 | `Oswald-Variable.ttf` | Oswald | Copyright 2016 The Oswald Project Authors (https://github.com/googlefonts/OswaldFont) |
 | `Inter-Variable.ttf` | Inter | Copyright 2020 The Inter Project Authors (https://github.com/rsms/inter) |
 | `PlayfairDisplay-Variable.ttf` | Playfair Display | Copyright 2017 The Playfair Display Project Authors (https://github.com/clauseggers/Playfair-Display), with Reserved Font Name "Playfair Display" |
