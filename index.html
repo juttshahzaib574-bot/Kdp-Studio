@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>KDP Studio</title>
-  <link rel="stylesheet" href="css/styles.css?v=7" />
+  <link rel="stylesheet" href="css/styles.css?v=8" />
 </head>
 <body>
   <header class="app-header">
@@ -339,11 +339,12 @@
             <h3 id="gallery-active-bucket-name">—</h3>
             <div class="gallery-main-actions">
               <button type="button" class="btn btn-secondary btn-small" id="asset-upload-btn">Upload Image</button>
-              <input type="file" id="asset-file-input" accept="image/*" hidden />
+              <input type="file" id="asset-file-input" accept="image/png,image/jpeg,image/webp" hidden />
               <button type="button" class="btn btn-secondary btn-small" id="rename-album-btn" hidden>Rename</button>
               <button type="button" class="btn btn-danger btn-small" id="delete-album-btn" hidden>Delete Album</button>
             </div>
           </div>
+          <p class="hint">Accepts PNG, JPG, WEBP — up to 30 MB per image. Any resolution is fine.</p>
           <div class="gallery-grid" id="asset-list"></div>
         </div>
       </div>
@@ -401,6 +402,14 @@
     </div>
   </dialog>
 
-  <script type="module" src="js/main.js?v=7"></script>
+  <dialog id="alert-dialog">
+    <h3 id="alert-dialog-title">⚠️ Something Went Wrong</h3>
+    <p id="alert-dialog-message"></p>
+    <div class="dialog-actions">
+      <button id="alert-dialog-ok-btn" type="button" class="btn btn-primary">OK</button>
+    </div>
+  </dialog>
+
+  <script type="module" src="js/main.js?v=8"></script>
 </body>
 </html>

@@ -4,7 +4,7 @@
 // page) and free-form user-created "albums" for organizing reference images before they're
 // assigned a role. Drag a thumbnail onto any bucket in the sidebar to move it there.
 
-import { state, setState, subscribe } from "../../state.js?v=7";
+import { state, setState, subscribe } from "../../state.js?v=8";
 import {
   ASSET_CATEGORIES,
   loadGallery,
@@ -18,7 +18,15 @@ import {
   createAlbum,
   renameAlbum,
   deleteAlbum,
-} from "../../modules/assetGalleryEngine.js?v=7";
+} from "../../modules/assetGalleryEngine.js?v=8";
+import { showAlert } from "../alertDialog.js?v=8";
+
+// KDP interiors only ever need raster photos/scans — these three cover essentially
+// every real image a creator would have on hand (phone photos, exports from Procreate/
+// Photoshop/Canva, scanned art).
+const MAX_UPLOAD_BYTES = 30 * 1024 * 1024;
+const ALLOWED_MIME_TYPES = ["image/png", "image/jpeg", "image/webp"];
+const ALLOWED_FORMATS_LABEL = "PNG, JPG, WEBP";
 
 let activeBucketId = ASSET_CATEGORIES[0].id;
 let dragAssetId = null;
@@ -38,8 +46,12 @@ const el = {
   grid: document.getElementById("asset-list"),
 };
 
-export function initGalleryPanel() {
-  setState({ assetGallery: loadGallery(), activeAssetByCategory: loadActiveAssetMap(), customAlbums: loadCustomAlbums() });
+export async function initGalleryPanel() {
+  // Gallery images live in IndexedDB (async) now; the active-asset map and custom
+  // albums are small JSON and stay on localStorage (sync) — see assetGalleryEngine.js.
+  setState({ activeAssetByCategory: loadActiveAssetMap(), customAlbums: loadCustomAlbums() });
+  const assetGallery = await loadGallery();
+  setState({ assetGallery });
 
   el.uploadBtn.addEventListener("click", () => el.fileInput.click());
   el.fileInput.addEventListener("change", handleUpload);
@@ -85,13 +97,33 @@ function confirmNewAlbum() {
   setState({ customAlbums: albums });
 }
 
-// Unrestricted uploads: any image, any pixel size, into any bucket — no dimension
-// gate. Each bucket already holds an unlimited array of candidates (saveAsset just
-// appends); which one is actually embedded into the PDF is a separate, explicit
-// "In Use" choice via resolveActiveAsset, not a constraint on what can be uploaded.
+function formatMegabytes(bytes) {
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+// Any pixel size/resolution is allowed (no dimension gate) — but format and file size
+// are validated up front with a clear popup on rejection, the way any professional
+// upload flow tells a user exactly what went wrong instead of silently doing nothing.
 async function handleUpload() {
   const file = el.fileInput.files[0];
   if (!file) return;
+  el.fileInput.value = ""; // reset immediately so re-selecting the same rejected file re-fires "change"
+
+  if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+    showAlert({
+      title: "Unsupported File Type",
+      message: `"${file.name}" is not a supported image format.\n\nSupported formats: ${ALLOWED_FORMATS_LABEL}.`,
+    });
+    return;
+  }
+
+  if (file.size > MAX_UPLOAD_BYTES) {
+    showAlert({
+      title: "File Too Large",
+      message: `"${file.name}" is ${formatMegabytes(file.size)}, which is over the ${formatMegabytes(MAX_UPLOAD_BYTES)} limit per image.\n\nTry a smaller export or a more compressed version of this file.`,
+    });
+    return;
+  }
 
   const dataUrl = await readFileAsDataUrl(file);
   const dims = await readImageDimensions(dataUrl);
@@ -99,7 +131,7 @@ async function handleUpload() {
   const asset = {
     // Globally unique and stable across reloads — a session-scoped counter starting
     // back at 1 every page load would eventually mint an id that collides with one
-    // already sitting in localStorage from an earlier session's uploads.
+    // already sitting in storage from an earlier session's uploads.
     id: `asset-${crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`}`,
     name: file.name,
     dataUrl,
@@ -107,9 +139,16 @@ async function handleUpload() {
     heightPx: dims.height,
   };
 
-  const gallery = saveAsset(state.assetGallery, activeBucketId, asset);
-  setState({ assetGallery: gallery });
-  el.fileInput.value = "";
+  try {
+    const gallery = await saveAsset(state.assetGallery, activeBucketId, asset);
+    setState({ assetGallery: gallery });
+  } catch (err) {
+    showAlert({
+      title: "Storage Full",
+      message: `This browser's local storage is full, so "${file.name}" couldn't be saved.\n\nTry removing some existing images from the gallery, or freeing up disk space on this device.`,
+    });
+    console.error("[Asset Gallery] Failed to save uploaded asset:", err);
+  }
 }
 
 function readFileAsDataUrl(file) {
@@ -198,9 +237,9 @@ function renderGrid(current) {
     `;
 
     item.querySelector(".remove-btn").addEventListener("mousedown", (e) => e.stopPropagation());
-    item.querySelector(".remove-btn").addEventListener("click", (e) => {
+    item.querySelector(".remove-btn").addEventListener("click", async (e) => {
       e.stopPropagation();
-      const gallery = removeAsset(state.assetGallery, activeBucketId, asset.id);
+      const gallery = await removeAsset(state.assetGallery, activeBucketId, asset.id);
       setState({ assetGallery: gallery });
     });
 
@@ -247,8 +286,8 @@ function startDrag(e, item, assetId) {
   document.addEventListener("mouseup", onUp, { once: true });
 }
 
-function dropOnBucket(toBucketId) {
+async function dropOnBucket(toBucketId) {
   if (!dragAssetId || toBucketId === activeBucketId) return;
-  const gallery = moveAsset(state.assetGallery, activeBucketId, toBucketId, dragAssetId);
+  const gallery = await moveAsset(state.assetGallery, activeBucketId, toBucketId, dragAssetId);
   setState({ assetGallery: gallery });
 }
