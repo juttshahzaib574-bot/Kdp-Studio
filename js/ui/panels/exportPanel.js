@@ -1,7 +1,7 @@
-import { state, setState, subscribe } from "../../state.js?v=32";
-import { exportInteriorPdf, downloadPdf } from "../pdfExport.js?v=32";
-import { isPageEnabled, togglePage, orderedFrontMatterPages, orderedBackMatterPages, reorderPage } from "../../modules/frontBackMatterEngine.js?v=32";
-import { DRAG_HANDLE_ICON, attachDragHandle } from "../dragReorderList.js?v=32";
+import { state, setState, subscribe } from "../../state.js?v=33";
+import { exportInteriorPdf, downloadPdf } from "../pdfExport.js?v=33";
+import { isPageEnabled, togglePage, orderedFrontMatterPages, orderedBackMatterPages, reorderPage } from "../../modules/frontBackMatterEngine.js?v=33";
+import { DRAG_HANDLE_ICON, attachDragHandle } from "../dragReorderList.js?v=33";
 
 const el = {
   frontMatterList: document.getElementById("front-matter-page-list"),
@@ -87,11 +87,15 @@ async function handleExport() {
 
     const filename = `${(state.bookTitle || "kdp-studio-interior").replace(/[^a-z0-9-]+/gi, "-")}.pdf`;
     downloadPdf(bytes, filename);
+    el.progressFill.style.width = "100%";
     el.progressLabel.textContent = `Done — ${filename} downloaded.`;
   } catch (err) {
     el.progressLabel.textContent = `Export failed: ${err.message}`;
   } finally {
     el.exportBtn.disabled = false;
+    setTimeout(() => {
+      el.progress.hidden = true;
+    }, 1200);
   }
 }
 
