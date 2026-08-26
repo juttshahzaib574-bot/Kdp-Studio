@@ -77,13 +77,3 @@ export function nearestPaletteColor(rgb, palette) {
   });
   return bestIndex;
 }
-
-// One strict-nearest-neighbor palette index per sampled cell color. Deliberately NOT
-// reassigning a cell to its 2nd-closest match just because an earlier cell already
-// claimed the true nearest one — a color-by-number page is supposed to have many
-// cells share the same number; that reassignment used to shove every cell after the
-// first one that wanted a given color onto a progressively worse, sometimes visually
-// unrelated, palette entry.
-export function assignDistinctShades(cellColors, palette) {
-  return cellColors.map((rgb) => nearestPaletteColor(rgb, palette));
-}
