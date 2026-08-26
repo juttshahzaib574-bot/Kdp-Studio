@@ -848,6 +848,12 @@ async function renderActiveItemFullPage(state, mode) {
   const { cellSizeMm: effectiveCellSizeMm, gridOverride } = resolveEffectiveGrid(safeZone, state.cellSizeMm, effective.gridPattern, comp, state.resolutionPriority);
   const contentBlack = isContentPageBlack(state.pageBackgroundMode);
   const blackWhiteEdition = isBlackWhiteEdition(state.bookColorMode);
+  // The "solved" render is a creator-facing proofing/reference image, not itself a page
+  // in the exported interior PDF (unlike the Solutions back-matter thumbnails, which do
+  // respect the edition) — so it always shows the artwork's TRUE colors, regardless of
+  // the book's own Black & White setting. "print" mode still respects it: that download
+  // is a literal proof of the actual exported page, key styling included.
+  const cellsBlackWhite = mode === "solved" ? false : blackWhiteEdition;
 
   const canvas = document.createElement("canvas");
   canvas.width = canvasDims.widthPx;
@@ -869,7 +875,7 @@ async function renderActiveItemFullPage(state, mode) {
     mode,
     gridCornerTrim: state.gridCornerTrim,
     gridPageBlack: contentBlack,
-    blackWhiteEdition,
+    blackWhiteEdition: cellsBlackWhite,
   });
 
   const geom = { canvasDims, safeZone, pageSide: state.pageSide, pageHeightPt };
