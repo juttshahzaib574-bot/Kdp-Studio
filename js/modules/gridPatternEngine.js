@@ -67,23 +67,61 @@ export function cellCenterIn(patternId, col, row, cellSizeIn) {
   return { x: col * cellSizeIn + cellSizeIn / 2, y: row * cellSizeIn + cellSizeIn / 2 };
 }
 
-// Grid Silhouette Trim: cuts a quarter-circle of cells from each of the four grid
-// corners (a rounded-rectangle mask over the cell grid) so a dense grid reads as a
-// deliberately shaped sheet instead of one continuous, perfectly-repeating rectangle —
-// the same visual trick that makes Amazon's own reference sheets feel less monotonous
-// than a raw uniform array of boxes. Off by default; opt-in per Section 3's grid setup.
-export function cornerTrimRadiusCells(cols, rows) {
-  return Math.max(2, Math.round(Math.min(cols, rows) * 0.12));
+// Grid Silhouette Trim: cuts cells from a chosen subset of the four grid corners so a
+// dense grid reads as a deliberately shaped sheet instead of one continuous, perfectly-
+// repeating rectangle. Complete control over WHICH corners (any combination of the 4,
+// not just all-or-nothing), HOW MUCH (size, as a % of the grid's shorter side), and
+// WHAT SHAPE the cut takes. Off by default (empty corner list) — opt-in per Section 3's
+// grid setup.
+export const CORNER_TRIM_CORNERS = [
+  { id: "top-left", label: "Top-Left", glyph: "◤" },
+  { id: "top-right", label: "Top-Right", glyph: "◥" },
+  { id: "bottom-left", label: "Bottom-Left", glyph: "◣" },
+  { id: "bottom-right", label: "Bottom-Right", glyph: "◢" },
+];
+
+export const CORNER_TRIM_SHAPES = [
+  { id: "rounded", label: "Rounded", note: "A smooth quarter-circle arc." },
+  { id: "diagonal", label: "Diagonal", note: "A straight 45° chamfer cut." },
+  { id: "notch", label: "Notch", note: "A hard, blocky square cutout." },
+];
+
+export const CORNER_TRIM_SIZE_MIN_PERCENT = 4;
+export const CORNER_TRIM_SIZE_MAX_PERCENT = 30;
+export const CORNER_TRIM_SIZE_DEFAULT_PERCENT = 12;
+
+export function cornerTrimRadiusCells(cols, rows, sizePercent = CORNER_TRIM_SIZE_DEFAULT_PERCENT) {
+  return Math.max(1, Math.round(Math.min(cols, rows) * (sizePercent / 100)));
 }
 
-export function isCellInGridSilhouette(col, row, cols, rows) {
-  const r = cornerTrimRadiusCells(cols, rows);
-  const cx = col < r ? r : col >= cols - r ? cols - r - 1 : null;
-  const cy = row < r ? r : row >= rows - r ? rows - r - 1 : null;
-  if (cx === null || cy === null) return true; // not inside a corner box — always kept
-  const dx = col - cx;
-  const dy = row - cy;
-  return dx * dx + dy * dy <= r * r;
+// corners: array of CORNER_TRIM_CORNERS ids to actually cut — any subset, including
+// just one, or all four. shape: which of CORNER_TRIM_SHAPES to cut with.
+export function isCellInGridSilhouette(col, row, cols, rows, corners = [], shape = "rounded", sizePercent = CORNER_TRIM_SIZE_DEFAULT_PERCENT) {
+  if (!corners || corners.length === 0) return true;
+  const r = cornerTrimRadiusCells(cols, rows, sizePercent);
+  if (r <= 0) return true;
+
+  const isTop = row < r;
+  const isBottom = row >= rows - r;
+  const isLeft = col < r;
+  const isRight = col >= cols - r;
+
+  const cornerId = isTop && isLeft ? "top-left" : isTop && isRight ? "top-right" : isBottom && isLeft ? "bottom-left" : isBottom && isRight ? "bottom-right" : null;
+  if (!cornerId || !corners.includes(cornerId)) return true; // outside every active corner box
+
+  // Local coordinates: 0 = the cell touching the true page corner, r-1 = the cell
+  // furthest into the box (closest to the grid's interior) — shared by all 3 shapes.
+  const localCol = isLeft ? col : cols - 1 - col;
+  const localRow = isTop ? row : rows - 1 - row;
+
+  if (shape === "notch") return false; // the entire r×r box is cut — a hard square notch
+  if (shape === "diagonal") return localCol + localRow >= r - 1; // straight 45° chamfer
+
+  // rounded (default): quarter-circle arc, pivoted at the box's innermost cell.
+  const d = r - 1;
+  const dx = localCol - d;
+  const dy = localRow - d;
+  return dx * dx + dy * dy <= d * d;
 }
 
 // Polygon points (relative to the cell center, in inches) used to draw/clip a cell.

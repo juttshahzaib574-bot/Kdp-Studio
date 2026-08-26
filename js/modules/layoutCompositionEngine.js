@@ -8,7 +8,7 @@
 // key onto the grid and the grid shrinks; push it to the blank page and the grid
 // reclaims the space.
 
-import { KEY_STRIP_HEIGHT_RATIO } from "./layoutEngine.js?v=30";
+import { KEY_STRIP_HEIGHT_RATIO } from "./layoutEngine.js?v=31";
 
 export const LAYOUT_ELEMENT_IDS = ["title", "subtitle", "instruction", "colorKey"];
 

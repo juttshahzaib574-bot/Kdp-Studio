@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>KDP Studio</title>
-  <link rel="stylesheet" href="css/styles.css?v=30" />
+  <link rel="stylesheet" href="css/styles.css?v=31" />
 </head>
 <body>
   <header class="app-header">
@@ -153,14 +153,22 @@
           <div class="stat"><div class="stat-value" id="stat-out-px">—</div><div class="stat-label">Output PX</div></div>
         </div>
 
-        <div class="toggle-row">
-          <label class="switch">
-            <input type="checkbox" id="grid-corner-trim-toggle" />
-            <span class="slider-track"></span>
-          </label>
-          <div>
-            <strong>Trim Grid Corners</strong>
-            <p class="hint">Cuts a rounded notch of cells from each of the four grid corners so the sheet reads as a deliberately shaped mosaic instead of one uniform rectangle of boxes.</p>
+        <div class="field-group">
+          <label>Grid Corner Trim <span class="lock-note">— pick any corners, none required</span></label>
+          <div class="corner-trim-picker" id="corner-trim-picker"></div>
+          <p class="hint">Click a corner to cut it, click again to leave it square. Any combination — just one, two opposite corners, or all four.</p>
+        </div>
+
+        <div class="field-group" id="corner-trim-detail-group">
+          <label>Trim Shape</label>
+          <div class="option-list" id="corner-trim-shape-options"></div>
+        </div>
+
+        <div class="field-group" id="corner-trim-size-group">
+          <label for="corner-trim-size-slider">Trim Size <span class="lock-note">(% of the grid's shorter side)</span></label>
+          <div class="dpi-control">
+            <input type="range" id="corner-trim-size-slider" min="4" max="30" step="1" value="12" />
+            <input type="number" id="corner-trim-size-input" min="4" max="30" step="1" value="12" />
           </div>
         </div>
 
@@ -457,6 +465,6 @@
        module scripts below — pdfExport.js needs window.fontkit already set when it
        calls doc.registerFontkit() to embed the custom fonts in js/vendor/fonts/. -->
   <script src="js/vendor/fontkit.umd.min.js"></script>
-  <script type="module" src="js/main.js?v=30"></script>
+  <script type="module" src="js/main.js?v=31"></script>
 </body>
 </html>
