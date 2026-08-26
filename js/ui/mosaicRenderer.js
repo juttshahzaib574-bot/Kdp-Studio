@@ -6,12 +6,13 @@
 //   - renderFullMosaicGrid: the entire safe-zone grid at the real chosen print DPI,
 //     used to generate the actual page image embedded into the exported PDF.
 
-import { computeFrameGeometry, drawFrame } from "./preview.js?v=18";
-import { computeGridDimensions, cellCenterIn, cellPolygonIn, mmToIn, isCellInGridSilhouette } from "../modules/gridPatternEngine.js?v=18";
-import { recommendFont, recommendTextTint, adjustForBorderWeight, centerOffsetIn, letterSpacingForLabel } from "../modules/typographyEngine.js?v=18";
-import { gridColorFromTint } from "../modules/borderStyleEngine.js?v=18";
-import { cornerRadiusIn, isFullCircle } from "../modules/cornerRadiusEngine.js?v=18";
-import { computeLayout, LAYOUT_ELEMENTS } from "../modules/layoutCompositionEngine.js?v=18";
+import { computeFrameGeometry, drawFrame } from "./preview.js?v=19";
+import { computeGridDimensions, cellCenterIn, cellPolygonIn, mmToIn, isCellInGridSilhouette } from "../modules/gridPatternEngine.js?v=19";
+import { recommendFont, recommendTextTint, adjustForBorderWeight, centerOffsetIn, letterSpacingForLabel } from "../modules/typographyEngine.js?v=19";
+import { gridColorFromTint } from "../modules/borderStyleEngine.js?v=19";
+import { cornerRadiusIn, isFullCircle } from "../modules/cornerRadiusEngine.js?v=19";
+import { nearestPaletteColor } from "../modules/shadeQuantizationEngine.js?v=19";
+import { computeLayout, LAYOUT_ELEMENTS } from "../modules/layoutCompositionEngine.js?v=19";
 
 const PT_TO_IN = 1 / 72;
 
@@ -98,29 +99,6 @@ function mulberry32(seed) {
 }
 
 const rgbDistance = (a, b) => Math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2);
-
-const NAMED_COLORS = [
-  ["Black", 0, 0, 0], ["White", 255, 255, 255], ["Gray", 128, 128, 128], ["Dark Gray", 70, 70, 70],
-  ["Light Gray", 205, 205, 205], ["Red", 225, 45, 40], ["Dark Red", 140, 20, 20], ["Orange", 240, 145, 45],
-  ["Brown", 145, 85, 45], ["Dark Brown", 80, 50, 25], ["Tan", 212, 170, 110], ["Beige", 235, 222, 195],
-  ["Cream", 250, 242, 218], ["Yellow", 245, 220, 85], ["Gold", 212, 170, 60], ["Green", 60, 140, 70],
-  ["Dark Green", 25, 90, 45], ["Light Green", 150, 200, 140], ["Teal", 60, 150, 140], ["Olive", 120, 120, 50],
-  ["Blue", 50, 100, 200], ["Light Blue", 160, 200, 230], ["Navy", 25, 35, 85], ["Purple", 130, 80, 170],
-  ["Pink", 240, 160, 180], ["Peach", 250, 200, 160],
-];
-
-function nameForColor(r, g, b) {
-  let best = "Color";
-  let bestDist = Infinity;
-  NAMED_COLORS.forEach(([name, nr, ng, nb]) => {
-    const d = (r - nr) ** 2 + (g - ng) ** 2 + (b - nb) ** 2;
-    if (d < bestDist) {
-      bestDist = d;
-      best = name;
-    }
-  });
-  return best;
-}
 
 // Crop to the grid's own aspect ratio (never a stretch), then downscale directly to
 // cols*8 x rows*8 with NEAREST-NEIGHBOR (no smoothing) — matches the reference tool
@@ -269,7 +247,8 @@ function kmeansSeeded(data, k, iters) {
 // invented average). Returns per-cell palette indices AND the discovered legend
 // itself, since — unlike a fixed palette — this palette is different every time and
 // the caller needs it to draw a matching color key.
-function quantizeGridCells(sourceCanvas, cols, rows, targetAspect, colorCount) {
+function quantizeGridCells(sourceCanvas, cols, rows, targetAspect, palette) {
+  const colorCount = palette.length;
   const cells = sampleGridCellsNearestNeighbor(sourceCanvas, cols, rows, targetAspect);
   const edges = detectOutlineCells(cells, cols, rows);
 
@@ -384,27 +363,23 @@ function quantizeGridCells(sourceCanvas, cols, rows, targetAspect, colorCount) {
   keptIndexes.forEach((oldIndex, newIndex) => remap.set(oldIndex, newIndex));
   const remappedLabels = cellLabels.map((l) => remap.get(l) ?? 0);
 
-  const legendEntries = finalColors.map((color) => ({ color }));
-  const outlineEntry = legendEntries[0];
-  const restSorted = legendEntries
-    .slice(1)
-    .sort(
-      (a, b) =>
-        0.299 * a.color[0] + 0.587 * a.color[1] + 0.114 * a.color[2] - (0.299 * b.color[0] + 0.587 * b.color[1] + 0.114 * b.color[2])
-    );
-  const sortedLegend = [outlineEntry, ...restSorted];
+  // The K-means/edge-detection above decides WHICH pixels group together and how
+  // much real detail survives — that's the technique being reused. What each group
+  // is actually CALLED and PRINTED comes only from our own fixed Universal palette:
+  // every discovered color (including the outline black) gets snapped to its nearest
+  // entry by true perceptual distance (LAB Delta E), never left as a raw discovered
+  // RGB or a generic reference name. Two discovered clusters that snap to the SAME
+  // palette entry are merged onto one shared legend slot — the same real color never
+  // gets printed under two different numbers.
+  const paletteIndexForColor = finalColors.map((color) => nearestPaletteColor({ r: color[0], g: color[1], b: color[2] }, palette));
+  const uniquePaletteIndexes = [...new Set(paletteIndexForColor)].sort((a, b) => a - b);
+  const legendSlotForPaletteIndex = new Map(uniquePaletteIndexes.map((paletteIndex, slot) => [paletteIndex, slot]));
 
-  const finalOrderMap = new Map();
-  sortedLegend.forEach((entry, newIndex) => {
-    const oldIndex = finalColors.findIndex((c) => c[0] === entry.color[0] && c[1] === entry.color[1] && c[2] === entry.color[2]);
-    finalOrderMap.set(oldIndex, newIndex);
-  });
-  const assignments = remappedLabels.map((l) => finalOrderMap.get(l) ?? 0);
+  const assignments = remappedLabels.map((clusterSlot) => legendSlotForPaletteIndex.get(paletteIndexForColor[clusterSlot]));
 
-  const legend = sortedLegend.map(({ color }) => {
-    const clamped = color.map((v) => Math.max(0, Math.min(255, Math.round(v))));
-    const hex = `#${clamped.map((v) => v.toString(16).padStart(2, "0")).join("")}`;
-    return { hex, rgb: { r: clamped[0], g: clamped[1], b: clamped[2] }, name: nameForColor(...clamped) };
+  const legend = uniquePaletteIndexes.map((paletteIndex) => {
+    const entry = palette[paletteIndex];
+    return { hex: entry.hex, rgb: entry.rgb, name: entry.name };
   });
 
   return { assignments, legend };
@@ -615,7 +590,7 @@ export function renderMosaicPreview(canvas, opts) {
   const regionWpx = gridZone.widthIn * ppi;
   const regionHpx = gridZone.heightIn * ppi;
 
-  const { assignments, legend } = quantizeGridCells(sourceCanvas, fullGrid.cols, fullGrid.rows, gridZone.widthIn / gridZone.heightIn, palette.length);
+  const { assignments, legend } = quantizeGridCells(sourceCanvas, fullGrid.cols, fullGrid.rows, gridZone.widthIn / gridZone.heightIn, palette);
 
   // Below this cell size a number is unreadable anyway, so cells fall back to a flat
   // fillRect (see drawCell's lowDetail branch) — keeps a dense grid's live preview
@@ -688,7 +663,7 @@ export function renderFullMosaicGrid(canvas, opts) {
   const originYPx = safeYIn * dpi;
 
   const cellSizePx = fullGrid.cellSizeIn * dpi;
-  const { assignments, legend } = quantizeGridCells(sourceCanvas, fullGrid.cols, fullGrid.rows, gridZone.widthIn / gridZone.heightIn, palette.length);
+  const { assignments, legend } = quantizeGridCells(sourceCanvas, fullGrid.cols, fullGrid.rows, gridZone.widthIn / gridZone.heightIn, palette);
 
   let index = 0;
   for (let row = 0; row < fullGrid.rows; row += 1) {

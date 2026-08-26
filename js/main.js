@@ -1,13 +1,13 @@
-import { initApp } from "./ui/app.js?v=18";
-import { initGridBorderPanel } from "./ui/panels/gridBorderPanel.js?v=18";
-import { initLayoutResolutionPanel } from "./ui/panels/layoutResolutionPanel.js?v=18";
-import { initLayoutComposerPanel } from "./ui/panels/layoutComposerPanel.js?v=18";
-import { initColorKeyPanel } from "./ui/panels/colorKeyPanel.js?v=18";
-import { initBatchStoryboardPanel } from "./ui/panels/batchStoryboardPanel.js?v=18";
-import { initGalleryPanel } from "./ui/panels/galleryPanel.js?v=18";
-import { initPreviewGalleryPanel } from "./ui/panels/previewGalleryPanel.js?v=18";
-import { initExportPanel } from "./ui/panels/exportPanel.js?v=18";
-import { initPdfPreviewPanel } from "./ui/panels/pdfPreviewPanel.js?v=18";
+import { initApp } from "./ui/app.js?v=19";
+import { initGridBorderPanel } from "./ui/panels/gridBorderPanel.js?v=19";
+import { initLayoutResolutionPanel } from "./ui/panels/layoutResolutionPanel.js?v=19";
+import { initLayoutComposerPanel } from "./ui/panels/layoutComposerPanel.js?v=19";
+import { initColorKeyPanel } from "./ui/panels/colorKeyPanel.js?v=19";
+import { initBatchStoryboardPanel } from "./ui/panels/batchStoryboardPanel.js?v=19";
+import { initGalleryPanel } from "./ui/panels/galleryPanel.js?v=19";
+import { initPreviewGalleryPanel } from "./ui/panels/previewGalleryPanel.js?v=19";
+import { initExportPanel } from "./ui/panels/exportPanel.js?v=19";
+import { initPdfPreviewPanel } from "./ui/panels/pdfPreviewPanel.js?v=19";
 
 // Each panel's init runs in isolation: a single missing/mismatched DOM element in
 // one panel (e.g. a stale-cached module paired with fresh HTML, or vice versa) throws
