@@ -1,16 +1,16 @@
 // Module: Stacked Live Preview Gallery + Live Preview Carousel
-import { state, setState, subscribe } from "../../state.js?v=31";
-import { getTrimSizeById } from "../../modules/canvasEngine.js?v=31";
-import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=31";
-import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=31";
-import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=31";
-import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=31";
-import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=31";
-import { normalizeComposition } from "../../modules/layoutCompositionEngine.js?v=31";
-import { getPlaceholderSource, loadImageSource, drawSourceToCanvas, renderMosaicPreview } from "../mosaicRenderer.js?v=31";
-import { createCarouselController } from "../../modules/previewLoopEngine.js?v=31";
-import { downloadActiveItemPng, downloadActiveItemPdf } from "../pdfExport.js?v=31";
-import { isContentPageBlack } from "../../modules/bookThemeEngine.js?v=31";
+import { state, setState, subscribe } from "../../state.js?v=32";
+import { getTrimSizeById } from "../../modules/canvasEngine.js?v=32";
+import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=32";
+import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=32";
+import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=32";
+import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=32";
+import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=32";
+import { normalizeComposition } from "../../modules/layoutCompositionEngine.js?v=32";
+import { getPlaceholderSource, loadImageSource, drawSourceToCanvas, renderMosaicPreview } from "../mosaicRenderer.js?v=32";
+import { createCarouselController } from "../../modules/previewLoopEngine.js?v=32";
+import { downloadActiveItemPng, downloadActiveItemPdf } from "../pdfExport.js?v=32";
+import { isContentPageBlack } from "../../modules/bookThemeEngine.js?v=32";
 
 const el = {
   printCanvas: document.getElementById("preview-canvas-print"),
@@ -124,7 +124,16 @@ function wireDownloadButton(button, action) {
 function resolveActiveSettings(current, globalPalette) {
   const activeItem = current.batchItems.find((item) => item.id === current.activeBatchItemId);
   if (!activeItem) {
-    return { gridPattern: current.gridPattern, borderWeightPt: current.borderWeightPt, gridTintPercent: current.gridTintPercent, cornerRadiusPercent: current.cornerRadiusPercent, palette: globalPalette };
+    return {
+      gridPattern: current.gridPattern,
+      borderWeightPt: current.borderWeightPt,
+      gridTintPercent: current.gridTintPercent,
+      cornerRadiusPercent: current.cornerRadiusPercent,
+      palette: globalPalette,
+      cornerTrimCorners: current.gridCornerTrimCorners,
+      cornerTrimShape: current.gridCornerTrimShape,
+      cornerTrimSizePercent: current.gridCornerTrimSizePercent,
+    };
   }
 
   const gridPattern = activeItem.settings.gridPattern ?? current.gridPattern;
@@ -137,8 +146,11 @@ function resolveActiveSettings(current, globalPalette) {
   }
   const cornerRadiusPercent = activeItem.settings.cornerRadiusPercent ?? current.cornerRadiusPercent;
   const palette = activeItem.settings.colorSetOverride ? buildCombinedPalette([activeItem.settings.colorSetOverride]) : globalPalette;
+  const cornerTrimCorners = activeItem.settings.cornerTrimCorners ?? current.gridCornerTrimCorners;
+  const cornerTrimShape = activeItem.settings.cornerTrimShape ?? current.gridCornerTrimShape;
+  const cornerTrimSizePercent = activeItem.settings.cornerTrimSizePercent ?? current.gridCornerTrimSizePercent;
 
-  return { gridPattern, borderWeightPt, gridTintPercent, cornerRadiusPercent, palette };
+  return { gridPattern, borderWeightPt, gridTintPercent, cornerRadiusPercent, palette, cornerTrimCorners, cornerTrimShape, cornerTrimSizePercent };
 }
 
 // Renders automatically for whatever's currently active — no manual step. With nothing
@@ -184,9 +196,9 @@ async function render(current) {
     cornerRadiusPercent: effective.cornerRadiusPercent,
     palette: effective.palette,
     sourceCanvas,
-    cornerTrimCorners: current.gridCornerTrimCorners,
-    cornerTrimShape: current.gridCornerTrimShape,
-    cornerTrimSizePercent: current.gridCornerTrimSizePercent,
+    cornerTrimCorners: effective.cornerTrimCorners,
+    cornerTrimShape: effective.cornerTrimShape,
+    cornerTrimSizePercent: effective.cornerTrimSizePercent,
     gridPageBlack: isContentPageBlack(current.pageBackgroundMode),
     // Deliberately NOT threading the Black & White book edition through here: this
     // Solved State panel exists to show the creator the artwork's TRUE colors as a

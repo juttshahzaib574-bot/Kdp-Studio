@@ -1,13 +1,22 @@
-import { state, setState, subscribe } from "../../state.js?v=31";
-import { MAX_BATCH_SIZE, addToBatch, removeFromBatch, updateItemSettings } from "../../modules/batchEngine.js?v=31";
-import { reorder, computePagination, statusBadges } from "../../modules/storyboardEngine.js?v=31";
-import { computeSolutionPageCount } from "../../modules/solutionGenerationEngine.js?v=31";
-import { GRID_PATTERNS } from "../../modules/gridPatternEngine.js?v=31";
-import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=31";
-import { computeFrontMatterPageCount } from "../../modules/frontBackMatterEngine.js?v=31";
+import { state, setState, subscribe } from "../../state.js?v=32";
+import { MAX_BATCH_SIZE, addToBatch, removeFromBatch, updateItemSettings } from "../../modules/batchEngine.js?v=32";
+import { reorder, computePagination, statusBadges } from "../../modules/storyboardEngine.js?v=32";
+import { computeSolutionPageCount } from "../../modules/solutionGenerationEngine.js?v=32";
+import { GRID_PATTERNS, CORNER_TRIM_CORNERS, CORNER_TRIM_SHAPES, CORNER_TRIM_SIZE_MIN_PERCENT, CORNER_TRIM_SIZE_MAX_PERCENT } from "../../modules/gridPatternEngine.js?v=32";
+import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=32";
+import { computeFrontMatterPageCount } from "../../modules/frontBackMatterEngine.js?v=32";
 
 const CORNER_RADIUS_CHOICES = [0, 25, 50, 75, 100];
 const COLOR_SET_CHOICES = [12, 24, 36];
+
+// Bulk-apply presets for Cell Shape Sequence: assigns every queued image a gridPattern
+// override by cycling this list in storyboard order (index % pattern.length) — "one
+// image square, then honeycomb, then square again" is exactly index % 2 on
+// ["square", "hexagon"]; the 3-shape rotation is the same idea with one more entry.
+const CELL_SHAPE_SEQUENCES = [
+  { id: "square-honeycomb", label: "Square ↔ Honeycomb", note: "Alternates every image: square, honeycomb, square, honeycomb…", pattern: ["square", "hexagon"] },
+  { id: "square-honeycomb-diamond", label: "Square → Honeycomb → Diamond", note: "Rotates every image through all three, then repeats.", pattern: ["square", "hexagon", "diamond"] },
+];
 
 const el = {
   fileInput: document.getElementById("batch-file-input"),
@@ -15,6 +24,8 @@ const el = {
   grid: document.getElementById("storyboard-grid"),
   perPageSelect: document.getElementById("solution-per-page-select"),
   summaryHint: document.getElementById("solution-summary-hint"),
+  cellShapeSequenceOptions: document.getElementById("cell-shape-sequence-options"),
+  randomizeColorSetsBtn: document.getElementById("randomize-color-sets-btn"),
 };
 
 // Manual mouse-based drag (not native HTML5 draggable, and not Pointer Events +
@@ -30,9 +41,43 @@ let dragState = null; // { fromId, hoverId }
 export function initBatchStoryboardPanel() {
   el.fileInput.addEventListener("change", handleFileInput);
   el.perPageSelect.addEventListener("change", () => setState({ solutionThumbsPerPage: Number(el.perPageSelect.value) }));
+  renderCellShapeSequenceOptions();
+  el.randomizeColorSetsBtn.addEventListener("click", randomizeColorSetsForEveryImage);
 
   subscribe(render);
   render(state);
+}
+
+function renderCellShapeSequenceOptions() {
+  el.cellShapeSequenceOptions.innerHTML = "";
+  CELL_SHAPE_SEQUENCES.forEach((seq) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "option-item";
+    btn.innerHTML = `<strong>${seq.label}</strong><span class="size-note">${seq.note}</span>`;
+    btn.addEventListener("click", () => applyCellShapeSequence(seq));
+    el.cellShapeSequenceOptions.appendChild(btn);
+  });
+}
+
+// A one-shot bulk apply, not a persisted "mode" — same pattern as the Border Style
+// presets (Seamless Realism / Midnight Marker): it sets each image's own gridPattern
+// override right now, in current storyboard order, and every image stays individually
+// adjustable afterward via its own ⚙ drawer.
+function applyCellShapeSequence(seq) {
+  const batch = state.batchItems.map((item, index) => ({
+    ...item,
+    settings: { ...item.settings, gridPattern: seq.pattern[index % seq.pattern.length] },
+  }));
+  setState({ batchItems: batch });
+}
+
+function randomizeColorSetsForEveryImage() {
+  const batch = state.batchItems.map((item) => ({
+    ...item,
+    settings: { ...item.settings, colorSetOverride: COLOR_SET_CHOICES[Math.floor(Math.random() * COLOR_SET_CHOICES.length)] },
+  }));
+  setState({ batchItems: batch });
 }
 
 function handleFileInput() {
@@ -151,6 +196,23 @@ function buildSettingsDrawer(item, current) {
         ${backgroundAssets.map((a) => `<option value="${a.id}">${a.name}</option>`).join("")}
       </select>
     </div>
+    <div class="drawer-field corner-trim-drawer-field">
+      <label>Grid Corner Trim</label>
+      <label class="drawer-toggle-label">
+        <input type="checkbox" data-role="corner-trim-override-toggle" />
+        Override for this image
+      </label>
+      <div class="corner-trim-drawer-detail" data-role="corner-trim-detail" hidden>
+        <div class="corner-trim-picker corner-trim-picker-mini" data-role="item-corner-picker"></div>
+        <select data-role="item-corner-shape">
+          ${CORNER_TRIM_SHAPES.map((s) => `<option value="${s.id}">${s.label}</option>`).join("")}
+        </select>
+        <div class="dpi-control">
+          <input type="range" data-role="item-corner-size-slider" min="${CORNER_TRIM_SIZE_MIN_PERCENT}" max="${CORNER_TRIM_SIZE_MAX_PERCENT}" step="1" />
+          <input type="number" data-role="item-corner-size-input" min="${CORNER_TRIM_SIZE_MIN_PERCENT}" max="${CORNER_TRIM_SIZE_MAX_PERCENT}" step="1" />
+        </div>
+      </div>
+    </div>
     <button type="button" class="btn btn-secondary drawer-close">Done</button>
   `;
 
@@ -170,9 +232,75 @@ function buildSettingsDrawer(item, current) {
     });
   });
 
+  wireCornerTrimDrawerField(drawer, item, current);
+
   drawer.querySelector(".drawer-close").addEventListener("click", () => setState({ expandedSettingsItemId: null }));
 
   return drawer;
+}
+
+// The corner-trim override is 3 related fields at once (which corners, shape, size),
+// gated behind one "Override for this image" checkbox — distinct enough from the
+// generic single-select drawer fields above to wire up on its own. Unchecking always
+// resets all three back to null (inherit the book-wide default), never leaves a stale
+// half-set override behind.
+function wireCornerTrimDrawerField(drawer, item, current) {
+  const toggle = drawer.querySelector('[data-role="corner-trim-override-toggle"]');
+  const detail = drawer.querySelector('[data-role="corner-trim-detail"]');
+  const picker = drawer.querySelector('[data-role="item-corner-picker"]');
+  const shapeSelect = drawer.querySelector('[data-role="item-corner-shape"]');
+  const sizeSlider = drawer.querySelector('[data-role="item-corner-size-slider"]');
+  const sizeInput = drawer.querySelector('[data-role="item-corner-size-input"]');
+
+  const overriding = item.settings.cornerTrimCorners !== null;
+  toggle.checked = overriding;
+  detail.hidden = !overriding;
+
+  const activeCorners = item.settings.cornerTrimCorners ?? [];
+  const activeShape = item.settings.cornerTrimShape ?? current.gridCornerTrimShape;
+  const activeSize = item.settings.cornerTrimSizePercent ?? current.gridCornerTrimSizePercent;
+
+  picker.innerHTML = "";
+  CORNER_TRIM_CORNERS.forEach((corner) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "corner-trim-btn";
+    btn.dataset.corner = corner.id;
+    btn.title = corner.label;
+    btn.textContent = corner.glyph;
+    btn.classList.toggle("active", activeCorners.includes(corner.id));
+    btn.addEventListener("click", () => {
+      const next = activeCorners.includes(corner.id) ? activeCorners.filter((id) => id !== corner.id) : [...activeCorners, corner.id];
+      const batch = updateItemSettings(state.batchItems, item.id, { cornerTrimCorners: next });
+      setState({ batchItems: batch });
+    });
+    picker.appendChild(btn);
+  });
+
+  shapeSelect.value = activeShape;
+  shapeSelect.addEventListener("change", () => {
+    const batch = updateItemSettings(state.batchItems, item.id, { cornerTrimShape: shapeSelect.value });
+    setState({ batchItems: batch });
+  });
+
+  sizeSlider.value = String(activeSize);
+  sizeInput.value = String(activeSize);
+  const commitSize = (pct) => {
+    const clamped = Math.min(CORNER_TRIM_SIZE_MAX_PERCENT, Math.max(CORNER_TRIM_SIZE_MIN_PERCENT, Number.isFinite(pct) ? pct : activeSize));
+    const batch = updateItemSettings(state.batchItems, item.id, { cornerTrimSizePercent: clamped });
+    setState({ batchItems: batch });
+  };
+  sizeSlider.addEventListener("input", () => commitSize(Number(sizeSlider.value)));
+  sizeInput.addEventListener("change", () => commitSize(Number(sizeInput.value)));
+
+  toggle.addEventListener("change", () => {
+    const batch = updateItemSettings(state.batchItems, item.id, {
+      cornerTrimCorners: toggle.checked ? [] : null,
+      cornerTrimShape: toggle.checked ? current.gridCornerTrimShape : null,
+      cornerTrimSizePercent: toggle.checked ? current.gridCornerTrimSizePercent : null,
+    });
+    setState({ batchItems: batch });
+  });
 }
 
 function startDrag(e, cell, itemId) {

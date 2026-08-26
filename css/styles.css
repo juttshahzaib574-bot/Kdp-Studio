@@ -817,6 +817,50 @@ input[type="file"] {
   padding: 6px 8px;
 }
 
+.corner-trim-drawer-field {
+  grid-column: 1 / -1;
+}
+
+.drawer-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.corner-trim-drawer-detail {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.corner-trim-drawer-detail select {
+  font-size: 0.78rem;
+  padding: 6px 8px;
+  width: auto;
+}
+
+.corner-trim-drawer-detail .dpi-control {
+  width: 160px;
+}
+
+.corner-trim-picker-mini {
+  width: 56px;
+  height: 56px;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.corner-trim-picker-mini .corner-trim-btn {
+  font-size: 0.8rem;
+}
+
 .item-settings-drawer .drawer-close {
   height: fit-content;
   padding: 7px 12px;

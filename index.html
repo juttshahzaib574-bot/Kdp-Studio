@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>KDP Studio</title>
-  <link rel="stylesheet" href="css/styles.css?v=31" />
+  <link rel="stylesheet" href="css/styles.css?v=32" />
 </head>
 <body>
   <header class="app-header">
@@ -26,6 +26,12 @@
         </div>
 
         <div class="field-group">
+          <label>Cell Shape Sequence <span class="lock-note">— bulk-applies a repeating pattern to every queued image, in storyboard order</span></label>
+          <div class="option-list" id="cell-shape-sequence-options"></div>
+          <p class="hint" id="cell-shape-sequence-hint">Each image still keeps its own ⚙ per-image override afterward — this just sets a starting point across every queued image at once.</p>
+        </div>
+
+        <div class="field-group">
           <label>Storyboard (drag to reorder · click to preview)</label>
           <div class="storyboard-grid" id="storyboard-grid"></div>
         </div>
@@ -37,6 +43,12 @@
             <option value="6">6 per page</option>
           </select>
           <p class="hint" id="solution-summary-hint"></p>
+        </div>
+
+        <div class="field-group">
+          <label>Advanced: Color-to-Number Set <span class="lock-note">— per-book default is above; this only affects individual images</span></label>
+          <button type="button" class="btn btn-secondary btn-small" id="randomize-color-sets-btn">🎲 Randomize Color Set for Every Image</button>
+          <p class="hint">Assigns each queued image a random 12/24/36-color set, independent of the book-wide Color Key setting. Re-click anytime for a fresh randomization. For one specific image instead, use its own ⚙ per-image "Color Set" override — that already lets you pick (or clear) any single image's set independently, no matter how many are queued.</p>
         </div>
       </div>
 
@@ -167,8 +179,8 @@
         <div class="field-group" id="corner-trim-size-group">
           <label for="corner-trim-size-slider">Trim Size <span class="lock-note">(% of the grid's shorter side)</span></label>
           <div class="dpi-control">
-            <input type="range" id="corner-trim-size-slider" min="4" max="30" step="1" value="12" />
-            <input type="number" id="corner-trim-size-input" min="4" max="30" step="1" value="12" />
+            <input type="range" id="corner-trim-size-slider" min="1" max="30" step="1" value="12" />
+            <input type="number" id="corner-trim-size-input" min="1" max="30" step="1" value="12" />
           </div>
         </div>
 
@@ -465,6 +477,6 @@
        module scripts below — pdfExport.js needs window.fontkit already set when it
        calls doc.registerFontkit() to embed the custom fonts in js/vendor/fonts/. -->
   <script src="js/vendor/fontkit.umd.min.js"></script>
-  <script type="module" src="js/main.js?v=31"></script>
+  <script type="module" src="js/main.js?v=32"></script>
 </body>
 </html>
