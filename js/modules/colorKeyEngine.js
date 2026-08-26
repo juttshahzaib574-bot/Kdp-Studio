@@ -1,6 +1,6 @@
 // Section 4: Color Key Standards for Mosaic Color-by-Number Books
-import { PALETTE_12, PALETTE_24, PALETTE_36, BRANDS } from "./data/colorPalettes.js?v=5";
-import { approximateHexForName, hexToRgb } from "./data/colorNameHex.js?v=5";
+import { PALETTE_12, PALETTE_24, PALETTE_36, BRANDS } from "./data/colorPalettes.js?v=6";
+import { approximateHexForName, hexToRgb } from "./data/colorNameHex.js?v=6";
 
 export { BRANDS };
 

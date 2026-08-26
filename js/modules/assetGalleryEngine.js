@@ -141,23 +141,3 @@ export function deleteAlbum(albums, albumId) {
   persistAlbums(next);
   return next;
 }
-
-// Format Auto-Check: a custom upload must match the active canvas's pixel dimensions
-// (within a small tolerance) for its selected bleed/no-bleed print tolerance.
-export function checkFormatCompliance(assetPx, expectedCanvasDims) {
-  const toleranceRatio = 0.01;
-  const withinTolerance = (a, b) => Math.abs(a - b) <= b * toleranceRatio;
-
-  const widthOk = withinTolerance(assetPx.widthPx, expectedCanvasDims.widthPx);
-  const heightOk = withinTolerance(assetPx.heightPx, expectedCanvasDims.heightPx);
-
-  return {
-    ok: widthOk && heightOk,
-    expectedPx: { width: expectedCanvasDims.widthPx, height: expectedCanvasDims.heightPx },
-    actualPx: { width: assetPx.widthPx, height: assetPx.heightPx },
-    message:
-      widthOk && heightOk
-        ? "Matches the active canvas size and bleed setting."
-        : `Expected ${expectedCanvasDims.widthPx}×${expectedCanvasDims.heightPx}px, got ${assetPx.widthPx}×${assetPx.heightPx}px.`,
-  };
-}
