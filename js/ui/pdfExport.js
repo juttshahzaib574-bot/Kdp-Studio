@@ -4,23 +4,23 @@
 // (honoring each image's own granular overrides), auto-generated solution pages, and
 // back matter — entirely client-side via pdf-lib, no server round-trip.
 
-import { PDFDocument, StandardFonts, rgb } from "../vendor/pdf-lib.esm.min.js?v=29";
-import { getTrimSizeById } from "../modules/canvasEngine.js?v=29";
-import { computeCanvasDimensions } from "../modules/bleedEngine.js?v=29";
-import { computeSafeZone } from "../modules/safeZoneEngine.js?v=29";
-import { getSizesForSelection, buildCombinedPalette } from "../modules/colorKeyEngine.js?v=29";
-import { computePagination } from "../modules/storyboardEngine.js?v=29";
-import { isPageEnabled, computeFrontMatterPageCount, orderedFrontMatterPages, orderedBackMatterPages } from "../modules/frontBackMatterEngine.js?v=29";
-import { buildSolutionPages } from "../modules/solutionGenerationEngine.js?v=29";
-import { BORDER_PRESETS } from "../modules/borderStyleEngine.js?v=29";
-import { migratedKeyStyle } from "../modules/layoutEngine.js?v=29";
-import { resolveEffectiveGrid } from "../modules/resolutionScalingEngine.js?v=29";
-import { computeKeyGridLayout, keyEntryPosition } from "../modules/colorKeyLayoutEngine.js?v=29";
-import { normalizeComposition, computeLayout } from "../modules/layoutCompositionEngine.js?v=29";
-import { resolveActiveAsset } from "../modules/assetGalleryEngine.js?v=29";
-import { renderFullMosaicGrid, getPlaceholderSource, loadImageSource, drawSourceToCanvas } from "./mosaicRenderer.js?v=29";
-import { isContentPageBlack, isFacingPageBlack, isBlackWhiteEdition, toGrayscaleRgb } from "../modules/bookThemeEngine.js?v=29";
-import { getFontById, fontAssetUrl } from "../modules/fontLibraryEngine.js?v=29";
+import { PDFDocument, rgb } from "../vendor/pdf-lib.esm.min.js?v=30";
+import { getTrimSizeById } from "../modules/canvasEngine.js?v=30";
+import { computeCanvasDimensions } from "../modules/bleedEngine.js?v=30";
+import { computeSafeZone } from "../modules/safeZoneEngine.js?v=30";
+import { getSizesForSelection, buildCombinedPalette } from "../modules/colorKeyEngine.js?v=30";
+import { computePagination } from "../modules/storyboardEngine.js?v=30";
+import { isPageEnabled, computeFrontMatterPageCount, orderedFrontMatterPages, orderedBackMatterPages } from "../modules/frontBackMatterEngine.js?v=30";
+import { buildSolutionPages } from "../modules/solutionGenerationEngine.js?v=30";
+import { BORDER_PRESETS } from "../modules/borderStyleEngine.js?v=30";
+import { migratedKeyStyle } from "../modules/layoutEngine.js?v=30";
+import { resolveEffectiveGrid } from "../modules/resolutionScalingEngine.js?v=30";
+import { computeKeyGridLayout, keyEntryPosition } from "../modules/colorKeyLayoutEngine.js?v=30";
+import { normalizeComposition, computeLayout } from "../modules/layoutCompositionEngine.js?v=30";
+import { resolveActiveAsset } from "../modules/assetGalleryEngine.js?v=30";
+import { renderFullMosaicGrid, getPlaceholderSource, loadImageSource, drawSourceToCanvas } from "./mosaicRenderer.js?v=30";
+import { isContentPageBlack, isFacingPageBlack, isBlackWhiteEdition, toGrayscaleRgb } from "../modules/bookThemeEngine.js?v=30";
+import { getFontById, fontAssetUrl } from "../modules/fontLibraryEngine.js?v=30";
 
 const PT_PER_IN = 72;
 const inToPt = (inches) => inches * PT_PER_IN;
@@ -141,13 +141,34 @@ function resolveItemComposition(item, state) {
   return normalizeComposition(state.globalComposition);
 }
 
+const BASE_FONT_REGULAR_FILE = "js/vendor/fonts/Poppins-Regular.ttf";
+const BASE_FONT_BOLD_FILE = "js/vendor/fonts/Poppins-Bold.ttf";
+
+// The book's default typeface — real embedded TTFs (Poppins), not pdf-lib's
+// StandardFonts.Helvetica/HelveticaBold, which only *references* one of the PDF
+// spec's 14 standard font names and ships no font program of its own, relying on
+// whatever the reader/printer substitutes. KDP explicitly requires every font in a
+// submitted PDF to be embedded, so every page — front matter, back matter, and any
+// composition element left on "Default" — now embeds this pair exactly like a Font
+// Library choice, closing that gap with zero exceptions anywhere in the export.
+async function embedBaseFonts(doc) {
+  doc.registerFontkit(window.fontkit);
+  const [regularBytes, boldBytes] = await Promise.all([
+    fetch(BASE_FONT_REGULAR_FILE).then((r) => r.arrayBuffer()),
+    fetch(BASE_FONT_BOLD_FILE).then((r) => r.arrayBuffer()),
+  ]);
+  const regular = await doc.embedFont(regularBytes, { subset: true });
+  const bold = await doc.embedFont(boldBytes, { subset: true });
+  return { bold, regular };
+}
+
 // ---- Font Library: custom-font embedding ----
 // Gathers every distinct custom fontId actually referenced across the compositions
 // that will actually be used, embeds each one exactly once — subset, so only the
-// glyphs actually drawn end up in the PDF, satisfying KDP's "every font must be
-// embedded" requirement — via pdf-lib + fontkit, and returns a resolver that turns any
-// one composition into a concrete {title, subtitle, instruction, colorKey} PDFFont set,
-// falling back to the book's bold/regular Helvetica for "system" or an unknown id.
+// glyphs actually drawn end up in the PDF — via pdf-lib + fontkit, and returns a
+// resolver that turns any one composition into a concrete {title, subtitle,
+// instruction, colorKey} PDFFont set, falling back to the book's (also embedded, see
+// embedBaseFonts above) bold/regular default for "system" or an unknown id.
 async function embedCompositionFonts(doc, bold, regular, compositions) {
   const usedIds = new Set();
   compositions.forEach((comp) => {
@@ -678,8 +699,7 @@ export async function exportInteriorPdf(state, { onProgress } = {}) {
   const blackWhiteEdition = isBlackWhiteEdition(state.bookColorMode);
 
   const doc = await PDFDocument.create();
-  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
-  const regular = await doc.embedFont(StandardFonts.Helvetica);
+  const { bold, regular } = await embedBaseFonts(doc);
 
   // Font Library: embed only the custom fonts actually referenced across every
   // composition this export will touch (global, or each item's own page-specific
@@ -1012,8 +1032,7 @@ export async function downloadActiveItemPdf(state, mode) {
   const { canvas, pageWidthPt, pageHeightPt, comp, geom, legend, contentBlack, blackWhiteEdition } = await renderActiveItemFullPage(state, mode);
 
   const doc = await PDFDocument.create();
-  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
-  const regular = await doc.embedFont(StandardFonts.Helvetica);
+  const { bold, regular } = await embedBaseFonts(doc);
   const pngImage = await doc.embedPng(await canvasToPngBytes(canvas));
   const page = doc.addPage([pageWidthPt, pageHeightPt]);
   page.drawImage(pngImage, { x: 0, y: 0, width: pageWidthPt, height: pageHeightPt });

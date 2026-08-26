@@ -4,7 +4,7 @@
 // tray. Edits target the global composition (Global scope) or the active image's own
 // composition (Page-Specific scope). The live preview + PDF recalculate the grid to fit.
 
-import { state, setState, subscribe } from "../../state.js?v=29";
+import { state, setState, subscribe } from "../../state.js?v=30";
 import {
   LAYOUT_ELEMENTS,
   LAYOUT_TARGETS,
@@ -13,9 +13,9 @@ import {
   normalizeComposition,
   layoutModeFromComposition,
   describeComposition,
-} from "../../modules/layoutCompositionEngine.js?v=29";
-import { FONT_CATEGORIES, FONT_LIBRARY, SYSTEM_FONT_ID, getFontById } from "../../modules/fontLibraryEngine.js?v=29";
-import { DRAG_HANDLE_ICON, attachDragHandle } from "../dragReorderList.js?v=29";
+} from "../../modules/layoutCompositionEngine.js?v=30";
+import { FONT_CATEGORIES, FONT_LIBRARY, SYSTEM_FONT_ID, getFontById } from "../../modules/fontLibraryEngine.js?v=30";
+import { DRAG_HANDLE_ICON, attachDragHandle } from "../dragReorderList.js?v=30";
 
 const SCOPES = [
   { id: "global", label: "Global", note: "One layout template applied to every page." },
@@ -48,7 +48,7 @@ const el = {
 };
 
 const FONT_OPTIONS_HTML =
-  `<option value="${SYSTEM_FONT_ID}">Default (Helvetica)</option>` +
+  `<option value="${SYSTEM_FONT_ID}">Default (Poppins)</option>` +
   FONT_CATEGORIES.map(
     (cat) =>
       `<optgroup label="${cat.label}">${FONT_LIBRARY.filter((f) => f.category === cat.id)
@@ -356,7 +356,7 @@ function renderControls(comp, current) {
 // not just a name in a plain list.
 function updateFontHint(hintEl, fontId) {
   if (!fontId || fontId === SYSTEM_FONT_ID) {
-    hintEl.textContent = "Default book font (Helvetica).";
+    hintEl.textContent = "Default book font (Poppins) — embedded like every other choice here.";
     hintEl.style.fontFamily = "";
     return;
   }

@@ -8,7 +8,7 @@
 // key onto the grid and the grid shrinks; push it to the blank page and the grid
 // reclaims the space.
 
-import { KEY_STRIP_HEIGHT_RATIO } from "./layoutEngine.js?v=29";
+import { KEY_STRIP_HEIGHT_RATIO } from "./layoutEngine.js?v=30";
 
 export const LAYOUT_ELEMENT_IDS = ["title", "subtitle", "instruction", "colorKey"];
 
@@ -41,9 +41,9 @@ const TEXT_SIDE_WIDTH_IN = 1.6;
 // center" is just anchor: "center", offsetIn: -0.4. Only meaningful for target: "blank" —
 // on-grid placement stays the existing top/bottom/left/right zone-band system, since
 // that page has too little spare room for free positioning to make sense.
-// Font choice per element — "system" is the unchanged default (pdf-lib's built-in
-// Helvetica/Helvetica-Bold); any other id names an entry in fontLibraryEngine.js's
-// FONT_LIBRARY, embedded (subset) into the exported PDF via pdf-lib + fontkit.
+// Font choice per element — "system" is the book's default (Poppins, embedded exactly
+// like every other choice — see pdfExport.js's embedBaseFonts); any other id names an
+// entry in fontLibraryEngine.js's FONT_LIBRARY, also embedded (subset) via fontkit.
 const DEFAULT_FONT_ID = "system";
 
 // Whole-stack vertical position on the blank facing page — only takes effect when 2+
