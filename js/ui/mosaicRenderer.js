@@ -6,13 +6,13 @@
 //   - renderFullMosaicGrid: the entire safe-zone grid at the real chosen print DPI,
 //     used to generate the actual page image embedded into the exported PDF.
 
-import { computeFrameGeometry, drawFrame } from "./preview.js?v=11";
-import { computeGridDimensions, cellCenterIn, cellPolygonIn, mmToIn, isCellInGridSilhouette } from "../modules/gridPatternEngine.js?v=11";
-import { recommendFont, recommendTextTint, adjustForBorderWeight, centerOffsetIn, letterSpacingForLabel } from "../modules/typographyEngine.js?v=11";
-import { gridColorFromTint } from "../modules/borderStyleEngine.js?v=11";
-import { cornerRadiusIn, isFullCircle } from "../modules/cornerRadiusEngine.js?v=11";
-import { nearestPaletteColor } from "../modules/shadeQuantizationEngine.js?v=11";
-import { computeLayout, LAYOUT_ELEMENTS } from "../modules/layoutCompositionEngine.js?v=11";
+import { computeFrameGeometry, drawFrame } from "./preview.js?v=13";
+import { computeGridDimensions, cellCenterIn, cellPolygonIn, mmToIn, isCellInGridSilhouette } from "../modules/gridPatternEngine.js?v=13";
+import { recommendFont, recommendTextTint, adjustForBorderWeight, centerOffsetIn, letterSpacingForLabel } from "../modules/typographyEngine.js?v=13";
+import { gridColorFromTint } from "../modules/borderStyleEngine.js?v=13";
+import { cornerRadiusIn, isFullCircle } from "../modules/cornerRadiusEngine.js?v=13";
+import { nearestPaletteColor, rgbToLab } from "../modules/shadeQuantizationEngine.js?v=13";
+import { computeLayout, LAYOUT_ELEMENTS } from "../modules/layoutCompositionEngine.js?v=13";
 
 const PT_TO_IN = 1 / 72;
 
@@ -74,8 +74,56 @@ export function drawSourceToCanvas(source, maxSize = 512) {
   // "no ink here" wherever a transparent background genuinely should stay blank.
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, c.width, c.height);
+  // A light blur on the draw itself, not a separate pass over the white fill: this
+  // softens exactly the fine noise/anti-aliasing texture that would otherwise reach
+  // the quantizer as isolated stray votes, before it ever gets sampled. Professional
+  // cross-stitch/mosaic converters run this same light smoothing step ahead of
+  // pixelating for the same reason — fewer stray votes at the source means less
+  // confetti for the majority-vote and region-merge passes to have to clean up after
+  // the fact. Small enough (1px, on a source already capped to maxSize) to soften
+  // noise without visibly softening real edges.
+  ctx.filter = "blur(1px)";
   ctx.drawImage(source, 0, 0, c.width, c.height);
+  ctx.filter = "none";
   return c;
+}
+
+// A true line-art outline stroke is dark AND essentially colorless (near-neutral
+// black/gray), which is what actually distinguishes it from a dark but SATURATED
+// palette color — lightness alone can't tell them apart. Navy Blue (#000080) is
+// darker (LAB L≈13) than Charcoal Black (#36454F, L≈28), but it's a real, intended
+// color; the difference is chroma (√(a²+b²)): Navy Blue's is ≈80, Charcoal
+// Black's is ≈9. Every genuinely dark-and-saturated entry in the Universal 36 sits
+// well clear of these thresholds (checked directly: Dark Walnut L≈22/chroma≈22,
+// Deep Violet L≈21/chroma≈74, Forest Green L≈51/chroma≈67), so this only ever
+// catches pixels that are actually near-black-and-neutral.
+const OUTLINE_LIGHTNESS_MAX = 20;
+const OUTLINE_CHROMA_MAX = 12;
+
+function isOutlinePixel(rgb) {
+  const lab = rgbToLab(rgb);
+  const chroma = Math.hypot(lab.a, lab.b);
+  return lab.l < OUTLINE_LIGHTNESS_MAX && chroma < OUTLINE_CHROMA_MAX;
+}
+
+// The single darkest entry in the active palette (always resolves to true black —
+// every set size includes one) — every pixel isOutlinePixel flags gets forced onto
+// this ONE index directly, skipping the normal all-palette vote entirely. Without
+// this, a near-black pixel competing normally could split votes between this and
+// a second near-black entry (e.g. Jet Black vs Charcoal Black), fragmenting what
+// should read as one continuous, unified outline into two different numbers
+// zig-zagging along the same line.
+function darkestPaletteIndex(palette) {
+  let bestIndex = 0;
+  let bestL = Infinity;
+  palette.forEach((entry, index) => {
+    const l = rgbToLab(entry.rgb).l;
+    if (l < bestL) {
+      bestL = l;
+      bestIndex = index;
+    }
+  });
+  return bestIndex;
 }
 
 // Granular Shade Separation starts here, not in the quantizer: this is a cover-crop
@@ -114,6 +162,7 @@ function quantizeGridCells(sourceCanvas, cols, rows, targetAspect, palette) {
   const SUPERSAMPLE = 4; // 4x4 sub-samples voted per cell
   const votes = new Int32Array(palette.length);
   const assignments = [];
+  const outlineIndex = darkestPaletteIndex(palette);
 
   for (let row = 0; row < rows; row += 1) {
     for (let col = 0; col < cols; col += 1) {
@@ -125,7 +174,8 @@ function quantizeGridCells(sourceCanvas, cols, rows, targetAspect, palette) {
           const x = Math.max(0, Math.min(sw - 1, Math.round(cropX + u * cropW)));
           const y = Math.max(0, Math.min(sh - 1, Math.round(cropY + v * cropH)));
           const i = (y * sw + x) * 4;
-          const idx = nearestPaletteColor({ r: imageData[i], g: imageData[i + 1], b: imageData[i + 2] }, palette);
+          const rgb = { r: imageData[i], g: imageData[i + 1], b: imageData[i + 2] };
+          const idx = isOutlinePixel(rgb) ? outlineIndex : nearestPaletteColor(rgb, palette);
           votes[idx] += 1;
         }
       }
@@ -141,7 +191,99 @@ function quantizeGridCells(sourceCanvas, cols, rows, targetAspect, palette) {
     }
   }
 
-  return assignments;
+  return mergeSmallRegions(assignments, cols, rows);
+}
+
+// A cell-by-cell "majority vote" (above) removes invented blend colors, but it does
+// nothing about a single cell — or a small handful of them — landing on a real,
+// correctly-nearest palette color that still isn't what the region around it is.
+// That's confetti: a fleck of "Amber Gold" alone inside a big field of "Golden
+// Yellow", each individually a valid closest-match, together reading as muddy
+// noise instead of one bold, printable block. Every professional paint-by-number /
+// cross-stitch generator runs a region-merging cleanup pass for exactly this reason
+// (the open-source paintbynumbersgenerator calls it facet removal; commercial
+// converters expose it as a "Min Area" setting) — find every contiguous same-color
+// region, and any region smaller than MIN_REGION_CELLS gets absorbed into whichever
+// neighboring region borders it the most, smallest region first.
+const MIN_REGION_CELLS = 2;
+
+function mergeSmallRegions(assignments, cols, rows) {
+  const total = cols * rows;
+  const regionId = new Int32Array(total).fill(-1);
+  const regions = []; // { colorIndex, cells: number[] } | null once absorbed
+
+  const gridNeighborsOf = (cellIndex) => {
+    const r = Math.floor(cellIndex / cols);
+    const c = cellIndex % cols;
+    const out = [];
+    if (r > 0) out.push(cellIndex - cols);
+    if (r < rows - 1) out.push(cellIndex + cols);
+    if (c > 0) out.push(cellIndex - 1);
+    if (c < cols - 1) out.push(cellIndex + 1);
+    return out;
+  };
+
+  // Connected-component labeling: flood-fill every maximal group of orthogonally
+  // touching cells that already share the same palette index.
+  for (let start = 0; start < total; start += 1) {
+    if (regionId[start] !== -1) continue;
+    const color = assignments[start];
+    const id = regions.length;
+    const cells = [start];
+    regionId[start] = id;
+    const stack = [start];
+    while (stack.length) {
+      const cur = stack.pop();
+      gridNeighborsOf(cur).forEach((n) => {
+        if (regionId[n] === -1 && assignments[n] === color) {
+          regionId[n] = id;
+          cells.push(n);
+          stack.push(n);
+        }
+      });
+    }
+    regions.push({ colorIndex: color, cells });
+  }
+
+  // Smallest region first, mirroring how these tools describe the process ("smallest
+  // cells are merged with their respective largest neighbour until only N are left").
+  const order = regions.map((_, id) => id).sort((a, b) => regions[a].cells.length - regions[b].cells.length);
+
+  order.forEach((id) => {
+    const region = regions[id];
+    if (!region || region.cells.length >= MIN_REGION_CELLS) return;
+
+    const neighborIds = new Set();
+    region.cells.forEach((cellIndex) => {
+      gridNeighborsOf(cellIndex).forEach((n) => {
+        if (regionId[n] !== id) neighborIds.add(regionId[n]);
+      });
+    });
+    if (neighborIds.size === 0) return; // the whole grid is one region — nothing to merge into
+
+    let bestId = null;
+    let bestSize = -1;
+    neighborIds.forEach((nid) => {
+      const size = regions[nid].cells.length;
+      if (size > bestSize) {
+        bestSize = size;
+        bestId = nid;
+      }
+    });
+
+    const target = regions[bestId];
+    region.cells.forEach((cellIndex) => {
+      regionId[cellIndex] = bestId;
+      target.cells.push(cellIndex);
+    });
+    regions[id] = null;
+  });
+
+  const cleaned = new Array(total);
+  for (let i = 0; i < total; i += 1) {
+    cleaned[i] = regions[regionId[i]].colorIndex;
+  }
+  return cleaned;
 }
 
 function polygonToPx(points, centerPx, scalePxPerIn) {
