@@ -153,9 +153,10 @@ function detectOutlineCells(cells, cols, rows) {
   const edges = new Array(cols * rows).fill(false);
   const lums = cells.map((px) => {
     let sum = 0;
-    px.forEach((p) => {
+    for (let i = 0; i < px.length; i += 1) {
+      const p = px[i];
       sum += 0.299 * p[0] + 0.587 * p[1] + 0.114 * p[2];
-    });
+    }
     return sum / px.length;
   });
   for (let row = 0; row < rows; row += 1) {
@@ -185,11 +186,13 @@ function kmeansSeeded(data, k, iters) {
     const distSq = new Float32Array(n);
     let total = 0;
     for (let i = 0; i < n; i += 1) {
+      const di = data[i];
       let minDist = Infinity;
-      cents.forEach((ct) => {
-        const d = (data[i][0] - ct[0]) ** 2 + (data[i][1] - ct[1]) ** 2 + (data[i][2] - ct[2]) ** 2;
+      for (let ci = 0; ci < cents.length; ci += 1) {
+        const ct = cents[ci];
+        const d = (di[0] - ct[0]) ** 2 + (di[1] - ct[1]) ** 2 + (di[2] - ct[2]) ** 2;
         if (d < minDist) minDist = d;
-      });
+      }
       distSq[i] = minDist;
       total += minDist;
     }
@@ -240,6 +243,33 @@ function kmeansSeeded(data, k, iters) {
   return { cents };
 }
 
+// Every render pass calls this twice with byte-identical arguments — once to draw
+// the "print" (numbered) page, once for the "solved" (filled) page — since both are
+// just two different renderings of the exact same discovered colors. Without this
+// cache the whole k-means/edge-detection pipeline (the most expensive part of a
+// render by far) ran twice per pass for an identical result, which is what made
+// every option change visibly freeze the UI. A single-slot cache is enough: it only
+// needs to catch that immediately-adjacent duplicate call, and any real change to
+// the source image, grid, or palette naturally misses and recomputes.
+let quantizationCache = null;
+
+function quantizeGridCells(sourceCanvas, cols, rows, targetAspect, palette) {
+  if (
+    quantizationCache &&
+    quantizationCache.sourceCanvas === sourceCanvas &&
+    quantizationCache.cols === cols &&
+    quantizationCache.rows === rows &&
+    quantizationCache.targetAspect === targetAspect &&
+    quantizationCache.palette === palette
+  ) {
+    return quantizationCache.result;
+  }
+
+  const result = computeQuantization(sourceCanvas, cols, rows, targetAspect, palette);
+  quantizationCache = { sourceCanvas, cols, rows, targetAspect, palette, result };
+  return result;
+}
+
 // The actual quantization pass: crop+sample, detect outline cells, cluster the rest
 // into `colorCount - 1` discovered colors (plus outline = colorCount total), merge
 // near-duplicate clusters, label every cell, and pick each cluster's final displayed
@@ -247,17 +277,18 @@ function kmeansSeeded(data, k, iters) {
 // invented average). Returns per-cell palette indices AND the discovered legend
 // itself, since — unlike a fixed palette — this palette is different every time and
 // the caller needs it to draw a matching color key.
-function quantizeGridCells(sourceCanvas, cols, rows, targetAspect, palette) {
+function computeQuantization(sourceCanvas, cols, rows, targetAspect, palette) {
   const colorCount = palette.length;
   const cells = sampleGridCellsNearestNeighbor(sourceCanvas, cols, rows, targetAspect);
   const edges = detectOutlineCells(cells, cols, rows);
 
   const cellMode = cells.map((px) => {
     const counts = new Map();
-    px.forEach((p) => {
+    for (let i = 0; i < px.length; i += 1) {
+      const p = px[i];
       const key = ((p[0] >> 3) << 10) | ((p[1] >> 3) << 5) | (p[2] >> 3);
       counts.set(key, (counts.get(key) || 0) + 1);
-    });
+    }
     let bestKey = 0;
     let bestCount = 0;
     counts.forEach((count, key) => {
@@ -270,9 +301,11 @@ function quantizeGridCells(sourceCanvas, cols, rows, targetAspect, palette) {
   });
 
   const nonEdgePixels = [];
-  cells.forEach((px, i) => {
-    if (!edges[i]) nonEdgePixels.push(...px);
-  });
+  for (let i = 0; i < cells.length; i += 1) {
+    if (edges[i]) continue;
+    const px = cells[i];
+    for (let j = 0; j < px.length; j += 1) nonEdgePixels.push(px[j]);
+  }
 
   const { cents } = kmeansSeeded(nonEdgePixels, Math.min(Math.max(1, colorCount - 1), nonEdgePixels.length), 20);
 
@@ -298,34 +331,43 @@ function quantizeGridCells(sourceCanvas, cols, rows, targetAspect, palette) {
 
   // Outline (label 0) is the default for any sub-pixel not clearly closer to a real
   // cluster than it already is to pure black, so ambiguous dark pixels bias toward
-  // the unified outline instead of an arbitrary nearby cluster.
+  // the unified outline instead of an arbitrary nearby cluster. This is the hottest
+  // loop in the whole engine (cells × 64 sub-pixels × cluster count), so it's written
+  // with plain indexed loops and squared distance (no sqrt, no per-iteration closures)
+  // rather than the more idiomatic .forEach — the closure/callback dispatch and the
+  // sqrt call are both pure overhead here, since only the nearest-cluster ordering
+  // matters and squared distance orders identically to true Euclidean distance. This
+  // also keeps the comparison unit-consistent with `minDist`'s squared-magnitude start.
   const cellLabels = new Array(cols * rows);
   for (let i = 0; i < cells.length; i += 1) {
     if (edges[i]) {
       cellLabels[i] = 0;
       continue;
     }
+    const px = cells[i];
     const votes = new Array(cents.length + 1).fill(0);
-    cells[i].forEach((p) => {
+    for (let s = 0; s < px.length; s += 1) {
+      const p = px[s];
       let minDist = p[0] ** 2 + p[1] ** 2 + p[2] ** 2;
       let best = 0;
-      cents.forEach((c, ci) => {
-        const d = rgbDistance(p, c);
+      for (let ci = 0; ci < cents.length; ci += 1) {
+        const c = cents[ci];
+        const d = (p[0] - c[0]) ** 2 + (p[1] - c[1]) ** 2 + (p[2] - c[2]) ** 2;
         if (d < minDist) {
           minDist = d;
           best = ci + 1;
         }
-      });
+      }
       votes[best] += 1;
-    });
+    }
     let maxVotes = 0;
     let bestLabel = 0;
-    votes.forEach((v, c) => {
-      if (v > maxVotes) {
-        maxVotes = v;
-        bestLabel = c;
+    for (let v = 0; v < votes.length; v += 1) {
+      if (votes[v] > maxVotes) {
+        maxVotes = votes[v];
+        bestLabel = v;
       }
-    });
+    }
     cellLabels[i] = bestLabel;
   }
 
