@@ -36,6 +36,10 @@ export const state = {
   // "vertical" (fill each column, wrap to a new column) — see colorKeyLayoutEngine.js.
   colorKeyOrientation: "horizontal",
 
+  // Explicit "colors per row" (horizontal) / "colors per column" (vertical) cap before
+  // wrapping — null = automatic (fills as many as comfortably fit the available space).
+  colorKeyEntriesPerLine: null,
+
   // Black Book: whole-book page-background control — independent of the grid tint/
   // border sliders. "all-white" | "all-black" | "grid-black" | "key-black" (see
   // modules/bookThemeEngine.js for exactly what each id paints).

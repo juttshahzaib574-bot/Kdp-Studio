@@ -10,36 +10,42 @@
 // Both directions produce a STRICT uniform grid — every entry the same width and the
 // same height — rather than a packed/variable layout, so the spacing between any two
 // consecutive numbers is always identical (1→2 exactly equals 2→3, etc.) in both the
-// primary flow direction and the wrap direction.
+// primary flow direction and the wrap direction. Entries always use their natural,
+// comfortable size (only shrinking if the area truly can't fit them) rather than
+// stretching to fill 100% of the available width/height — this is what leaves real
+// slack for the key BLOCK to be left/center/right-aligned within its band (see
+// pdfExport.js's keyBlockXOffsetPt) instead of always spanning edge-to-edge.
 
 const DEFAULT_ENTRY_WIDTH_IN = 0.95;
 const DEFAULT_ENTRY_HEIGHT_IN = 0.2;
+export const MAX_ENTRIES_PER_LINE = 12;
 
 export const COLOR_KEY_ORIENTATIONS = [
   { id: "horizontal", label: "Horizontal", note: "Fills left-to-right, wraps to a new row." },
   { id: "vertical", label: "Vertical", note: "Fills top-to-bottom, wraps to a new column." },
 ];
 
-export function computeKeyGridLayout(paletteLength, areaWidthIn, areaHeightIn, entryWidthMinIn = DEFAULT_ENTRY_WIDTH_IN, entryHeightMaxIn = DEFAULT_ENTRY_HEIGHT_IN, orientation = "horizontal") {
-  if (orientation === "vertical") {
-    const rows = Math.max(1, Math.floor(areaHeightIn / entryHeightMaxIn));
-    const cols = Math.max(1, Math.ceil(paletteLength / rows));
-    return {
-      cols,
-      rows,
-      entryWidthIn: Math.min(entryWidthMinIn, areaWidthIn / cols),
-      entryHeightIn: areaHeightIn / rows,
-      orientation,
-    };
-  }
+// maxPerLine: explicit "colors per row" (horizontal) / "colors per column" (vertical)
+// cap — e.g. maxPerLine=3 horizontal means every row holds at most 3 colors before
+// wrapping to a new row, maxPerLine=4 vertical means every column holds at most 4
+// before wrapping to a new column. null/0/undefined = automatic (as many as
+// comfortably fit the available space, the original default behavior).
+export function computeKeyGridLayout(paletteLength, areaWidthIn, areaHeightIn, entryWidthIn = DEFAULT_ENTRY_WIDTH_IN, entryHeightIn = DEFAULT_ENTRY_HEIGHT_IN, orientation = "horizontal", maxPerLine = null) {
+  const isVertical = orientation === "vertical";
+  const autoLineCount = isVertical ? Math.max(1, Math.floor(areaHeightIn / entryHeightIn)) : Math.max(1, Math.floor(areaWidthIn / entryWidthIn));
+  const lineCount = maxPerLine && maxPerLine > 0 ? Math.max(1, Math.min(MAX_ENTRIES_PER_LINE, Math.round(maxPerLine))) : autoLineCount;
 
-  const cols = Math.max(1, Math.floor(areaWidthIn / entryWidthMinIn));
-  const rows = Math.max(1, Math.ceil(paletteLength / cols));
+  const rows = isVertical ? lineCount : Math.max(1, Math.ceil(paletteLength / lineCount));
+  const cols = isVertical ? Math.max(1, Math.ceil(paletteLength / lineCount)) : lineCount;
+
   return {
     cols,
     rows,
-    entryWidthIn: areaWidthIn / cols,
-    entryHeightIn: Math.min(entryHeightMaxIn, areaHeightIn / rows),
+    // min(natural, available-per-slot): uses the natural/comfortable size whenever
+    // there's room, and only shrinks entries evenly if a user-requested per-line count
+    // (or a very large auto-computed one) wouldn't otherwise fit.
+    entryWidthIn: Math.min(entryWidthIn, areaWidthIn / cols),
+    entryHeightIn: Math.min(entryHeightIn, areaHeightIn / rows),
     orientation,
   };
 }

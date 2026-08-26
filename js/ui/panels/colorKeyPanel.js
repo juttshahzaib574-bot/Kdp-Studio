@@ -1,7 +1,7 @@
-import { state, setState, subscribe } from "../../state.js?v=28";
-import { COLOR_SET_OPTIONS, getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=28";
-import { BOOK_COLOR_MODES } from "../../modules/bookThemeEngine.js?v=28";
-import { COLOR_KEY_ORIENTATIONS } from "../../modules/colorKeyLayoutEngine.js?v=28";
+import { state, setState, subscribe } from "../../state.js?v=29";
+import { COLOR_SET_OPTIONS, getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=29";
+import { BOOK_COLOR_MODES } from "../../modules/bookThemeEngine.js?v=29";
+import { COLOR_KEY_ORIENTATIONS, MAX_ENTRIES_PER_LINE } from "../../modules/colorKeyLayoutEngine.js?v=29";
 
 const PAIR_CHOICES = [
   { id: "12-24", sizes: [12, 24], label: "12 & 24" },
@@ -16,6 +16,8 @@ const el = {
   customPairGroup: document.getElementById("custom-pair-group"),
   customPairOptions: document.getElementById("custom-pair-options"),
   orientationOptions: document.getElementById("color-key-orientation-options"),
+  entriesPerLineInput: document.getElementById("color-key-entries-per-line"),
+  entriesPerLineLabel: document.getElementById("color-key-entries-per-line-axis"),
   swatchList: document.getElementById("color-swatch-list"),
 };
 
@@ -26,6 +28,11 @@ export function initColorKeyPanel() {
   renderOrientationOptions();
 
   el.setSelect.addEventListener("change", () => setState({ colorSetOptionId: el.setSelect.value }));
+  el.entriesPerLineInput.addEventListener("change", () => {
+    const raw = el.entriesPerLineInput.value.trim();
+    const n = raw ? Math.max(1, Math.min(MAX_ENTRIES_PER_LINE, Math.round(Number(raw)))) : null;
+    setState({ colorKeyEntriesPerLine: Number.isFinite(n) ? n : null });
+  });
 
   subscribe(render);
   render(state);
@@ -93,6 +100,11 @@ function render(current) {
   el.orientationOptions.querySelectorAll(".option-item").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.orientationId === current.colorKeyOrientation);
   });
+
+  el.entriesPerLineLabel.textContent = current.colorKeyOrientation === "vertical" ? "Column" : "Row";
+  if (document.activeElement !== el.entriesPerLineInput) {
+    el.entriesPerLineInput.value = current.colorKeyEntriesPerLine ?? "";
+  }
 
   const sizes = getSizesForSelection(current.colorSetOptionId, current.colorSetCustomPair);
   const palette = buildCombinedPalette(sizes);
