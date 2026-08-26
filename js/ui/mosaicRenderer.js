@@ -6,13 +6,13 @@
 //   - renderFullMosaicGrid: the entire safe-zone grid at the real chosen print DPI,
 //     used to generate the actual page image embedded into the exported PDF.
 
-import { computeFrameGeometry, drawFrame } from "./preview.js?v=13";
-import { computeGridDimensions, cellCenterIn, cellPolygonIn, mmToIn, isCellInGridSilhouette } from "../modules/gridPatternEngine.js?v=13";
-import { recommendFont, recommendTextTint, adjustForBorderWeight, centerOffsetIn, letterSpacingForLabel } from "../modules/typographyEngine.js?v=13";
-import { gridColorFromTint } from "../modules/borderStyleEngine.js?v=13";
-import { cornerRadiusIn, isFullCircle } from "../modules/cornerRadiusEngine.js?v=13";
-import { nearestPaletteColor, rgbToLab } from "../modules/shadeQuantizationEngine.js?v=13";
-import { computeLayout, LAYOUT_ELEMENTS } from "../modules/layoutCompositionEngine.js?v=13";
+import { computeFrameGeometry, drawFrame } from "./preview.js?v=15";
+import { computeGridDimensions, cellCenterIn, cellPolygonIn, mmToIn, isCellInGridSilhouette } from "../modules/gridPatternEngine.js?v=15";
+import { recommendFont, recommendTextTint, adjustForBorderWeight, centerOffsetIn, letterSpacingForLabel } from "../modules/typographyEngine.js?v=15";
+import { gridColorFromTint } from "../modules/borderStyleEngine.js?v=15";
+import { cornerRadiusIn, isFullCircle } from "../modules/cornerRadiusEngine.js?v=15";
+import { nearestPaletteColor, rgbToLab } from "../modules/shadeQuantizationEngine.js?v=15";
+import { computeLayout, LAYOUT_ELEMENTS } from "../modules/layoutCompositionEngine.js?v=15";
 
 const PT_TO_IN = 1 / 72;
 
@@ -74,18 +74,75 @@ export function drawSourceToCanvas(source, maxSize = 512) {
   // "no ink here" wherever a transparent background genuinely should stay blank.
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, c.width, c.height);
-  // A light blur on the draw itself, not a separate pass over the white fill: this
-  // softens exactly the fine noise/anti-aliasing texture that would otherwise reach
-  // the quantizer as isolated stray votes, before it ever gets sampled. Professional
-  // cross-stitch/mosaic converters run this same light smoothing step ahead of
-  // pixelating for the same reason — fewer stray votes at the source means less
-  // confetti for the majority-vote and region-merge passes to have to clean up after
-  // the fact. Small enough (1px, on a source already capped to maxSize) to soften
-  // noise without visibly softening real edges.
-  ctx.filter = "blur(1px)";
   ctx.drawImage(source, 0, 0, c.width, c.height);
-  ctx.filter = "none";
+
+  // Edge-preserving smoothing, not a plain blur: a plain gaussian/box blur softens
+  // real silhouette edges right along with noise, which is backwards for this job.
+  // A bilateral filter only averages a pixel with neighbors that are BOTH spatially
+  // close AND already similar in color, so a hard boundary (black outline against a
+  // gold fill) stays hard, while fine same-region texture (anti-aliasing, a thin
+  // shading stroke a pixel or two wide) gets smoothed into its surrounding dominant
+  // color instead of surviving as an inconsistent fragment. This is the standard
+  // preprocessing step in "cartoonization" pipelines (bilateral filter → color
+  // quantization → edge detection) for exactly this reason.
+  const imageData = ctx.getImageData(0, 0, c.width, c.height);
+  ctx.putImageData(bilateralFilter(imageData), 0, 0);
   return c;
+}
+
+// radius 2 (5x5 taps), sigmaSpace 2, sigmaColor 30: smooths within roughly a
+// palette-swatch's worth of color difference, preserves anything bigger (a real
+// edge between two genuinely different colors).
+function bilateralFilter(imageData, radius = 2, sigmaSpace = 2, sigmaColor = 30) {
+  const { data: src, width: w, height: h } = imageData;
+  const out = new Uint8ClampedArray(src.length);
+
+  const spatialWeights = [];
+  for (let dy = -radius; dy <= radius; dy += 1) {
+    for (let dx = -radius; dx <= radius; dx += 1) {
+      spatialWeights.push(Math.exp(-(dx * dx + dy * dy) / (2 * sigmaSpace * sigmaSpace)));
+    }
+  }
+  const colorWeightLUT = new Float32Array(766); // max possible |dr|+|dg|+|db| is 255*3
+  for (let d = 0; d < colorWeightLUT.length; d += 1) {
+    colorWeightLUT[d] = Math.exp(-(d * d) / (2 * sigmaColor * sigmaColor));
+  }
+
+  for (let y = 0; y < h; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      const ci = (y * w + x) * 4;
+      const cr = src[ci];
+      const cg = src[ci + 1];
+      const cb = src[ci + 2];
+      let rSum = 0;
+      let gSum = 0;
+      let bSum = 0;
+      let wSum = 0;
+      let tapIndex = 0;
+      for (let dy = -radius; dy <= radius; dy += 1) {
+        const ny = Math.min(h - 1, Math.max(0, y + dy));
+        for (let dx = -radius; dx <= radius; dx += 1, tapIndex += 1) {
+          const nx = Math.min(w - 1, Math.max(0, x + dx));
+          const ni = (ny * w + nx) * 4;
+          const nr = src[ni];
+          const ng = src[ni + 1];
+          const nb = src[ni + 2];
+          const colorDist = Math.abs(nr - cr) + Math.abs(ng - cg) + Math.abs(nb - cb);
+          const weight = spatialWeights[tapIndex] * colorWeightLUT[colorDist];
+          rSum += nr * weight;
+          gSum += ng * weight;
+          bSum += nb * weight;
+          wSum += weight;
+        }
+      }
+      out[ci] = rSum / wSum;
+      out[ci + 1] = gSum / wSum;
+      out[ci + 2] = bSum / wSum;
+      out[ci + 3] = src[ci + 3];
+    }
+  }
+
+  return new ImageData(out, w, h);
 }
 
 // A true line-art outline stroke is dark AND essentially colorless (near-neutral
@@ -126,6 +183,56 @@ function darkestPaletteIndex(palette) {
   return bestIndex;
 }
 
+// True background is a fact about the SOURCE image, not something to infer through
+// per-cell color voting — a cell outside the subject's silhouette is not "the color
+// closest to white in the palette", it's blank paper. Flood-fill from the canvas's
+// own outer border through connected near-white pixels (the standard "magic wand
+// from the edges" every real background-removal/pattern-generator tool uses, with a
+// tolerance for anti-aliased near-white edges); anything the fill reaches is real
+// background, everything else is the subject, however light its own colors are.
+// This is what actually stops a stray gray/navy cell from floating in open space
+// outside the silhouette — that cell is never handed to the palette vote at all.
+const BACKGROUND_LIGHTNESS_MIN = 92;
+const BACKGROUND_CHROMA_MAX = 8;
+export const BACKGROUND_CELL = -1;
+
+function computeBackgroundMask(imageData, w, h) {
+  const mask = new Uint8Array(w * h);
+  const isNearWhite = (i) => {
+    const lab = rgbToLab({ r: imageData[i], g: imageData[i + 1], b: imageData[i + 2] });
+    return lab.l > BACKGROUND_LIGHTNESS_MIN && Math.hypot(lab.a, lab.b) < BACKGROUND_CHROMA_MAX;
+  };
+
+  const stack = [];
+  const seed = (x, y) => {
+    const p = y * w + x;
+    if (mask[p]) return;
+    if (!isNearWhite(p * 4)) return;
+    mask[p] = 1;
+    stack.push(p);
+  };
+  for (let x = 0; x < w; x += 1) {
+    seed(x, 0);
+    seed(x, h - 1);
+  }
+  for (let y = 0; y < h; y += 1) {
+    seed(0, y);
+    seed(w - 1, y);
+  }
+
+  while (stack.length) {
+    const p = stack.pop();
+    const x = p % w;
+    const y = Math.floor(p / w);
+    if (x > 0) seed(x - 1, y);
+    if (x < w - 1) seed(x + 1, y);
+    if (y > 0) seed(x, y - 1);
+    if (y < h - 1) seed(x, y + 1);
+  }
+
+  return mask;
+}
+
 // Granular Shade Separation starts here, not in the quantizer: this is a cover-crop
 // (center-crop to the grid's own aspect ratio, never a stretch) plus a small per-cell
 // supersample — so a single outline-stroke or anti-aliased edge pixel can no longer
@@ -159,6 +266,7 @@ function quantizeGridCells(sourceCanvas, cols, rows, targetAspect, palette) {
   }
 
   const imageData = sourceCanvas.getContext("2d").getImageData(0, 0, sw, sh).data;
+  const backgroundMask = computeBackgroundMask(imageData, sw, sh);
   const SUPERSAMPLE = 4; // 4x4 sub-samples voted per cell
   const votes = new Int32Array(palette.length);
   const assignments = [];
@@ -167,20 +275,25 @@ function quantizeGridCells(sourceCanvas, cols, rows, targetAspect, palette) {
   for (let row = 0; row < rows; row += 1) {
     for (let col = 0; col < cols; col += 1) {
       votes.fill(0);
+      let backgroundVotes = 0;
       for (let sy = 0; sy < SUPERSAMPLE; sy += 1) {
         for (let sx = 0; sx < SUPERSAMPLE; sx += 1) {
           const u = (col + (sx + 0.5) / SUPERSAMPLE) / cols;
           const v = (row + (sy + 0.5) / SUPERSAMPLE) / rows;
           const x = Math.max(0, Math.min(sw - 1, Math.round(cropX + u * cropW)));
           const y = Math.max(0, Math.min(sh - 1, Math.round(cropY + v * cropH)));
+          if (backgroundMask[y * sw + x]) {
+            backgroundVotes += 1;
+            continue;
+          }
           const i = (y * sw + x) * 4;
           const rgb = { r: imageData[i], g: imageData[i + 1], b: imageData[i + 2] };
           const idx = isOutlinePixel(rgb) ? outlineIndex : nearestPaletteColor(rgb, palette);
           votes[idx] += 1;
         }
       }
-      let bestIndex = 0;
-      let bestCount = -1;
+      let bestIndex = BACKGROUND_CELL;
+      let bestCount = backgroundVotes;
       for (let i = 0; i < votes.length; i += 1) {
         if (votes[i] > bestCount) {
           bestCount = votes[i];
@@ -503,15 +616,27 @@ export function renderMosaicPreview(canvas, opts) {
   ctx.rect(originX, originY, regionWpx, regionHpx);
   ctx.clip();
 
-  // Canvas background only — cells always render white regardless of this (see drawCell).
-  // True K:100% rich black, per the Midnight/Blackout Cell & Background Standard.
-  ctx.fillStyle = mode === "solved" ? "#111318" : style.blackoutMode ? "#000000" : "#f5f3ee";
+  // The real page background, not just a loading placeholder: background cells (see
+  // quantizeGridCells) are now genuinely skipped rather than drawn, so this fill is
+  // what actually shows through the silhouette's negative space — it has to match
+  // renderFullMosaicGrid's real export background or the preview would show a dark
+  // void around the subject that the real PDF never has. Solved mode always reads
+  // as a normal finished page (white), matching the real export; print mode goes
+  // rich black only in Blackout mode, same as the export.
+  ctx.fillStyle = mode === "solved" ? "#ffffff" : style.blackoutMode ? "#000000" : "#f5f3ee";
   ctx.fillRect(originX, originY, regionWpx, regionHpx);
 
   let index = 0;
   for (let row = 0; row < fullGrid.rows; row += 1) {
     for (let col = 0; col < fullGrid.cols; col += 1) {
       if (gridCornerTrim && !isCellInGridSilhouette(col, row, fullGrid.cols, fullGrid.rows)) {
+        index += 1;
+        continue;
+      }
+      // A cell the background flood-fill claimed (see quantizeGridCells) is blank
+      // paper outside the subject's silhouette — not a color, so nothing gets drawn
+      // for it at all, same as a corner-trimmed cell.
+      if (assignments[index] === BACKGROUND_CELL) {
         index += 1;
         continue;
       }
@@ -552,9 +677,10 @@ export function renderFullMosaicGrid(canvas, opts) {
   const fullGrid = resolveGrid(gridZone, cellSizeMm, gridPattern, gridOverride);
   const style = computeCellStyle({ cellSizeMm, cellSizeIn: fullGrid.cellSizeIn, borderWeightPt, gridTintPercent, cornerRadiusPercent, palette, ppi: dpi });
 
-  // True K:100% solid Rich Black canvas background per the Midnight/Blackout standard —
-  // cells always render white regardless of this (see drawCell); this is the "outer
-  // framework," not the puzzle panes.
+  // True K:100% solid Rich Black canvas background per the Midnight/Blackout standard.
+  // This is also what shows through wherever a background cell is skipped (see
+  // quantizeGridCells/BACKGROUND_CELL) — white here, so the trimmed-to-silhouette
+  // negative space around the subject reads as ordinary blank page, not a void.
   ctx.fillStyle = mode === "solved" ? "#ffffff" : style.blackoutMode ? "#000000" : "#ffffff";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -574,6 +700,10 @@ export function renderFullMosaicGrid(canvas, opts) {
   for (let row = 0; row < fullGrid.rows; row += 1) {
     for (let col = 0; col < fullGrid.cols; col += 1) {
       if (gridCornerTrim && !isCellInGridSilhouette(col, row, fullGrid.cols, fullGrid.rows)) {
+        index += 1;
+        continue;
+      }
+      if (assignments[index] === BACKGROUND_CELL) {
         index += 1;
         continue;
       }

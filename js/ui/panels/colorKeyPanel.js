@@ -1,5 +1,5 @@
-import { state, setState, subscribe } from "../../state.js?v=13";
-import { COLOR_SET_OPTIONS, getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=13";
+import { state, setState, subscribe } from "../../state.js?v=15";
+import { COLOR_SET_OPTIONS, getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=15";
 
 const PAIR_CHOICES = [
   { id: "12-24", sizes: [12, 24], label: "12 & 24" },
