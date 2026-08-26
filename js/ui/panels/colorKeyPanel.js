@@ -1,5 +1,5 @@
-import { state, setState, subscribe } from "../../state.js?v=9";
-import { COLOR_SET_OPTIONS, BRANDS, getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=9";
+import { state, setState, subscribe } from "../../state.js?v=10";
+import { COLOR_SET_OPTIONS, getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=10";
 
 const PAIR_CHOICES = [
   { id: "12-24", sizes: [12, 24], label: "12 & 24" },
@@ -11,14 +11,12 @@ const el = {
   setSelect: document.getElementById("color-set-select"),
   customPairGroup: document.getElementById("custom-pair-group"),
   customPairOptions: document.getElementById("custom-pair-options"),
-  brandOptions: document.getElementById("color-brand-options"),
   swatchList: document.getElementById("color-swatch-list"),
 };
 
 export function initColorKeyPanel() {
   renderSetOptions();
   renderPairOptions();
-  renderBrandOptions();
 
   el.setSelect.addEventListener("change", () => setState({ colorSetOptionId: el.setSelect.value }));
 
@@ -43,19 +41,6 @@ function renderPairOptions() {
   });
 }
 
-function renderBrandOptions() {
-  el.brandOptions.innerHTML = "";
-  BRANDS.forEach((brand) => {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "option-item";
-    btn.dataset.brandId = brand.id;
-    btn.textContent = brand.label;
-    btn.addEventListener("click", () => setState({ colorBrand: brand.id }));
-    el.brandOptions.appendChild(btn);
-  });
-}
-
 function render(current) {
   el.setSelect.value = current.colorSetOptionId;
   el.customPairGroup.hidden = current.colorSetOptionId !== "set-custom-pair";
@@ -66,12 +51,8 @@ function render(current) {
     btn.classList.toggle("active", isActive);
   });
 
-  el.brandOptions.querySelectorAll(".option-item").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.brandId === current.colorBrand);
-  });
-
   const sizes = getSizesForSelection(current.colorSetOptionId, current.colorSetCustomPair);
-  const palette = buildCombinedPalette(sizes, current.colorBrand);
+  const palette = buildCombinedPalette(sizes);
 
   el.swatchList.innerHTML = palette
     .map(

@@ -1,15 +1,15 @@
 // Module: Stacked Live Preview Gallery + The 3-Second Looping Interface
-import { state, subscribe } from "../../state.js?v=9";
-import { getTrimSizeById } from "../../modules/canvasEngine.js?v=9";
-import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=9";
-import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=9";
-import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=9";
-import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=9";
-import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=9";
-import { normalizeComposition } from "../../modules/layoutCompositionEngine.js?v=9";
-import { getPlaceholderSource, loadImageSource, drawSourceToCanvas, renderMosaicPreview } from "../mosaicRenderer.js?v=9";
-import { createLoopController } from "../../modules/previewLoopEngine.js?v=9";
-import { downloadActiveItemPng, downloadActiveItemPdf } from "../pdfExport.js?v=9";
+import { state, subscribe } from "../../state.js?v=10";
+import { getTrimSizeById } from "../../modules/canvasEngine.js?v=10";
+import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=10";
+import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=10";
+import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=10";
+import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=10";
+import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=10";
+import { normalizeComposition } from "../../modules/layoutCompositionEngine.js?v=10";
+import { getPlaceholderSource, loadImageSource, drawSourceToCanvas, renderMosaicPreview } from "../mosaicRenderer.js?v=10";
+import { createLoopController } from "../../modules/previewLoopEngine.js?v=10";
+import { downloadActiveItemPng, downloadActiveItemPdf } from "../pdfExport.js?v=10";
 
 const el = {
   printCanvas: document.getElementById("preview-canvas-print"),
@@ -115,7 +115,7 @@ function resolveActiveSettings(current, globalPalette) {
     gridTintPercent = preset.gridTintPercent;
   }
   const cornerRadiusPercent = activeItem.settings.cornerRadiusPercent ?? current.cornerRadiusPercent;
-  const palette = activeItem.settings.colorSetOverride ? buildCombinedPalette([activeItem.settings.colorSetOverride], current.colorBrand) : globalPalette;
+  const palette = activeItem.settings.colorSetOverride ? buildCombinedPalette([activeItem.settings.colorSetOverride]) : globalPalette;
 
   return { gridPattern, borderWeightPt, gridTintPercent, cornerRadiusPercent, palette };
 }
@@ -138,7 +138,7 @@ async function render(current) {
   const canvasDims = computeCanvasDimensions(trimSize, current.dpi, current.bleedEnabled);
   const safeZone = computeSafeZone(trimSize, current.pageSide);
   const sizes = getSizesForSelection(current.colorSetOptionId, current.colorSetCustomPair);
-  const globalPalette = buildCombinedPalette(sizes, current.colorBrand);
+  const globalPalette = buildCombinedPalette(sizes);
   const effective = resolveActiveSettings(current, globalPalette);
   const composition = current.layoutScope === "page-specific" && activeItem.settings.composition
     ? normalizeComposition(activeItem.settings.composition)

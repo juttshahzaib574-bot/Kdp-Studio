@@ -1,12 +1,12 @@
-import { state, setState, subscribe } from "../../state.js?v=9";
-import { LAYOUT_MODES } from "../../modules/layoutEngine.js?v=9";
-import { SCALING_PRIORITIES, isAdaptiveScalingUnlocked, resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=9";
-import { getTrimSizeById } from "../../modules/canvasEngine.js?v=9";
-import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=9";
-import { computeGridDimensions } from "../../modules/gridPatternEngine.js?v=9";
-import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=9";
-import { recommendFont } from "../../modules/typographyEngine.js?v=9";
-import { withColorKeyTarget, normalizeComposition, layoutModeFromComposition, isColorKeyOffloaded } from "../../modules/layoutCompositionEngine.js?v=9";
+import { state, setState, subscribe } from "../../state.js?v=10";
+import { LAYOUT_MODES } from "../../modules/layoutEngine.js?v=10";
+import { SCALING_PRIORITIES, isAdaptiveScalingUnlocked, resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=10";
+import { getTrimSizeById } from "../../modules/canvasEngine.js?v=10";
+import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=10";
+import { computeGridDimensions } from "../../modules/gridPatternEngine.js?v=10";
+import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=10";
+import { recommendFont } from "../../modules/typographyEngine.js?v=10";
+import { withColorKeyTarget, normalizeComposition, layoutModeFromComposition, isColorKeyOffloaded } from "../../modules/layoutCompositionEngine.js?v=10";
 
 const el = {
   layoutOptions: document.getElementById("layout-mode-options"),
@@ -79,7 +79,7 @@ function render(current) {
   const grid = gridOverride ?? computeGridDimensions(safeZone.widthIn, safeZone.heightIn, effectiveCellSizeMm, current.gridPattern);
 
   const sizes = getSizesForSelection(current.colorSetOptionId, current.colorSetCustomPair);
-  const colorCount = buildCombinedPalette(sizes, current.colorBrand).length;
+  const colorCount = buildCombinedPalette(sizes).length;
   const font = recommendFont(effectiveCellSizeMm, colorCount);
 
   el.readout.textContent = `${grid.cols}×${grid.rows} grid @ ${effectiveCellSizeMm.toFixed(2)}mm cells (base ${current.cellSizeMm.toFixed(1)}mm) → ${font.sizePt}pt ${font.weight}. This is exactly what the exported PDF will render.`;

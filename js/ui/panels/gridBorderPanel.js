@@ -1,14 +1,14 @@
-import { state, setState, subscribe } from "../../state.js?v=9";
-import { GRID_PATTERNS, computeGridDimensions, isCellInGridSilhouette } from "../../modules/gridPatternEngine.js?v=9";
-import { recommendFont, recommendTextTint } from "../../modules/typographyEngine.js?v=9";
-import { applyPreset, clampBorderWeight } from "../../modules/borderStyleEngine.js?v=9";
-import { CORNER_RADIUS_MIN_PERCENT, CORNER_RADIUS_MAX_PERCENT } from "../../modules/cornerRadiusEngine.js?v=9";
-import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=9";
-import { getTrimSizeById } from "../../modules/canvasEngine.js?v=9";
-import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=9";
-import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=9";
-import { normalizeComposition, computeLayout } from "../../modules/layoutCompositionEngine.js?v=9";
-import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=9";
+import { state, setState, subscribe } from "../../state.js?v=10";
+import { GRID_PATTERNS, computeGridDimensions, isCellInGridSilhouette } from "../../modules/gridPatternEngine.js?v=10";
+import { recommendFont, recommendTextTint } from "../../modules/typographyEngine.js?v=10";
+import { applyPreset, clampBorderWeight } from "../../modules/borderStyleEngine.js?v=10";
+import { CORNER_RADIUS_MIN_PERCENT, CORNER_RADIUS_MAX_PERCENT } from "../../modules/cornerRadiusEngine.js?v=10";
+import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=10";
+import { getTrimSizeById } from "../../modules/canvasEngine.js?v=10";
+import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=10";
+import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=10";
+import { normalizeComposition, computeLayout } from "../../modules/layoutCompositionEngine.js?v=10";
+import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=10";
 
 const el = {
   patternGrid: document.getElementById("grid-pattern-options"),
@@ -111,7 +111,7 @@ function render(current) {
   renderLiveStats(current);
 
   const sizes = getSizesForSelection(current.colorSetOptionId, current.colorSetCustomPair);
-  const colorCount = buildCombinedPalette(sizes, current.colorBrand).length;
+  const colorCount = buildCombinedPalette(sizes).length;
   const font = recommendFont(current.cellSizeMm, colorCount);
   const tint = recommendTextTint(current.cellSizeMm, current.gridTintPercent);
 
