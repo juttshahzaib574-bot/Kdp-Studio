@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>KDP Studio</title>
-  <link rel="stylesheet" href="css/styles.css?v=28" />
+  <link rel="stylesheet" href="css/styles.css?v=29" />
 </head>
 <body>
   <header class="app-header">
@@ -282,8 +282,14 @@
         </div>
 
         <div class="field-group">
-          <label>Key Layout <span class="lock-note">(fills a strict, evenly-spaced grid either way — wraps to a new row/column automatically once one fills up)</span></label>
+          <label>Key Layout <span class="lock-note">(fills a strict, evenly-spaced grid either way — wraps to a new row/column automatically once one fills up, or set an exact count below)</span></label>
           <div class="option-list" id="color-key-orientation-options"></div>
+        </div>
+
+        <div class="field-group">
+          <label for="color-key-entries-per-line">Colors per <span id="color-key-entries-per-line-axis">Row</span></label>
+          <input type="number" id="color-key-entries-per-line" min="1" max="12" placeholder="Auto" />
+          <p class="hint">Leave blank for automatic (as many as comfortably fit). Set a number to force an exact wrap — e.g. 3 means every row holds exactly 3 colors before starting a new one.</p>
         </div>
 
         <div class="field-group">
@@ -451,6 +457,6 @@
        module scripts below — pdfExport.js needs window.fontkit already set when it
        calls doc.registerFontkit() to embed the custom fonts in js/vendor/fonts/. -->
   <script src="js/vendor/fontkit.umd.min.js"></script>
-  <script type="module" src="js/main.js?v=28"></script>
+  <script type="module" src="js/main.js?v=29"></script>
 </body>
 </html>

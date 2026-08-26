@@ -4,23 +4,23 @@
 // (honoring each image's own granular overrides), auto-generated solution pages, and
 // back matter — entirely client-side via pdf-lib, no server round-trip.
 
-import { PDFDocument, StandardFonts, rgb } from "../vendor/pdf-lib.esm.min.js?v=28";
-import { getTrimSizeById } from "../modules/canvasEngine.js?v=28";
-import { computeCanvasDimensions } from "../modules/bleedEngine.js?v=28";
-import { computeSafeZone } from "../modules/safeZoneEngine.js?v=28";
-import { getSizesForSelection, buildCombinedPalette } from "../modules/colorKeyEngine.js?v=28";
-import { computePagination } from "../modules/storyboardEngine.js?v=28";
-import { isPageEnabled, computeFrontMatterPageCount, orderedFrontMatterPages, orderedBackMatterPages } from "../modules/frontBackMatterEngine.js?v=28";
-import { buildSolutionPages } from "../modules/solutionGenerationEngine.js?v=28";
-import { BORDER_PRESETS } from "../modules/borderStyleEngine.js?v=28";
-import { migratedKeyStyle } from "../modules/layoutEngine.js?v=28";
-import { resolveEffectiveGrid } from "../modules/resolutionScalingEngine.js?v=28";
-import { computeKeyGridLayout, keyEntryPosition } from "../modules/colorKeyLayoutEngine.js?v=28";
-import { normalizeComposition, computeLayout } from "../modules/layoutCompositionEngine.js?v=28";
-import { resolveActiveAsset } from "../modules/assetGalleryEngine.js?v=28";
-import { renderFullMosaicGrid, getPlaceholderSource, loadImageSource, drawSourceToCanvas } from "./mosaicRenderer.js?v=28";
-import { isContentPageBlack, isFacingPageBlack, isBlackWhiteEdition, toGrayscaleRgb } from "../modules/bookThemeEngine.js?v=28";
-import { getFontById, fontAssetUrl } from "../modules/fontLibraryEngine.js?v=28";
+import { PDFDocument, StandardFonts, rgb } from "../vendor/pdf-lib.esm.min.js?v=29";
+import { getTrimSizeById } from "../modules/canvasEngine.js?v=29";
+import { computeCanvasDimensions } from "../modules/bleedEngine.js?v=29";
+import { computeSafeZone } from "../modules/safeZoneEngine.js?v=29";
+import { getSizesForSelection, buildCombinedPalette } from "../modules/colorKeyEngine.js?v=29";
+import { computePagination } from "../modules/storyboardEngine.js?v=29";
+import { isPageEnabled, computeFrontMatterPageCount, orderedFrontMatterPages, orderedBackMatterPages } from "../modules/frontBackMatterEngine.js?v=29";
+import { buildSolutionPages } from "../modules/solutionGenerationEngine.js?v=29";
+import { BORDER_PRESETS } from "../modules/borderStyleEngine.js?v=29";
+import { migratedKeyStyle } from "../modules/layoutEngine.js?v=29";
+import { resolveEffectiveGrid } from "../modules/resolutionScalingEngine.js?v=29";
+import { computeKeyGridLayout, keyEntryPosition } from "../modules/colorKeyLayoutEngine.js?v=29";
+import { normalizeComposition, computeLayout } from "../modules/layoutCompositionEngine.js?v=29";
+import { resolveActiveAsset } from "../modules/assetGalleryEngine.js?v=29";
+import { renderFullMosaicGrid, getPlaceholderSource, loadImageSource, drawSourceToCanvas } from "./mosaicRenderer.js?v=29";
+import { isContentPageBlack, isFacingPageBlack, isBlackWhiteEdition, toGrayscaleRgb } from "../modules/bookThemeEngine.js?v=29";
+import { getFontById, fontAssetUrl } from "../modules/fontLibraryEngine.js?v=29";
 
 const PT_PER_IN = 72;
 const inToPt = (inches) => inches * PT_PER_IN;
@@ -198,18 +198,18 @@ function keyBlockXOffsetPt(align, contentWidthPt, widthPt) {
   return 0;
 }
 
-function drawKeyEntries(page, rect, palette, font, textColor, blackWhiteEdition, orientation, align = "start") {
+function drawKeyEntries(page, rect, palette, font, textColor, blackWhiteEdition, orientation, align = "start", maxPerLine = null) {
   if (rect.heightPt <= 0 || rect.widthPt <= 0) return;
   if (blackWhiteEdition) {
-    drawKeyEntriesBlackWhite(page, rect, palette, font, textColor, orientation, align);
+    drawKeyEntriesBlackWhite(page, rect, palette, font, textColor, orientation, align, maxPerLine);
   } else {
-    drawKeyEntriesColor(page, rect, palette, font, textColor, orientation, align);
+    drawKeyEntriesColor(page, rect, palette, font, textColor, orientation, align, maxPerLine);
   }
 }
 
-function drawKeyEntriesColor(page, rect, palette, font, textColor, orientation, align) {
+function drawKeyEntriesColor(page, rect, palette, font, textColor, orientation, align, maxPerLine) {
   const { xPt: xPtBase, yPt, widthPt, heightPt } = rect;
-  const { cols, rows, entryWidthIn, entryHeightIn } = computeKeyGridLayout(palette.length, widthPt / PT_PER_IN, heightPt / PT_PER_IN, undefined, KEY_ENTRY_HEIGHT_IN, orientation);
+  const { cols, rows, entryWidthIn, entryHeightIn } = computeKeyGridLayout(palette.length, widthPt / PT_PER_IN, heightPt / PT_PER_IN, undefined, KEY_ENTRY_HEIGHT_IN, orientation, maxPerLine);
   const entryWidthPt = entryWidthIn * PT_PER_IN;
   const entryHeightPt = entryHeightIn * PT_PER_IN;
   const fontSize = Math.max(5.5, Math.min(9, entryHeightPt * 0.42));
@@ -249,9 +249,9 @@ function drawKeyEntriesColor(page, rect, palette, font, textColor, orientation, 
 // Black & White edition: nothing anywhere in the book spends color ink, so each legend
 // entry is a numbered black box (fixed white border + white number — its own identity,
 // independent of the page's own black/white background) stacked above the color's name.
-function drawKeyEntriesBlackWhite(page, rect, palette, font, textColor, orientation, align) {
+function drawKeyEntriesBlackWhite(page, rect, palette, font, textColor, orientation, align, maxPerLine) {
   const { xPt: xPtBase, yPt, widthPt, heightPt } = rect;
-  const { cols, rows, entryWidthIn, entryHeightIn } = computeKeyGridLayout(palette.length, widthPt / PT_PER_IN, heightPt / PT_PER_IN, KEY_ENTRY_WIDTH_BW_IN, KEY_ENTRY_HEIGHT_BW_IN, orientation);
+  const { cols, rows, entryWidthIn, entryHeightIn } = computeKeyGridLayout(palette.length, widthPt / PT_PER_IN, heightPt / PT_PER_IN, KEY_ENTRY_WIDTH_BW_IN, KEY_ENTRY_HEIGHT_BW_IN, orientation, maxPerLine);
   const entryWidthPt = entryWidthIn * PT_PER_IN;
   const entryHeightPt = entryHeightIn * PT_PER_IN;
   const boxSize = Math.max(9, Math.min(entryWidthPt * 0.4, entryHeightPt * 0.55));
@@ -345,7 +345,7 @@ function drawPlacedElement(page, { id, rect, elConfig, state, palette, fonts, te
   const rectPt = safeLocalRectToPdf(rect, geom);
   const align = elConfig.align === "start" ? "start" : elConfig.align === "end" ? "end" : "center";
   if (id === "colorKey") {
-    drawKeyEntries(page, rectPt, palette, fonts.colorKey, textColor, blackWhiteEdition, state.colorKeyOrientation, align);
+    drawKeyEntries(page, rectPt, palette, fonts.colorKey, textColor, blackWhiteEdition, state.colorKeyOrientation, align, state.colorKeyEntriesPerLine);
     return;
   }
   const fallback = { title: state.bookTitle, subtitle: state.bookSubtitle, instruction: elConfig.text }[id] || "";
