@@ -24,6 +24,7 @@ export function createBatchItem(file) {
       cornerTrimCorners: null,
       cornerTrimShape: null,
       cornerTrimSizePercent: null,
+      sourceSmoothing: null, // null = inherit the book-wide default (Per-Image Granularity System)
     },
   };
 }

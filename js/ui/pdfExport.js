@@ -4,23 +4,24 @@
 // (honoring each image's own granular overrides), auto-generated solution pages, and
 // back matter — entirely client-side via pdf-lib, no server round-trip.
 
-import { PDFDocument, rgb } from "../vendor/pdf-lib.esm.min.js?v=38";
-import { getTrimSizeById } from "../modules/canvasEngine.js?v=38";
-import { computeCanvasDimensions } from "../modules/bleedEngine.js?v=38";
-import { computeSafeZone } from "../modules/safeZoneEngine.js?v=38";
-import { getSizesForSelection, buildCombinedPalette } from "../modules/colorKeyEngine.js?v=38";
-import { computePagination } from "../modules/storyboardEngine.js?v=38";
-import { isPageEnabled, computeFrontMatterPageCount, orderedFrontMatterPages, orderedBackMatterPages } from "../modules/frontBackMatterEngine.js?v=38";
-import { buildSolutionPages } from "../modules/solutionGenerationEngine.js?v=38";
-import { BORDER_PRESETS } from "../modules/borderStyleEngine.js?v=38";
-import { migratedKeyStyle } from "../modules/layoutEngine.js?v=38";
-import { resolveEffectiveGrid } from "../modules/resolutionScalingEngine.js?v=38";
-import { computeKeyGridLayout, keyEntryPosition } from "../modules/colorKeyLayoutEngine.js?v=38";
-import { normalizeComposition, computeLayout } from "../modules/layoutCompositionEngine.js?v=38";
-import { resolveActiveAsset } from "../modules/assetGalleryEngine.js?v=38";
-import { renderFullMosaicGrid, getPlaceholderSource, loadImageSource, drawSourceToCanvas } from "./mosaicRenderer.js?v=38";
-import { isContentPageBlack, isFacingPageBlack, isBlackWhiteEdition, toGrayscaleRgb } from "../modules/bookThemeEngine.js?v=38";
-import { getFontById, fontAssetUrl } from "../modules/fontLibraryEngine.js?v=38";
+import { PDFDocument, rgb } from "../vendor/pdf-lib.esm.min.js?v=39";
+import { getTrimSizeById } from "../modules/canvasEngine.js?v=39";
+import { computeCanvasDimensions } from "../modules/bleedEngine.js?v=39";
+import { computeSafeZone } from "../modules/safeZoneEngine.js?v=39";
+import { getSizesForSelection, buildCombinedPalette } from "../modules/colorKeyEngine.js?v=39";
+import { computePagination } from "../modules/storyboardEngine.js?v=39";
+import { isPageEnabled, computeFrontMatterPageCount, orderedFrontMatterPages, orderedBackMatterPages } from "../modules/frontBackMatterEngine.js?v=39";
+import { buildSolutionPages } from "../modules/solutionGenerationEngine.js?v=39";
+import { BORDER_PRESETS } from "../modules/borderStyleEngine.js?v=39";
+import { migratedKeyStyle } from "../modules/layoutEngine.js?v=39";
+import { resolveEffectiveGrid } from "../modules/resolutionScalingEngine.js?v=39";
+import { computeKeyGridLayout, keyEntryPosition } from "../modules/colorKeyLayoutEngine.js?v=39";
+import { normalizeComposition, computeLayout } from "../modules/layoutCompositionEngine.js?v=39";
+import { resolveActiveAsset } from "../modules/assetGalleryEngine.js?v=39";
+import { renderFullMosaicGrid, getPlaceholderSource, loadImageSource, drawSourceToCanvas } from "./mosaicRenderer.js?v=39";
+import { isContentPageBlack, isFacingPageBlack, isBlackWhiteEdition, toGrayscaleRgb } from "../modules/bookThemeEngine.js?v=39";
+import { getFontById, fontAssetUrl } from "../modules/fontLibraryEngine.js?v=39";
+import { applySourceSmoothing } from "../modules/sourceSmoothingEngine.js?v=39";
 
 const PT_PER_IN = 72;
 const inToPt = (inches) => inches * PT_PER_IN;
@@ -98,10 +99,10 @@ function paintPageBackground(page, w, h, isBlack) {
   return isBlack ? rgb(0.95, 0.95, 0.95) : rgb(0.15, 0.15, 0.15);
 }
 
-async function resolveItemSource(item) {
+async function resolveItemSource(item, smoothingMode) {
   try {
     const img = await loadImageSource(item.objectUrl);
-    return drawSourceToCanvas(img, 256);
+    return applySourceSmoothing(drawSourceToCanvas(img, 256), smoothingMode);
   } catch {
     return getPlaceholderSource();
   }
@@ -126,8 +127,9 @@ function resolveItemEffectiveSettings(item, state, globalPalette) {
   const cornerTrimCorners = item.settings.cornerTrimCorners ?? state.gridCornerTrimCorners;
   const cornerTrimShape = item.settings.cornerTrimShape ?? state.gridCornerTrimShape;
   const cornerTrimSizePercent = item.settings.cornerTrimSizePercent ?? state.gridCornerTrimSizePercent;
+  const sourceSmoothing = item.settings.sourceSmoothing ?? state.sourceSmoothing;
 
-  return { gridPattern, borderWeightPt, gridTintPercent, cornerRadiusPercent, palette, cornerTrimCorners, cornerTrimShape, cornerTrimSizePercent };
+  return { gridPattern, borderWeightPt, gridTintPercent, cornerRadiusPercent, palette, cornerTrimCorners, cornerTrimShape, cornerTrimSizePercent, sourceSmoothing };
 }
 
 function resolveItemBackImage(item, backImagesByAssetId, globalBackImage) {
@@ -801,7 +803,7 @@ export async function exportInteriorPdf(state, { onProgress } = {}) {
     const comp = resolveItemComposition(item, state);
     const fonts = fontsForComposition(comp);
     const layout = computeLayout(safeZone, comp);
-    const sourceCanvas = await resolveItemSource(item);
+    const sourceCanvas = await resolveItemSource(item, effective.sourceSmoothing);
     const { cellSizeMm: effectiveCellSizeMm, gridOverride } = resolveEffectiveGrid(safeZone, state.cellSizeMm, effective.gridPattern, comp, state.resolutionPriority);
 
     const renderOpts = {
@@ -984,7 +986,6 @@ async function renderActiveItemFullPage(state, mode) {
   const pageHeightPt = inToPt(canvasDims.heightIn);
 
   const activeItem = state.batchItems.find((i) => i.id === state.activeBatchItemId);
-  const sourceCanvas = activeItem ? await resolveItemSource(activeItem) : getPlaceholderSource();
   const effective = activeItem
     ? resolveItemEffectiveSettings(activeItem, state, globalPalette)
     : {
@@ -996,7 +997,9 @@ async function renderActiveItemFullPage(state, mode) {
         cornerTrimCorners: state.gridCornerTrimCorners,
         cornerTrimShape: state.gridCornerTrimShape,
         cornerTrimSizePercent: state.gridCornerTrimSizePercent,
+        sourceSmoothing: state.sourceSmoothing,
       };
+  const sourceCanvas = activeItem ? await resolveItemSource(activeItem, effective.sourceSmoothing) : getPlaceholderSource();
   const comp = activeItem ? resolveItemComposition(activeItem, state) : normalizeComposition(state.globalComposition);
   const { cellSizeMm: effectiveCellSizeMm, gridOverride } = resolveEffectiveGrid(safeZone, state.cellSizeMm, effective.gridPattern, comp, state.resolutionPriority);
   const contentBlack = isContentPageBlack(state.pageBackgroundMode);

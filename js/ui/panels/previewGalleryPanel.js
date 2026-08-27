@@ -1,16 +1,17 @@
 // Module: Stacked Live Preview Gallery + Live Preview Carousel
-import { state, setState, subscribe } from "../../state.js?v=38";
-import { getTrimSizeById } from "../../modules/canvasEngine.js?v=38";
-import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=38";
-import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=38";
-import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=38";
-import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=38";
-import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=38";
-import { normalizeComposition } from "../../modules/layoutCompositionEngine.js?v=38";
-import { getPlaceholderSource, loadImageSource, drawSourceToCanvas, renderMosaicPreview } from "../mosaicRenderer.js?v=38";
-import { createCarouselController } from "../../modules/previewLoopEngine.js?v=38";
-import { downloadActiveItemPng, downloadActiveItemPdf } from "../pdfExport.js?v=38";
-import { isContentPageBlack } from "../../modules/bookThemeEngine.js?v=38";
+import { state, setState, subscribe } from "../../state.js?v=39";
+import { getTrimSizeById } from "../../modules/canvasEngine.js?v=39";
+import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=39";
+import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=39";
+import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=39";
+import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=39";
+import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=39";
+import { normalizeComposition } from "../../modules/layoutCompositionEngine.js?v=39";
+import { getPlaceholderSource, loadImageSource, drawSourceToCanvas, renderMosaicPreview } from "../mosaicRenderer.js?v=39";
+import { createCarouselController } from "../../modules/previewLoopEngine.js?v=39";
+import { downloadActiveItemPng, downloadActiveItemPdf } from "../pdfExport.js?v=39";
+import { isContentPageBlack } from "../../modules/bookThemeEngine.js?v=39";
+import { applySourceSmoothing } from "../../modules/sourceSmoothingEngine.js?v=39";
 
 const el = {
   printCanvas: document.getElementById("preview-canvas-print"),
@@ -167,7 +168,8 @@ async function render(current) {
     return;
   }
 
-  const sourceCanvas = await resolveSourceCanvas(current);
+  const smoothingMode = activeItem.settings.sourceSmoothing ?? current.sourceSmoothing;
+  const sourceCanvas = await resolveSourceCanvas(current, smoothingMode);
 
   const trimSize = getTrimSizeById(current.trimSizeId);
   const canvasDims = computeCanvasDimensions(trimSize, current.dpi, current.bleedEnabled);
@@ -230,9 +232,9 @@ function updateCarouselNav(current) {
   el.carouselDot.classList.toggle("on", current.previewLoopEnabled && items.length > 1);
 }
 
-async function resolveSourceCanvas(current) {
+async function resolveSourceCanvas(current, smoothingMode) {
   const activeItem = current.batchItems.find((item) => item.id === current.activeBatchItemId);
-  const key = activeItem ? activeItem.objectUrl : "placeholder";
+  const key = activeItem ? `${activeItem.objectUrl}::${smoothingMode}` : "placeholder";
 
   if (cachedSourceCanvas && cachedSourceKey === key) return cachedSourceCanvas;
 
@@ -244,7 +246,7 @@ async function resolveSourceCanvas(current) {
 
   try {
     const img = await loadImageSource(activeItem.objectUrl);
-    cachedSourceCanvas = drawSourceToCanvas(img);
+    cachedSourceCanvas = applySourceSmoothing(drawSourceToCanvas(img), smoothingMode);
     cachedSourceKey = key;
   } catch {
     cachedSourceCanvas = getPlaceholderSource();
