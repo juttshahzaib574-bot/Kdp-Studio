@@ -197,3 +197,19 @@ export function nearestPaletteColor(rgb, palette) {
   });
   return bestIndex;
 }
+
+export function nearestPaletteColorLAB(lab, palette) {
+  if (!palette || palette.length === 0) {
+    throw new Error("nearestPaletteColorLAB: palette is empty — nothing to snap to.");
+  }
+  let bestIndex = 0;
+  let bestDist = Infinity;
+  palette.forEach((entry, index) => {
+    const dist = deltaE2000(lab, paletteLab(entry));
+    if (dist < bestDist) {
+      bestDist = dist;
+      bestIndex = index;
+    }
+  });
+  return bestIndex;
+}

@@ -80,6 +80,11 @@ export const state = {
   // Each image can also override this individually via its own ⚙ drawer.
   sourceSmoothing: "off",
 
+  // Source Resolution: the maximum pixel dimension (long edge) for the internal
+  // canvas the quantizer works from. Higher = more detail preserved from the original
+  // photo = sharper color identification, but slower renders. Each image can override.
+  sourceResolution: 1024,
+
   // Automated Solution Generation Engine
   solutionThumbsPerPage: 4,
 

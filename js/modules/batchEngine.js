@@ -25,6 +25,7 @@ export function createBatchItem(file) {
       cornerTrimShape: null,
       cornerTrimSizePercent: null,
       sourceSmoothing: null, // null = inherit the book-wide default (Per-Image Granularity System)
+      sourceResolution: null, // null = inherit the book-wide default
       // Custom Color-to-Number Order — per-item only, no book-wide default: it's a
       // deliberate per-image choice (e.g. "Black is 1 on this puzzle, 2 on that one"),
       // not a book-wide style. null/[] = use the palette's normal fixed order. See

@@ -4,9 +4,9 @@
 // pdfExport.js onto <canvas>) guarantees the preview can never drift out of sync with
 // what actually downloads — same zero-API, fully-local architecture as pdf-lib.
 
-import * as pdfjsLib from "../vendor/pdf.min.mjs?v=45";
+import * as pdfjsLib from "../vendor/pdf.min.mjs?v=47";
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL("../vendor/pdf.worker.min.mjs?v=45", import.meta.url).href;
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL("../vendor/pdf.worker.min.mjs?v=47", import.meta.url).href;
 
 export async function loadPdfDocument(bytes) {
   // pdf.js detaches/transfers the buffer it's given — pass a copy so the caller's own
