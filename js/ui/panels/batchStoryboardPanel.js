@@ -1,13 +1,13 @@
-import { state, setState, subscribe } from "../../state.js?v=44";
-import { MAX_BATCH_SIZE, addToBatch, removeFromBatch, updateItemSettings } from "../../modules/batchEngine.js?v=44";
-import { reorder, computePagination, statusBadges } from "../../modules/storyboardEngine.js?v=44";
-import { computeSolutionPageCount } from "../../modules/solutionGenerationEngine.js?v=44";
-import { GRID_PATTERNS, CORNER_TRIM_CORNERS, CORNER_TRIM_SHAPES, CORNER_TRIM_SIZE_MIN_PERCENT, CORNER_TRIM_SIZE_MAX_PERCENT } from "../../modules/gridPatternEngine.js?v=44";
-import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=44";
-import { computeFrontMatterPageCount } from "../../modules/frontBackMatterEngine.js?v=44";
-import { SOURCE_SMOOTHING_OPTIONS } from "../../modules/sourceSmoothingEngine.js?v=44";
-import { getSizesForSelection, buildCombinedPalette, applyCustomColorOrder } from "../../modules/colorKeyEngine.js?v=44";
-import { DRAG_HANDLE_ICON, attachDragHandle } from "../dragReorderList.js?v=44";
+import { state, setState, subscribe } from "../../state.js?v=45";
+import { MAX_BATCH_SIZE, addToBatch, removeFromBatch, updateItemSettings } from "../../modules/batchEngine.js?v=45";
+import { reorder, computePagination, statusBadges } from "../../modules/storyboardEngine.js?v=45";
+import { computeSolutionPageCount } from "../../modules/solutionGenerationEngine.js?v=45";
+import { GRID_PATTERNS, CORNER_TRIM_CORNERS, CORNER_TRIM_SHAPES, CORNER_TRIM_SIZE_MIN_PERCENT, CORNER_TRIM_SIZE_MAX_PERCENT } from "../../modules/gridPatternEngine.js?v=45";
+import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=45";
+import { computeFrontMatterPageCount } from "../../modules/frontBackMatterEngine.js?v=45";
+import { SOURCE_SMOOTHING_OPTIONS } from "../../modules/sourceSmoothingEngine.js?v=45";
+import { getSizesForSelection, buildCombinedPalette, applyCustomColorOrder } from "../../modules/colorKeyEngine.js?v=45";
+import { DRAG_HANDLE_ICON, attachDragHandle } from "../dragReorderList.js?v=45";
 
 const CORNER_RADIUS_CHOICES = [0, 25, 50, 75, 100];
 const COLOR_SET_CHOICES = [12, 24, 36];

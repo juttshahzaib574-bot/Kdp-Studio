@@ -1,17 +1,17 @@
 // Module: Stacked Live Preview Gallery + Live Preview Carousel
-import { state, setState, subscribe } from "../../state.js?v=44";
-import { getTrimSizeById } from "../../modules/canvasEngine.js?v=44";
-import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=44";
-import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=44";
-import { getSizesForSelection, buildCombinedPalette, applyCustomColorOrder } from "../../modules/colorKeyEngine.js?v=44";
-import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=44";
-import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=44";
-import { normalizeComposition } from "../../modules/layoutCompositionEngine.js?v=44";
-import { getPlaceholderSource, loadImageSource, drawSourceToCanvas, renderMosaicPreview } from "../mosaicRenderer.js?v=44";
-import { createCarouselController } from "../../modules/previewLoopEngine.js?v=44";
-import { downloadActiveItemPng, downloadActiveItemPdf } from "../pdfExport.js?v=44";
-import { isContentPageBlack } from "../../modules/bookThemeEngine.js?v=44";
-import { applySourceSmoothing } from "../../modules/sourceSmoothingEngine.js?v=44";
+import { state, setState, subscribe } from "../../state.js?v=45";
+import { getTrimSizeById } from "../../modules/canvasEngine.js?v=45";
+import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=45";
+import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=45";
+import { getSizesForSelection, buildCombinedPalette, applyCustomColorOrder } from "../../modules/colorKeyEngine.js?v=45";
+import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=45";
+import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=45";
+import { normalizeComposition } from "../../modules/layoutCompositionEngine.js?v=45";
+import { getPlaceholderSource, loadImageSource, drawSourceToCanvas, renderMosaicPreview } from "../mosaicRenderer.js?v=45";
+import { createCarouselController } from "../../modules/previewLoopEngine.js?v=45";
+import { downloadActiveItemPng, downloadActiveItemPdf } from "../pdfExport.js?v=45";
+import { isContentPageBlack } from "../../modules/bookThemeEngine.js?v=45";
+import { applySourceSmoothing } from "../../modules/sourceSmoothingEngine.js?v=45";
 
 const el = {
   printCanvas: document.getElementById("preview-canvas-print"),

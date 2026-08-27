@@ -6,14 +6,14 @@
 //   - renderFullMosaicGrid: the entire safe-zone grid at the real chosen print DPI,
 //     used to generate the actual page image embedded into the exported PDF.
 
-import { computeFrameGeometry, drawFrame } from "./preview.js?v=44";
-import { computeGridDimensions, cellCenterIn, cellPolygonIn, mmToIn, isCellInGridSilhouette, isCellInFrameMargin } from "../modules/gridPatternEngine.js?v=44";
-import { recommendFont, recommendTextTint, adjustForBorderWeight, centerOffsetIn, letterSpacingForLabel } from "../modules/typographyEngine.js?v=44";
-import { gridColorFromTint } from "../modules/borderStyleEngine.js?v=44";
-import { cornerRadiusIn, isFullCircle } from "../modules/cornerRadiusEngine.js?v=44";
-import { nearestPaletteColor, rgbToLabTriple, labTripleToRgb } from "../modules/shadeQuantizationEngine.js?v=44";
-import { computeLayout, LAYOUT_ELEMENTS } from "../modules/layoutCompositionEngine.js?v=44";
-import { toGrayscaleHex } from "../modules/bookThemeEngine.js?v=44";
+import { computeFrameGeometry, drawFrame } from "./preview.js?v=45";
+import { computeGridDimensions, cellCenterIn, cellPolygonIn, mmToIn, isCellInGridSilhouette, isCellInFrameMargin } from "../modules/gridPatternEngine.js?v=45";
+import { recommendFont, recommendTextTint, adjustForBorderWeight, centerOffsetIn, letterSpacingForLabel } from "../modules/typographyEngine.js?v=45";
+import { gridColorFromTint } from "../modules/borderStyleEngine.js?v=45";
+import { cornerRadiusIn, isFullCircle } from "../modules/cornerRadiusEngine.js?v=45";
+import { nearestPaletteColor, rgbToLabTriple, labTripleToRgb, deltaE2000Triple } from "../modules/shadeQuantizationEngine.js?v=45";
+import { computeLayout, LAYOUT_ELEMENTS } from "../modules/layoutCompositionEngine.js?v=45";
+import { toGrayscaleHex } from "../modules/bookThemeEngine.js?v=45";
 
 const PT_TO_IN = 1 / 72;
 
@@ -99,17 +99,17 @@ function mulberry32(seed) {
   };
 }
 
-// Generic 3-channel Euclidean distance — used on LAB triples below (so this IS a true
-// perceptual Delta E), not RGB. Named for what it computes, not which color space it
-// happens to be fed, since kmeansSeeded/the merge step are channel-agnostic either way.
+// CIE76 (Euclidean in LAB) — fast enough for the k-means inner loop (hundreds of
+// thousands of iterations per render). Cluster merging and palette snap use the more
+// accurate CIEDE2000 instead (imported from shadeQuantizationEngine).
 const euclidean3 = (a, b) => Math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2);
 
-// Perceptually-close clusters (by CIE76 Delta E, in LAB — see computeQuantization)
-// merge into one before the final palette snap. Chosen well above the ~2.3 JND
-// ("just noticeable difference") threshold: this step exists to collapse redundant
-// near-duplicate k-means clusters, not to distinguish subtly different shades — the
-// final nearestPaletteColor step is what actually decides "closest printed color."
-const CLUSTER_MERGE_DELTA_E = 15;
+// Perceptually-close clusters merge into one before the final palette snap, now
+// measured by CIEDE2000 (not CIE76) for accuracy in the blue and saturated regions.
+// Threshold 8 in CIEDE2000 units ≈ the old CIE76 threshold of 15 — well above
+// the ~1.0 JND — collapsing genuinely redundant near-duplicate clusters without
+// merging visually distinct shades.
+const CLUSTER_MERGE_DELTA_E = 8;
 
 // kmeansSeeded's Lloyd iterations cost O(n * clusters * iters) — at a small cell size
 // (more grid cells) combined with a wide color set (more clusters), n (every non-outline
@@ -379,7 +379,7 @@ function computeQuantization(sourceCanvas, cols, rows, targetAspect, palette) {
     let bestDist = Infinity;
     for (let a = 0; a < cents.length; a += 1) {
       for (let b = a + 1; b < cents.length; b += 1) {
-        const d = euclidean3(cents[a], cents[b]);
+        const d = deltaE2000Triple(cents[a], cents[b]);
         if (d < bestDist) {
           bestDist = d;
           bj = b;
