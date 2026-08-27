@@ -41,6 +41,12 @@ export const state = {
   colorSetOptionId: "set-24",
   colorSetCustomPair: [12, 24],
 
+  // Blank Colors: creator-picked subset of the active palette (by UNIVERSAL_PALETTE_36
+  // id) that renders with no border and no number on the puzzle page — bare paper, not
+  // a special "background" color. Empty by default; nothing is ever blanked unless a
+  // creator explicitly picks it here, on purpose, per book (deepens the mystery reveal).
+  blankColorIds: [],
+
   // Color key flow direction: "horizontal" (fill each row, wrap to a new row) |
   // "vertical" (fill each column, wrap to a new column) — see colorKeyLayoutEngine.js.
   colorKeyOrientation: "horizontal",

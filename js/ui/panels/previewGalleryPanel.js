@@ -1,16 +1,16 @@
 // Module: Stacked Live Preview Gallery + Live Preview Carousel
-import { state, setState, subscribe } from "../../state.js?v=33";
-import { getTrimSizeById } from "../../modules/canvasEngine.js?v=33";
-import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=33";
-import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=33";
-import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=33";
-import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=33";
-import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=33";
-import { normalizeComposition } from "../../modules/layoutCompositionEngine.js?v=33";
-import { getPlaceholderSource, loadImageSource, drawSourceToCanvas, renderMosaicPreview } from "../mosaicRenderer.js?v=33";
-import { createCarouselController } from "../../modules/previewLoopEngine.js?v=33";
-import { downloadActiveItemPng, downloadActiveItemPdf } from "../pdfExport.js?v=33";
-import { isContentPageBlack } from "../../modules/bookThemeEngine.js?v=33";
+import { state, setState, subscribe } from "../../state.js?v=34";
+import { getTrimSizeById } from "../../modules/canvasEngine.js?v=34";
+import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=34";
+import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=34";
+import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=34";
+import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=34";
+import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=34";
+import { normalizeComposition } from "../../modules/layoutCompositionEngine.js?v=34";
+import { getPlaceholderSource, loadImageSource, drawSourceToCanvas, renderMosaicPreview } from "../mosaicRenderer.js?v=34";
+import { createCarouselController } from "../../modules/previewLoopEngine.js?v=34";
+import { downloadActiveItemPng, downloadActiveItemPdf } from "../pdfExport.js?v=34";
+import { isContentPageBlack } from "../../modules/bookThemeEngine.js?v=34";
 
 const el = {
   printCanvas: document.getElementById("preview-canvas-print"),
@@ -200,6 +200,7 @@ async function render(current) {
     cornerTrimShape: effective.cornerTrimShape,
     cornerTrimSizePercent: effective.cornerTrimSizePercent,
     frameMarginCells: current.gridFrameMarginCells,
+    blankColorIds: current.blankColorIds,
     gridPageBlack: isContentPageBlack(current.pageBackgroundMode),
     // Deliberately NOT threading the Black & White book edition through here: this
     // Solved State panel exists to show the creator the artwork's TRUE colors as a

@@ -572,6 +572,27 @@ input[type="file"] {
   white-space: nowrap;
 }
 
+#blank-color-options {
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.swatch-toggle {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+}
+
+.swatch-toggle strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+  font-size: 0.78rem;
+}
+
 /* --- Selective front/back matter (reorderable checklist) --- */
 
 .matter-page-list {
