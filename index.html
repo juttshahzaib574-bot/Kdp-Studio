@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>KDP Studio</title>
-  <link rel="stylesheet" href="css/styles.css?v=41" />
+  <link rel="stylesheet" href="css/styles.css?v=43" />
 </head>
 <body>
   <header class="app-header">
@@ -67,6 +67,7 @@
             </div>
           </div>
           <p class="hint">Updates live as you tune Source Smoothing and Posterize Levels above — tune here until the image looks like clean, flat art before it ever reaches the grid.</p>
+          <p class="hint hint-warning" id="native-grid-warning" hidden></p>
         </div>
 
         <div class="field-group">
@@ -536,6 +537,6 @@
        module scripts below — pdfExport.js needs window.fontkit already set when it
        calls doc.registerFontkit() to embed the custom fonts in js/vendor/fonts/. -->
   <script src="js/vendor/fontkit.umd.min.js"></script>
-  <script type="module" src="js/main.js?v=41"></script>
+  <script type="module" src="js/main.js?v=43"></script>
 </body>
 </html>

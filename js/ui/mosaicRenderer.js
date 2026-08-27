@@ -6,14 +6,14 @@
 //   - renderFullMosaicGrid: the entire safe-zone grid at the real chosen print DPI,
 //     used to generate the actual page image embedded into the exported PDF.
 
-import { computeFrameGeometry, drawFrame } from "./preview.js?v=41";
-import { computeGridDimensions, cellCenterIn, cellPolygonIn, mmToIn, isCellInGridSilhouette, isCellInFrameMargin } from "../modules/gridPatternEngine.js?v=41";
-import { recommendFont, recommendTextTint, adjustForBorderWeight, centerOffsetIn, letterSpacingForLabel } from "../modules/typographyEngine.js?v=41";
-import { gridColorFromTint } from "../modules/borderStyleEngine.js?v=41";
-import { cornerRadiusIn, isFullCircle } from "../modules/cornerRadiusEngine.js?v=41";
-import { nearestPaletteColor, rgbToLabTriple, labTripleToRgb } from "../modules/shadeQuantizationEngine.js?v=41";
-import { computeLayout, LAYOUT_ELEMENTS } from "../modules/layoutCompositionEngine.js?v=41";
-import { toGrayscaleHex } from "../modules/bookThemeEngine.js?v=41";
+import { computeFrameGeometry, drawFrame } from "./preview.js?v=43";
+import { computeGridDimensions, cellCenterIn, cellPolygonIn, mmToIn, isCellInGridSilhouette, isCellInFrameMargin } from "../modules/gridPatternEngine.js?v=43";
+import { recommendFont, recommendTextTint, adjustForBorderWeight, centerOffsetIn, letterSpacingForLabel } from "../modules/typographyEngine.js?v=43";
+import { gridColorFromTint } from "../modules/borderStyleEngine.js?v=43";
+import { cornerRadiusIn, isFullCircle } from "../modules/cornerRadiusEngine.js?v=43";
+import { nearestPaletteColor, rgbToLabTriple, labTripleToRgb } from "../modules/shadeQuantizationEngine.js?v=43";
+import { computeLayout, LAYOUT_ELEMENTS } from "../modules/layoutCompositionEngine.js?v=43";
+import { toGrayscaleHex } from "../modules/bookThemeEngine.js?v=43";
 
 const PT_TO_IN = 1 / 72;
 
@@ -451,14 +451,73 @@ function computeQuantization(sourceCanvas, cols, rows, targetAspect, palette) {
   const uniquePaletteIndexes = [...new Set(paletteIndexForColor)].sort((a, b) => a - b);
   const legendSlotForPaletteIndex = new Map(uniquePaletteIndexes.map((paletteIndex, slot) => [paletteIndex, slot]));
 
-  const assignments = remappedLabels.map((clusterSlot) => legendSlotForPaletteIndex.get(paletteIndexForColor[clusterSlot]));
+  const rawAssignments = remappedLabels.map((clusterSlot) => legendSlotForPaletteIndex.get(paletteIndexForColor[clusterSlot]));
+  const despeckled = despeckleAssignments(rawAssignments, cols, rows);
 
-  const legend = uniquePaletteIndexes.map((paletteIndex) => {
-    const entry = palette[paletteIndex];
+  // Despeckling can fully absorb a rare cluster into its neighbors, so the legend is
+  // built from what's actually left on the grid, not from every cluster k-means found —
+  // otherwise a swatch with zero cells would still print in the color key.
+  const survivingPaletteIndexes = [...new Set(despeckled)].sort((a, b) => a - b);
+  const finalSlotForSurvivingSlot = new Map(survivingPaletteIndexes.map((slot, finalSlot) => [slot, finalSlot]));
+  const assignments = despeckled.map((slot) => finalSlotForSurvivingSlot.get(slot));
+
+  const legend = survivingPaletteIndexes.map((slot) => {
+    const entry = palette[uniquePaletteIndexes[slot]];
     return { id: entry.id, hex: entry.hex, rgb: entry.rgb, name: entry.name };
   });
 
   return { assignments, legend };
+}
+
+// Merges cells that sit isolated from their own color — surrounded by 7 or 8 neighbors
+// of other colors — into whichever neighboring color is most common. Per-cell nearest-
+// palette assignment has no notion of its neighbors, so on busy/textured source photos
+// it scatters lone off-color cells across otherwise-uniform regions ("salt and pepper"),
+// which is what actually reads as "muddy" once printed as small numbered cells — the
+// per-cell colors are individually correct, they just don't cohere into a colorable
+// shape. A few passes of "adopt the majority around you" restores that coherence
+// without touching genuinely-sized regions (2+ matching neighbors are left alone).
+function despeckleAssignments(assignments, cols, rows) {
+  let cur = assignments;
+  for (let pass = 0; pass < 4; pass += 1) {
+    const next = cur.slice();
+    for (let r = 0; r < rows; r += 1) {
+      for (let c = 0; c < cols; c += 1) {
+        const idx = r * cols + c;
+        const self = cur[idx];
+        const neighbors = [
+          c > 0 ? cur[idx - 1] : null,
+          c < cols - 1 ? cur[idx + 1] : null,
+          r > 0 ? cur[idx - cols] : null,
+          r < rows - 1 ? cur[idx + cols] : null,
+          r > 0 && c > 0 ? cur[idx - cols - 1] : null,
+          r > 0 && c < cols - 1 ? cur[idx - cols + 1] : null,
+          r < rows - 1 && c > 0 ? cur[idx + cols - 1] : null,
+          r < rows - 1 && c < cols - 1 ? cur[idx + cols + 1] : null,
+        ].filter((v) => v !== null);
+
+        const neighborCounts = new Map();
+        let selfCount = 0;
+        neighbors.forEach((v) => {
+          if (v === self) selfCount += 1;
+          neighborCounts.set(v, (neighborCounts.get(v) || 0) + 1);
+        });
+        if (selfCount >= 2) continue;
+
+        let bestVal = self;
+        let bestCount = 0;
+        neighborCounts.forEach((count, val) => {
+          if (count > bestCount) {
+            bestCount = count;
+            bestVal = val;
+          }
+        });
+        next[idx] = bestVal;
+      }
+    }
+    cur = next;
+  }
+  return cur;
 }
 
 function polygonToPx(points, centerPx, scalePxPerIn) {

@@ -1,6 +1,6 @@
 // Module 7: Adaptive Resolution & Cell Scaling Engine
-import { computeGridDimensions, inToMm } from "./gridPatternEngine.js?v=41";
-import { computeLayout, isColorKeyOffloaded, normalizeComposition } from "./layoutCompositionEngine.js?v=41";
+import { computeGridDimensions, inToMm, CELL_SIZE_MM_MIN, CELL_SIZE_MM_MAX } from "./gridPatternEngine.js?v=43";
+import { computeLayout, isColorKeyOffloaded, normalizeComposition } from "./layoutCompositionEngine.js?v=43";
 
 export const SCALING_PRIORITIES = [
   {
@@ -53,10 +53,32 @@ export function computeAdaptiveGrid(baseGrid, extraSafeZoneWidthIn, extraSafeZon
 // closes that gap; grid-expansion needs no such pin, since its cols/rows already come
 // from that same computeGridDimensions call over the same full area, so an independent
 // recompute downstream reproduces it exactly (deterministic function, identical inputs).
-export function resolveEffectiveGrid(safeZone, cellSizeMm, gridPattern, composition, resolutionPriority) {
+// nativeGrid ({ cols, rows } | null): a per-image "this source is already exact pixel
+// art at these dimensions" override (Native Pixel Grid). It takes priority over the
+// usual cell-size-driven computation and over adaptive scaling, since it expresses a
+// stronger intent — every print cell should map 1:1 onto one block of the source image,
+// with no cell straddling (and blurring) two source blocks. It's still bounded by the
+// same CELL_SIZE_MM_MIN/MAX every other cell size in this app must obey: if honoring the
+// exact block count would need cells outside that printable range at the current trim
+// size, this falls back to the normal computed grid and reports why via nativeGridWarning
+// rather than silently printing illegibly tiny (or oversized) cells.
+export function resolveEffectiveGrid(safeZone, cellSizeMm, gridPattern, composition, resolutionPriority, nativeGrid = null) {
   const comp = normalizeComposition(composition);
+
+  if (nativeGrid && nativeGrid.cols > 0 && nativeGrid.rows > 0) {
+    const gridZone = computeLayout(safeZone, comp).gridZone;
+    const nativeCellSizeMm = inToMm(Math.min(gridZone.widthIn / nativeGrid.cols, gridZone.heightIn / nativeGrid.rows));
+    if (nativeCellSizeMm >= CELL_SIZE_MM_MIN && nativeCellSizeMm <= CELL_SIZE_MM_MAX) {
+      return { cellSizeMm: nativeCellSizeMm, gridOverride: { cols: nativeGrid.cols, rows: nativeGrid.rows }, nativeGridWarning: null };
+    }
+    return {
+      ...resolveEffectiveGrid(safeZone, cellSizeMm, gridPattern, composition, resolutionPriority),
+      nativeGridWarning: `A ${nativeGrid.cols}×${nativeGrid.rows} native grid would need ${nativeCellSizeMm.toFixed(2)}mm cells at this trim size — outside the printable ${CELL_SIZE_MM_MIN}–${CELL_SIZE_MM_MAX}mm range, so this image is using its normal computed grid instead.`,
+    };
+  }
+
   if (!isAdaptiveScalingUnlocked(comp)) {
-    return { cellSizeMm, gridOverride: null };
+    return { cellSizeMm, gridOverride: null, nativeGridWarning: null };
   }
 
   // Baseline = the exact same composition but with the color key forced back onto the
@@ -78,5 +100,6 @@ export function resolveEffectiveGrid(safeZone, cellSizeMm, gridPattern, composit
   return {
     cellSizeMm: adaptive.cellSizeMm,
     gridOverride: resolutionPriority === "cell-enlargement" ? { cols: adaptive.cols, rows: adaptive.rows } : null,
+    nativeGridWarning: null,
   };
 }

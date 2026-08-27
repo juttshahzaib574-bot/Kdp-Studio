@@ -32,5 +32,6 @@ export function statusBadges(item, globalDefaults) {
   if (item.settings.cornerRadiusPercent !== null && item.settings.cornerRadiusPercent !== undefined) badges.push("custom-radius");
   if (item.settings.colorSetOverride) badges.push("custom-palette");
   if (item.settings.backBackgroundAssetId) badges.push("custom-back");
+  if (item.settings.nativeGridCols && item.settings.nativeGridRows) badges.push("native-grid");
   return badges;
 }
