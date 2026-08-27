@@ -11,6 +11,21 @@ export const GRID_PATTERNS = [
   { id: "circle", label: "Circle", note: "Solid punched-circle cells, like a classic dot-art color-by-number sheet." },
 ];
 
+// Diamonds are squares rotated 45°. Their point-to-point width — the number that
+// actually determines both the drawn shape (cellPolygonIn) AND the tessellation
+// spacing (computeGridDimensions/cellCenterIn) — is deliberately cellSizeIn * √2,
+// not cellSizeIn directly. That √2 scale-up is what makes the "Cell Size" slider
+// mean roughly the same on-page density for Diamond as it does for Square: a true
+// gapless argyle tessellation needs its rows packed at HALF this width's vertical
+// pitch (see cellCenterIn below), so leaving the diagonal at a literal cellSizeIn
+// would pack diamonds at ~2x Square's cell count for the same slider value — dense
+// enough that the diagonal borders alias into a grayish blur on a small preview.
+// Every one of the three functions below computes this from the exact same formula
+// so the shape and its spacing can never drift apart again the way they did before.
+function diamondDiagonalIn(cellSizeIn) {
+  return cellSizeIn * Math.SQRT2;
+}
+
 export function getGridPatternById(id) {
   const found = GRID_PATTERNS.find((p) => p.id === id);
   if (!found) throw new Error(`Unknown grid pattern: ${id}`);
@@ -37,14 +52,12 @@ export function computeGridDimensions(safeZoneWidthIn, safeZoneHeightIn, cellSiz
   }
 
   if (patternId === "diamond") {
-    // Diamonds are squares rotated 45°; cellPolygonIn draws each one with a
-    // point-to-point width/height of exactly cellSizeIn (half = cellSizeIn / 2).
     // A true edge-to-edge argyle tessellation — every diamond sharing an edge with
     // its 4 neighbors, no dead gaps — needs the same staggered-row trick Hexagon
-    // already uses below: full cellSizeIn horizontal pitch, HALF that vertical
-    // pitch (rows interlock at their half-height), each row offset by half a step.
-    const xStep = cellSizeIn;
-    const yStep = cellSizeIn / 2;
+    // already uses above: full diagonal horizontal pitch, HALF that vertical pitch
+    // (rows interlock at their half-height), each row offset by half a step.
+    const xStep = diamondDiagonalIn(cellSizeIn);
+    const yStep = xStep / 2;
     const cols = Math.max(1, Math.floor(safeZoneWidthIn / xStep - 0.5));
     const rows = Math.max(1, Math.floor(safeZoneHeightIn / yStep));
     return { cols, rows, cellSizeIn };
@@ -66,10 +79,10 @@ export function cellCenterIn(patternId, col, row, cellSizeIn) {
   }
 
   if (patternId === "diamond") {
-    const xStep = cellSizeIn;
-    const yStep = cellSizeIn / 2;
+    const xStep = diamondDiagonalIn(cellSizeIn);
+    const yStep = xStep / 2;
     const xOffset = row % 2 === 1 ? xStep / 2 : 0;
-    return { x: col * xStep + xOffset + xStep / 2, y: row * yStep + cellSizeIn / 2 };
+    return { x: col * xStep + xOffset + xStep / 2, y: row * yStep + xStep / 2 };
   }
 
   return { x: col * cellSizeIn + cellSizeIn / 2, y: row * cellSizeIn + cellSizeIn / 2 };
@@ -146,11 +159,12 @@ export function cellPolygonIn(patternId, cellSizeIn) {
   }
 
   if (patternId === "diamond") {
+    const diamondHalf = diamondDiagonalIn(cellSizeIn) / 2;
     return [
-      { x: 0, y: -half },
-      { x: half, y: 0 },
-      { x: 0, y: half },
-      { x: -half, y: 0 },
+      { x: 0, y: -diamondHalf },
+      { x: diamondHalf, y: 0 },
+      { x: 0, y: diamondHalf },
+      { x: -diamondHalf, y: 0 },
     ];
   }
 

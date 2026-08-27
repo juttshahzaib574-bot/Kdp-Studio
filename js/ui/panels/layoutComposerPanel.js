@@ -4,7 +4,7 @@
 // tray. Edits target the global composition (Global scope) or the active image's own
 // composition (Page-Specific scope). The live preview + PDF recalculate the grid to fit.
 
-import { state, setState, subscribe } from "../../state.js?v=35";
+import { state, setState, subscribe } from "../../state.js?v=36";
 import {
   LAYOUT_ELEMENTS,
   LAYOUT_TARGETS,
@@ -13,9 +13,9 @@ import {
   normalizeComposition,
   layoutModeFromComposition,
   describeComposition,
-} from "../../modules/layoutCompositionEngine.js?v=35";
-import { FONT_CATEGORIES, FONT_LIBRARY, SYSTEM_FONT_ID, getFontById } from "../../modules/fontLibraryEngine.js?v=35";
-import { DRAG_HANDLE_ICON, attachDragHandle } from "../dragReorderList.js?v=35";
+} from "../../modules/layoutCompositionEngine.js?v=36";
+import { FONT_CATEGORIES, FONT_LIBRARY, SYSTEM_FONT_ID, getFontById } from "../../modules/fontLibraryEngine.js?v=36";
+import { DRAG_HANDLE_ICON, attachDragHandle } from "../dragReorderList.js?v=36";
 
 const SCOPES = [
   { id: "global", label: "Global", note: "One layout template applied to every page." },
