@@ -26,6 +26,13 @@ export function createBatchItem(file) {
       cornerTrimSizePercent: null,
       sourceSmoothing: null, // null = inherit the book-wide default (Per-Image Granularity System)
       posterizeLevels: null, // null = inherit the book-wide default
+      // Native Pixel Grid — per-item only, no book-wide default: this is a fact about
+      // THIS source image's own generation resolution (e.g. an AI pixel-art image made
+      // at exactly 64x80 blocks), not a book-wide style choice like the fields above.
+      // null = off (grid size comes from cell-size-mm + page area, as usual). Set means
+      // both cols and rows are set together (see clampNativeGrid in gridBorderPanel.js).
+      nativeGridCols: null,
+      nativeGridRows: null,
     },
   };
 }

@@ -202,6 +202,10 @@ body {
   line-height: 1.4;
 }
 
+.hint-warning {
+  color: #fca5a5;
+}
+
 .toggle-row {
   display: flex;
   gap: 14px;
@@ -869,6 +873,23 @@ input[type="file"] {
 
 .corner-trim-drawer-detail .dpi-control {
   width: 160px;
+}
+
+.native-grid-drawer-detail {
+  margin-top: 6px;
+}
+
+.native-grid-dims {
+  max-width: 220px;
+}
+
+.native-grid-dims input[type="number"] {
+  width: 70px;
+  flex: none;
+}
+
+.native-grid-dims span {
+  color: var(--text-dim);
 }
 
 .corner-trim-picker-mini {
