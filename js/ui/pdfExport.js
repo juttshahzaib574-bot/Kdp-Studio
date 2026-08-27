@@ -4,24 +4,25 @@
 // (honoring each image's own granular overrides), auto-generated solution pages, and
 // back matter — entirely client-side via pdf-lib, no server round-trip.
 
-import { PDFDocument, rgb } from "../vendor/pdf-lib.esm.min.js?v=39";
-import { getTrimSizeById } from "../modules/canvasEngine.js?v=39";
-import { computeCanvasDimensions } from "../modules/bleedEngine.js?v=39";
-import { computeSafeZone } from "../modules/safeZoneEngine.js?v=39";
-import { getSizesForSelection, buildCombinedPalette } from "../modules/colorKeyEngine.js?v=39";
-import { computePagination } from "../modules/storyboardEngine.js?v=39";
-import { isPageEnabled, computeFrontMatterPageCount, orderedFrontMatterPages, orderedBackMatterPages } from "../modules/frontBackMatterEngine.js?v=39";
-import { buildSolutionPages } from "../modules/solutionGenerationEngine.js?v=39";
-import { BORDER_PRESETS } from "../modules/borderStyleEngine.js?v=39";
-import { migratedKeyStyle } from "../modules/layoutEngine.js?v=39";
-import { resolveEffectiveGrid } from "../modules/resolutionScalingEngine.js?v=39";
-import { computeKeyGridLayout, keyEntryPosition } from "../modules/colorKeyLayoutEngine.js?v=39";
-import { normalizeComposition, computeLayout } from "../modules/layoutCompositionEngine.js?v=39";
-import { resolveActiveAsset } from "../modules/assetGalleryEngine.js?v=39";
-import { renderFullMosaicGrid, getPlaceholderSource, loadImageSource, drawSourceToCanvas } from "./mosaicRenderer.js?v=39";
-import { isContentPageBlack, isFacingPageBlack, isBlackWhiteEdition, toGrayscaleRgb } from "../modules/bookThemeEngine.js?v=39";
-import { getFontById, fontAssetUrl } from "../modules/fontLibraryEngine.js?v=39";
-import { applySourceSmoothing } from "../modules/sourceSmoothingEngine.js?v=39";
+import { PDFDocument, rgb } from "../vendor/pdf-lib.esm.min.js?v=41";
+import { getTrimSizeById } from "../modules/canvasEngine.js?v=41";
+import { computeCanvasDimensions } from "../modules/bleedEngine.js?v=41";
+import { computeSafeZone } from "../modules/safeZoneEngine.js?v=41";
+import { getSizesForSelection, buildCombinedPalette } from "../modules/colorKeyEngine.js?v=41";
+import { computePagination } from "../modules/storyboardEngine.js?v=41";
+import { isPageEnabled, computeFrontMatterPageCount, orderedFrontMatterPages, orderedBackMatterPages } from "../modules/frontBackMatterEngine.js?v=41";
+import { buildSolutionPages } from "../modules/solutionGenerationEngine.js?v=41";
+import { BORDER_PRESETS } from "../modules/borderStyleEngine.js?v=41";
+import { migratedKeyStyle } from "../modules/layoutEngine.js?v=41";
+import { resolveEffectiveGrid } from "../modules/resolutionScalingEngine.js?v=41";
+import { computeKeyGridLayout, keyEntryPosition } from "../modules/colorKeyLayoutEngine.js?v=41";
+import { normalizeComposition, computeLayout } from "../modules/layoutCompositionEngine.js?v=41";
+import { resolveActiveAsset } from "../modules/assetGalleryEngine.js?v=41";
+import { renderFullMosaicGrid, getPlaceholderSource, loadImageSource, drawSourceToCanvas } from "./mosaicRenderer.js?v=41";
+import { isContentPageBlack, isFacingPageBlack, isBlackWhiteEdition, toGrayscaleRgb } from "../modules/bookThemeEngine.js?v=41";
+import { getFontById, fontAssetUrl } from "../modules/fontLibraryEngine.js?v=41";
+import { applySourceSmoothing } from "../modules/sourceSmoothingEngine.js?v=41";
+import { applyPosterize } from "../modules/posterizeEngine.js?v=41";
 
 const PT_PER_IN = 72;
 const inToPt = (inches) => inches * PT_PER_IN;
@@ -99,10 +100,11 @@ function paintPageBackground(page, w, h, isBlack) {
   return isBlack ? rgb(0.95, 0.95, 0.95) : rgb(0.15, 0.15, 0.15);
 }
 
-async function resolveItemSource(item, smoothingMode) {
+async function resolveItemSource(item, smoothingMode, posterizeLevels) {
   try {
     const img = await loadImageSource(item.objectUrl);
-    return applySourceSmoothing(drawSourceToCanvas(img, 256), smoothingMode);
+    const smoothed = applySourceSmoothing(drawSourceToCanvas(img, 256), smoothingMode);
+    return applyPosterize(smoothed, posterizeLevels);
   } catch {
     return getPlaceholderSource();
   }
@@ -128,8 +130,9 @@ function resolveItemEffectiveSettings(item, state, globalPalette) {
   const cornerTrimShape = item.settings.cornerTrimShape ?? state.gridCornerTrimShape;
   const cornerTrimSizePercent = item.settings.cornerTrimSizePercent ?? state.gridCornerTrimSizePercent;
   const sourceSmoothing = item.settings.sourceSmoothing ?? state.sourceSmoothing;
+  const posterizeLevels = item.settings.posterizeLevels ?? state.posterizeLevels;
 
-  return { gridPattern, borderWeightPt, gridTintPercent, cornerRadiusPercent, palette, cornerTrimCorners, cornerTrimShape, cornerTrimSizePercent, sourceSmoothing };
+  return { gridPattern, borderWeightPt, gridTintPercent, cornerRadiusPercent, palette, cornerTrimCorners, cornerTrimShape, cornerTrimSizePercent, sourceSmoothing, posterizeLevels };
 }
 
 function resolveItemBackImage(item, backImagesByAssetId, globalBackImage) {
@@ -225,6 +228,17 @@ function keyBlockXOffsetPt(align, contentWidthPt, widthPt) {
   return 0;
 }
 
+// Scales a font size down (never up) just enough that `text` fits within
+// `maxWidthPt`, so a genuinely long name (this palette has several — "Chocolate
+// Brown", "Dark Walnut") can never overflow into the next legend entry's swatch or
+// number the way a fixed, unmeasured font size did. Text width scales linearly with
+// font size for a given font, so one ratio gets there without an iterative search.
+function fitFontSizeToWidth(font, text, fontSize, maxWidthPt, minFontSize = 4.5) {
+  const width = font.widthOfTextAtSize(text, fontSize);
+  if (width <= maxWidthPt || fontSize <= minFontSize) return fontSize;
+  return Math.max(minFontSize, fontSize * (maxWidthPt / width));
+}
+
 function drawKeyEntries(page, rect, palette, font, textColor, blackWhiteEdition, orientation, align = "start", maxPerLine = null) {
   if (rect.heightPt <= 0 || rect.widthPt <= 0) return;
   if (blackWhiteEdition) {
@@ -236,7 +250,21 @@ function drawKeyEntries(page, rect, palette, font, textColor, blackWhiteEdition,
 
 function drawKeyEntriesColor(page, rect, palette, font, textColor, orientation, align, maxPerLine) {
   const { xPt: xPtBase, yPt, widthPt, heightPt } = rect;
-  const { cols, rows, entryWidthIn, entryHeightIn } = computeKeyGridLayout(palette.length, widthPt / PT_PER_IN, heightPt / PT_PER_IN, undefined, KEY_ENTRY_HEIGHT_IN, orientation, maxPerLine);
+
+  // A column has to be wide enough for its own actual text ("6 Chocolate Brown"), not
+  // a fixed guess — this palette has several names long enough that a fixed 0.95in
+  // guess (DEFAULT_ENTRY_WIDTH_IN) overflows straight into the next entry's swatch.
+  // Estimate the font size from the fixed row height (KEY_ENTRY_HEIGHT_IN dominates in
+  // the vast majority of real layouts — even where a very tall palette forces rows
+  // smaller, that only makes text narrower, never wider, so this stays a safe upper
+  // bound) and measure every real name in THIS palette at that size, so the automatic
+  // column count adapts to what's actually being printed.
+  const estFontSize = Math.max(5.5, Math.min(9, KEY_ENTRY_HEIGHT_IN * PT_PER_IN * 0.42));
+  const estSwatchSize = Math.max(4, estFontSize * 0.85);
+  const maxTextWidthPt = palette.reduce((max, swatch, i) => Math.max(max, font.widthOfTextAtSize(`${i + 1} ${swatch.name}`, estFontSize)), 0);
+  const naturalEntryWidthIn = (estSwatchSize + 9 + maxTextWidthPt) / PT_PER_IN;
+
+  const { cols, rows, entryWidthIn, entryHeightIn } = computeKeyGridLayout(palette.length, widthPt / PT_PER_IN, heightPt / PT_PER_IN, naturalEntryWidthIn, KEY_ENTRY_HEIGHT_IN, orientation, maxPerLine);
   const entryWidthPt = entryWidthIn * PT_PER_IN;
   const entryHeightPt = entryHeightIn * PT_PER_IN;
   const fontSize = Math.max(5.5, Math.min(9, entryHeightPt * 0.42));
@@ -263,10 +291,15 @@ function drawKeyEntriesColor(page, rect, palette, font, textColor, orientation, 
       borderColor: textColor,
       borderWidth: 0.3,
     });
-    page.drawText(`${i + 1} ${swatch.name}`, {
+    // Safety net for a manually-forced "Colors per Row/Column" count narrow enough
+    // that even the content-aware column width above can't fit this entry's text —
+    // shrinks just this one entry rather than letting it overflow into the next.
+    const label = `${i + 1} ${swatch.name}`;
+    const labelFontSize = fitFontSizeToWidth(font, label, fontSize, entryWidthPt - swatchSize - 9);
+    page.drawText(label, {
       x: cellX + 3 + swatchSize + 3,
-      y: cellY + (entryHeightPt - fontSize) / 2 + 1,
-      size: fontSize,
+      y: cellY + (entryHeightPt - labelFontSize) / 2 + 1,
+      size: labelFontSize,
       font,
       color: textColor,
     });
@@ -316,11 +349,14 @@ function drawKeyEntriesBlackWhite(page, rect, palette, font, textColor, orientat
       color: rgb(1, 1, 1),
     });
 
-    const nameWidth = font.widthOfTextAtSize(swatch.name, nameSize);
+    // Same overflow guard as the color legend below — a long name (this palette has
+    // several) shrinks to fit its own column instead of bleeding into the next one.
+    const fittedNameSize = fitFontSizeToWidth(font, swatch.name, nameSize, entryWidthPt - 4);
+    const nameWidth = font.widthOfTextAtSize(swatch.name, fittedNameSize);
     page.drawText(swatch.name, {
       x: cellX + Math.max(1, (entryWidthPt - nameWidth) / 2),
-      y: boxY - nameSize - 2,
-      size: nameSize,
+      y: boxY - fittedNameSize - 2,
+      size: fittedNameSize,
       font,
       color: textColor,
     });
@@ -803,7 +839,7 @@ export async function exportInteriorPdf(state, { onProgress } = {}) {
     const comp = resolveItemComposition(item, state);
     const fonts = fontsForComposition(comp);
     const layout = computeLayout(safeZone, comp);
-    const sourceCanvas = await resolveItemSource(item, effective.sourceSmoothing);
+    const sourceCanvas = await resolveItemSource(item, effective.sourceSmoothing, effective.posterizeLevels);
     const { cellSizeMm: effectiveCellSizeMm, gridOverride } = resolveEffectiveGrid(safeZone, state.cellSizeMm, effective.gridPattern, comp, state.resolutionPriority);
 
     const renderOpts = {
@@ -998,8 +1034,9 @@ async function renderActiveItemFullPage(state, mode) {
         cornerTrimShape: state.gridCornerTrimShape,
         cornerTrimSizePercent: state.gridCornerTrimSizePercent,
         sourceSmoothing: state.sourceSmoothing,
+        posterizeLevels: state.posterizeLevels,
       };
-  const sourceCanvas = activeItem ? await resolveItemSource(activeItem, effective.sourceSmoothing) : getPlaceholderSource();
+  const sourceCanvas = activeItem ? await resolveItemSource(activeItem, effective.sourceSmoothing, effective.posterizeLevels) : getPlaceholderSource();
   const comp = activeItem ? resolveItemComposition(activeItem, state) : normalizeComposition(state.globalComposition);
   const { cellSizeMm: effectiveCellSizeMm, gridOverride } = resolveEffectiveGrid(safeZone, state.cellSizeMm, effective.gridPattern, comp, state.resolutionPriority);
   const contentBlack = isContentPageBlack(state.pageBackgroundMode);

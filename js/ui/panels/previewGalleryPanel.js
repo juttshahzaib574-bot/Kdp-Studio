@@ -1,17 +1,18 @@
 // Module: Stacked Live Preview Gallery + Live Preview Carousel
-import { state, setState, subscribe } from "../../state.js?v=39";
-import { getTrimSizeById } from "../../modules/canvasEngine.js?v=39";
-import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=39";
-import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=39";
-import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=39";
-import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=39";
-import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=39";
-import { normalizeComposition } from "../../modules/layoutCompositionEngine.js?v=39";
-import { getPlaceholderSource, loadImageSource, drawSourceToCanvas, renderMosaicPreview } from "../mosaicRenderer.js?v=39";
-import { createCarouselController } from "../../modules/previewLoopEngine.js?v=39";
-import { downloadActiveItemPng, downloadActiveItemPdf } from "../pdfExport.js?v=39";
-import { isContentPageBlack } from "../../modules/bookThemeEngine.js?v=39";
-import { applySourceSmoothing } from "../../modules/sourceSmoothingEngine.js?v=39";
+import { state, setState, subscribe } from "../../state.js?v=41";
+import { getTrimSizeById } from "../../modules/canvasEngine.js?v=41";
+import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=41";
+import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=41";
+import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=41";
+import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=41";
+import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=41";
+import { normalizeComposition } from "../../modules/layoutCompositionEngine.js?v=41";
+import { getPlaceholderSource, loadImageSource, drawSourceToCanvas, renderMosaicPreview } from "../mosaicRenderer.js?v=41";
+import { createCarouselController } from "../../modules/previewLoopEngine.js?v=41";
+import { downloadActiveItemPng, downloadActiveItemPdf } from "../pdfExport.js?v=41";
+import { isContentPageBlack } from "../../modules/bookThemeEngine.js?v=41";
+import { applySourceSmoothing } from "../../modules/sourceSmoothingEngine.js?v=41";
+import { applyPosterize } from "../../modules/posterizeEngine.js?v=41";
 
 const el = {
   printCanvas: document.getElementById("preview-canvas-print"),
@@ -27,11 +28,16 @@ const el = {
   downloadPrintPdf: document.getElementById("download-print-pdf"),
   downloadSolvedPng: document.getElementById("download-solved-png"),
   downloadSolvedPdf: document.getElementById("download-solved-pdf"),
+  sourcePreviewOriginal: document.getElementById("source-preview-original"),
+  sourcePreviewOriginalPlaceholder: document.getElementById("source-preview-original-placeholder"),
+  sourcePreviewProcessed: document.getElementById("source-preview-processed"),
+  sourcePreviewProcessedPlaceholder: document.getElementById("source-preview-processed-placeholder"),
+  sourcePreviewProcessedCaption: document.getElementById("source-preview-processed-caption"),
 };
 
 let carouselController;
-let cachedSourceCanvas = null;
-let cachedSourceKey = null;
+let cachedRawCanvas = null;
+let cachedRawKey = null;
 // Auto-regenerates on every relevant state change (upload, settings, layout edits) — no
 // manual "Generate" step. A short debounce coalesces a burst of changes (e.g. dragging a
 // slider) into one render instead of quantizing the grid on every intermediate tick.
@@ -165,11 +171,26 @@ async function render(current) {
     el.solvedCanvas.hidden = true;
     el.printPlaceholder.hidden = false;
     el.solvedPlaceholder.hidden = false;
+    el.sourcePreviewOriginal.hidden = true;
+    el.sourcePreviewProcessed.hidden = true;
+    el.sourcePreviewOriginalPlaceholder.hidden = false;
+    el.sourcePreviewProcessedPlaceholder.hidden = false;
     return;
   }
 
   const smoothingMode = activeItem.settings.sourceSmoothing ?? current.sourceSmoothing;
-  const sourceCanvas = await resolveSourceCanvas(current, smoothingMode);
+  const posterizeLevels = activeItem.settings.posterizeLevels ?? current.posterizeLevels;
+  const rawSourceCanvas = await resolveRawSourceCanvas(current);
+  const sourceCanvas = applyPosterize(applySourceSmoothing(rawSourceCanvas, smoothingMode), posterizeLevels);
+
+  drawFitted(el.sourcePreviewOriginal, rawSourceCanvas);
+  drawFitted(el.sourcePreviewProcessed, sourceCanvas);
+  el.sourcePreviewOriginal.hidden = false;
+  el.sourcePreviewProcessed.hidden = false;
+  el.sourcePreviewOriginalPlaceholder.hidden = true;
+  el.sourcePreviewProcessedPlaceholder.hidden = true;
+  el.sourcePreviewProcessedCaption.textContent =
+    smoothingMode === "off" && posterizeLevels === 0 ? "No changes applied — tune the controls above" : "After Smoothing + Posterize";
 
   const trimSize = getTrimSizeById(current.trimSizeId);
   const canvasDims = computeCanvasDimensions(trimSize, current.dpi, current.bleedEnabled);
@@ -232,26 +253,48 @@ function updateCarouselNav(current) {
   el.carouselDot.classList.toggle("on", current.previewLoopEnabled && items.length > 1);
 }
 
-async function resolveSourceCanvas(current, smoothingMode) {
+// Caches only the RAW drawn source (keyed purely by image identity) — Source
+// Smoothing and Posterize are applied on top of this every render via their own
+// single-slot memos (sourceSmoothingEngine.js / posterizeEngine.js), so switching
+// either setting never re-decodes or re-draws the image itself, only re-filters it.
+async function resolveRawSourceCanvas(current) {
   const activeItem = current.batchItems.find((item) => item.id === current.activeBatchItemId);
-  const key = activeItem ? `${activeItem.objectUrl}::${smoothingMode}` : "placeholder";
+  const key = activeItem ? activeItem.objectUrl : "placeholder";
 
-  if (cachedSourceCanvas && cachedSourceKey === key) return cachedSourceCanvas;
+  if (cachedRawCanvas && cachedRawKey === key) return cachedRawCanvas;
 
   if (!activeItem) {
-    cachedSourceCanvas = getPlaceholderSource();
-    cachedSourceKey = key;
-    return cachedSourceCanvas;
+    cachedRawCanvas = getPlaceholderSource();
+    cachedRawKey = key;
+    return cachedRawCanvas;
   }
 
   try {
     const img = await loadImageSource(activeItem.objectUrl);
-    cachedSourceCanvas = applySourceSmoothing(drawSourceToCanvas(img), smoothingMode);
-    cachedSourceKey = key;
+    cachedRawCanvas = drawSourceToCanvas(img);
+    cachedRawKey = key;
   } catch {
-    cachedSourceCanvas = getPlaceholderSource();
-    cachedSourceKey = "placeholder";
+    cachedRawCanvas = getPlaceholderSource();
+    cachedRawKey = "placeholder";
   }
 
-  return cachedSourceCanvas;
+  return cachedRawCanvas;
+}
+
+// Scales `source` (a canvas or image) to fit inside `canvas`'s own pixel dimensions,
+// preserving aspect ratio and centering it — a simple letterbox, not a crop, so the
+// before/after preview always shows the whole frame the quantizer will actually see.
+function drawFitted(canvas, source) {
+  const ctx = canvas.getContext("2d");
+  const cw = canvas.width;
+  const ch = canvas.height;
+  ctx.clearRect(0, 0, cw, ch);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, cw, ch);
+  const sw = source.width;
+  const sh = source.height;
+  const scale = Math.min(cw / sw, ch / sh);
+  const dw = sw * scale;
+  const dh = sh * scale;
+  ctx.drawImage(source, (cw - dw) / 2, (ch - dh) / 2, dw, dh);
 }

@@ -1,11 +1,12 @@
-import { state, setState, subscribe } from "../../state.js?v=39";
-import { MAX_BATCH_SIZE, addToBatch, removeFromBatch, updateItemSettings } from "../../modules/batchEngine.js?v=39";
-import { reorder, computePagination, statusBadges } from "../../modules/storyboardEngine.js?v=39";
-import { computeSolutionPageCount } from "../../modules/solutionGenerationEngine.js?v=39";
-import { GRID_PATTERNS, CORNER_TRIM_CORNERS, CORNER_TRIM_SHAPES, CORNER_TRIM_SIZE_MIN_PERCENT, CORNER_TRIM_SIZE_MAX_PERCENT } from "../../modules/gridPatternEngine.js?v=39";
-import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=39";
-import { computeFrontMatterPageCount } from "../../modules/frontBackMatterEngine.js?v=39";
-import { SOURCE_SMOOTHING_OPTIONS } from "../../modules/sourceSmoothingEngine.js?v=39";
+import { state, setState, subscribe } from "../../state.js?v=41";
+import { MAX_BATCH_SIZE, addToBatch, removeFromBatch, updateItemSettings } from "../../modules/batchEngine.js?v=41";
+import { reorder, computePagination, statusBadges } from "../../modules/storyboardEngine.js?v=41";
+import { computeSolutionPageCount } from "../../modules/solutionGenerationEngine.js?v=41";
+import { GRID_PATTERNS, CORNER_TRIM_CORNERS, CORNER_TRIM_SHAPES, CORNER_TRIM_SIZE_MIN_PERCENT, CORNER_TRIM_SIZE_MAX_PERCENT } from "../../modules/gridPatternEngine.js?v=41";
+import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=41";
+import { computeFrontMatterPageCount } from "../../modules/frontBackMatterEngine.js?v=41";
+import { SOURCE_SMOOTHING_OPTIONS } from "../../modules/sourceSmoothingEngine.js?v=41";
+import { POSTERIZE_LEVEL_MIN, POSTERIZE_LEVEL_MAX } from "../../modules/posterizeEngine.js?v=41";
 
 const CORNER_RADIUS_CHOICES = [0, 25, 50, 75, 100];
 const COLOR_SET_CHOICES = [12, 24, 36];
@@ -28,6 +29,9 @@ const el = {
   cellShapeSequenceOptions: document.getElementById("cell-shape-sequence-options"),
   randomizeColorSetsBtn: document.getElementById("randomize-color-sets-btn"),
   sourceSmoothingOptions: document.getElementById("source-smoothing-options"),
+  posterizeSlider: document.getElementById("posterize-slider"),
+  posterizeInput: document.getElementById("posterize-input"),
+  posterizeHint: document.getElementById("posterize-hint"),
 };
 
 // Manual mouse-based drag (not native HTML5 draggable, and not Pointer Events +
@@ -45,10 +49,21 @@ export function initBatchStoryboardPanel() {
   el.perPageSelect.addEventListener("change", () => setState({ solutionThumbsPerPage: Number(el.perPageSelect.value) }));
   renderCellShapeSequenceOptions();
   renderSourceSmoothingOptions();
+  bindPosterizeLevels();
   el.randomizeColorSetsBtn.addEventListener("click", randomizeColorSetsForEveryImage);
 
   subscribe(render);
   render(state);
+}
+
+function bindPosterizeLevels() {
+  el.posterizeSlider.addEventListener("input", () => setState({ posterizeLevels: Number(el.posterizeSlider.value) }));
+  el.posterizeInput.addEventListener("change", () => setState({ posterizeLevels: clampPosterizeLevels(Number(el.posterizeInput.value)) }));
+}
+
+function clampPosterizeLevels(n) {
+  if (!Number.isFinite(n) || n < POSTERIZE_LEVEL_MIN) return 0;
+  return Math.min(POSTERIZE_LEVEL_MAX, n);
 }
 
 function renderCellShapeSequenceOptions() {
@@ -124,6 +139,13 @@ function render(current) {
   el.sourceSmoothingOptions.querySelectorAll(".option-item").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.smoothingId === current.sourceSmoothing);
   });
+
+  if (Number(el.posterizeSlider.value) !== current.posterizeLevels) el.posterizeSlider.value = String(current.posterizeLevels);
+  if (Number(el.posterizeInput.value) !== current.posterizeLevels) el.posterizeInput.value = String(current.posterizeLevels);
+  el.posterizeHint.textContent =
+    current.posterizeLevels === 0
+      ? "0 = Off. Collapses each color channel to a small number of flat steps before quantization — turns a smooth photo gradient into clean bands, the same effect as a Posterize filter in Photoshop/GIMP. Runs after Source Smoothing above. Lower = bolder/flatter, higher = subtler."
+      : `${current.posterizeLevels} levels per channel — ${current.posterizeLevels <= 3 ? "bold, flat" : current.posterizeLevels <= 5 ? "moderate" : "subtle"} banding. Runs after Source Smoothing above.`;
 
   el.countHint.textContent = `${current.batchItems.length} / ${MAX_BATCH_SIZE} images queued.`;
   el.perPageSelect.value = String(current.solutionThumbsPerPage);
@@ -223,6 +245,16 @@ function buildSettingsDrawer(item, current) {
         ${SOURCE_SMOOTHING_OPTIONS.map((o) => `<option value="${o.id}">${o.label}</option>`).join("")}
       </select>
     </div>
+    <div class="drawer-field">
+      <label>Posterize Levels</label>
+      <select data-key="posterizeLevels">
+        <option value="">Inherit (${current.posterizeLevels === 0 ? "Off" : `${current.posterizeLevels} Levels`})</option>
+        <option value="0">Off</option>
+        ${Array.from({ length: POSTERIZE_LEVEL_MAX - POSTERIZE_LEVEL_MIN + 1 }, (_, i) => i + POSTERIZE_LEVEL_MIN)
+          .map((n) => `<option value="${n}">${n} Levels</option>`)
+          .join("")}
+      </select>
+    </div>
     <div class="drawer-field corner-trim-drawer-field">
       <label>Grid Corner Trim</label>
       <label class="drawer-toggle-label">
@@ -251,7 +283,7 @@ function buildSettingsDrawer(item, current) {
     select.addEventListener("change", () => {
       const raw = select.value;
       let value = raw === "" ? null : raw;
-      if (key === "cornerRadiusPercent" || key === "colorSetOverride") {
+      if (key === "cornerRadiusPercent" || key === "colorSetOverride" || key === "posterizeLevels") {
         value = raw === "" ? null : Number(raw);
       }
       const batch = updateItemSettings(state.batchItems, item.id, { [key]: value });
