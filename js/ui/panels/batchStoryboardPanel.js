@@ -1,10 +1,11 @@
-import { state, setState, subscribe } from "../../state.js?v=38";
-import { MAX_BATCH_SIZE, addToBatch, removeFromBatch, updateItemSettings } from "../../modules/batchEngine.js?v=38";
-import { reorder, computePagination, statusBadges } from "../../modules/storyboardEngine.js?v=38";
-import { computeSolutionPageCount } from "../../modules/solutionGenerationEngine.js?v=38";
-import { GRID_PATTERNS, CORNER_TRIM_CORNERS, CORNER_TRIM_SHAPES, CORNER_TRIM_SIZE_MIN_PERCENT, CORNER_TRIM_SIZE_MAX_PERCENT } from "../../modules/gridPatternEngine.js?v=38";
-import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=38";
-import { computeFrontMatterPageCount } from "../../modules/frontBackMatterEngine.js?v=38";
+import { state, setState, subscribe } from "../../state.js?v=39";
+import { MAX_BATCH_SIZE, addToBatch, removeFromBatch, updateItemSettings } from "../../modules/batchEngine.js?v=39";
+import { reorder, computePagination, statusBadges } from "../../modules/storyboardEngine.js?v=39";
+import { computeSolutionPageCount } from "../../modules/solutionGenerationEngine.js?v=39";
+import { GRID_PATTERNS, CORNER_TRIM_CORNERS, CORNER_TRIM_SHAPES, CORNER_TRIM_SIZE_MIN_PERCENT, CORNER_TRIM_SIZE_MAX_PERCENT } from "../../modules/gridPatternEngine.js?v=39";
+import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=39";
+import { computeFrontMatterPageCount } from "../../modules/frontBackMatterEngine.js?v=39";
+import { SOURCE_SMOOTHING_OPTIONS } from "../../modules/sourceSmoothingEngine.js?v=39";
 
 const CORNER_RADIUS_CHOICES = [0, 25, 50, 75, 100];
 const COLOR_SET_CHOICES = [12, 24, 36];
@@ -26,6 +27,7 @@ const el = {
   summaryHint: document.getElementById("solution-summary-hint"),
   cellShapeSequenceOptions: document.getElementById("cell-shape-sequence-options"),
   randomizeColorSetsBtn: document.getElementById("randomize-color-sets-btn"),
+  sourceSmoothingOptions: document.getElementById("source-smoothing-options"),
 };
 
 // Manual mouse-based drag (not native HTML5 draggable, and not Pointer Events +
@@ -42,6 +44,7 @@ export function initBatchStoryboardPanel() {
   el.fileInput.addEventListener("change", handleFileInput);
   el.perPageSelect.addEventListener("change", () => setState({ solutionThumbsPerPage: Number(el.perPageSelect.value) }));
   renderCellShapeSequenceOptions();
+  renderSourceSmoothingOptions();
   el.randomizeColorSetsBtn.addEventListener("click", randomizeColorSetsForEveryImage);
 
   subscribe(render);
@@ -57,6 +60,19 @@ function renderCellShapeSequenceOptions() {
     btn.innerHTML = `<strong>${seq.label}</strong><span class="size-note">${seq.note}</span>`;
     btn.addEventListener("click", () => applyCellShapeSequence(seq));
     el.cellShapeSequenceOptions.appendChild(btn);
+  });
+}
+
+function renderSourceSmoothingOptions() {
+  el.sourceSmoothingOptions.innerHTML = "";
+  SOURCE_SMOOTHING_OPTIONS.forEach((option) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "option-item";
+    btn.dataset.smoothingId = option.id;
+    btn.innerHTML = `<strong>${option.label}</strong><span class="size-note">${option.note}</span>`;
+    btn.addEventListener("click", () => setState({ sourceSmoothing: option.id }));
+    el.sourceSmoothingOptions.appendChild(btn);
   });
 }
 
@@ -103,6 +119,10 @@ function render(current) {
     if (current.expandedSettingsItemId === item.id) {
       el.grid.appendChild(buildSettingsDrawer(item, current));
     }
+  });
+
+  el.sourceSmoothingOptions.querySelectorAll(".option-item").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.smoothingId === current.sourceSmoothing);
   });
 
   el.countHint.textContent = `${current.batchItems.length} / ${MAX_BATCH_SIZE} images queued.`;
@@ -194,6 +214,13 @@ function buildSettingsDrawer(item, current) {
       <select data-key="backBackgroundAssetId">
         <option value="">Inherit (global default)</option>
         ${backgroundAssets.map((a) => `<option value="${a.id}">${a.name}</option>`).join("")}
+      </select>
+    </div>
+    <div class="drawer-field">
+      <label>Source Smoothing</label>
+      <select data-key="sourceSmoothing">
+        <option value="">Inherit (${SOURCE_SMOOTHING_OPTIONS.find((o) => o.id === current.sourceSmoothing)?.label ?? "Off"})</option>
+        ${SOURCE_SMOOTHING_OPTIONS.map((o) => `<option value="${o.id}">${o.label}</option>`).join("")}
       </select>
     </div>
     <div class="drawer-field corner-trim-drawer-field">

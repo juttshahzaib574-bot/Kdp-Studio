@@ -75,6 +75,11 @@ export const state = {
   activeBatchItemId: null,
   expandedSettingsItemId: null,
 
+  // Source Smoothing: book-wide default for the optional pre-quantization median
+  // denoise (see modules/sourceSmoothingEngine.js) — "off" unless a creator opts in.
+  // Each image can also override this individually via its own ⚙ drawer.
+  sourceSmoothing: "off",
+
   // Automated Solution Generation Engine
   solutionThumbsPerPage: 4,
 
