@@ -1371,6 +1371,18 @@ input[type="file"] {
   color: var(--text-dim);
 }
 
+.canvas-stage-small {
+  padding: 8px;
+}
+
+.canvas-stage-small .preview-placeholder-icon {
+  font-size: 1.4rem;
+}
+
+.canvas-stage-small .preview-placeholder p {
+  font-size: 0.72rem;
+}
+
 /* --- Export panel --- */
 
 .text-input {

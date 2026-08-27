@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>KDP Studio</title>
-  <link rel="stylesheet" href="css/styles.css?v=39" />
+  <link rel="stylesheet" href="css/styles.css?v=40" />
 </head>
 <body>
   <header class="app-header">
@@ -35,6 +35,38 @@
           <label>Source Smoothing <span class="lock-note">— book-wide default; each image can override this in its own ⚙ drawer</span></label>
           <div class="option-list" id="source-smoothing-options"></div>
           <p class="hint">Runs a small edge-preserving median denoise on a photo before it's quantized — cleans up sensor grain/noise that can otherwise split one region's color vote across two or three near-identical picks, especially at larger 5-6mm cells. Off by default; leave off for already-clean flat-color art.</p>
+        </div>
+
+        <div class="field-group">
+          <label for="posterize-slider">Posterize Levels <span class="lock-note">— book-wide default; each image can override this in its own ⚙ drawer</span></label>
+          <div class="dpi-control">
+            <input type="range" id="posterize-slider" min="0" max="8" step="1" value="0" />
+            <input type="number" id="posterize-input" min="0" max="8" step="1" value="0" />
+          </div>
+          <p class="hint" id="posterize-hint">0 = Off. Collapses each color channel to a small number of flat steps before quantization — turns a smooth photo gradient into clean bands, the same effect as a Posterize filter in Photoshop/GIMP. Runs after Source Smoothing above. Lower = bolder/flatter, higher = subtler.</p>
+        </div>
+
+        <div class="field-group">
+          <label>Source Preview <span class="lock-note">— live before/after of Source Smoothing + Posterize on the active image</span></label>
+          <div class="dual-canvas-row">
+            <div class="canvas-stage canvas-stage-small">
+              <canvas id="source-preview-original" width="220" height="220" hidden></canvas>
+              <div class="preview-placeholder" id="source-preview-original-placeholder">
+                <span class="preview-placeholder-icon">🖼️</span>
+                <p>Upload artwork to see it here</p>
+              </div>
+              <p class="canvas-caption">Original</p>
+            </div>
+            <div class="canvas-stage canvas-stage-small">
+              <canvas id="source-preview-processed" width="220" height="220" hidden></canvas>
+              <div class="preview-placeholder" id="source-preview-processed-placeholder">
+                <span class="preview-placeholder-icon">🎛️</span>
+                <p>Upload artwork to see it here</p>
+              </div>
+              <p class="canvas-caption" id="source-preview-processed-caption">After Smoothing + Posterize</p>
+            </div>
+          </div>
+          <p class="hint">Updates live as you tune Source Smoothing and Posterize Levels above — tune here until the image looks like clean, flat art before it ever reaches the grid.</p>
         </div>
 
         <div class="field-group">
@@ -504,6 +536,6 @@
        module scripts below — pdfExport.js needs window.fontkit already set when it
        calls doc.registerFontkit() to embed the custom fonts in js/vendor/fonts/. -->
   <script src="js/vendor/fontkit.umd.min.js"></script>
-  <script type="module" src="js/main.js?v=39"></script>
+  <script type="module" src="js/main.js?v=40"></script>
 </body>
 </html>
