@@ -1,14 +1,14 @@
-import { state, setState, subscribe } from "../state.js?v=47";
+import { state, setState, subscribe } from "../state.js?v=48";
 import {
   TRIM_SIZES,
   DPI_MIN,
   DPI_MAX,
   clampDpi,
   getTrimSizeById,
-} from "../modules/canvasEngine.js?v=47";
-import { computeCanvasDimensions, needsRiskWarning } from "../modules/bleedEngine.js?v=47";
-import { computeSafeZone } from "../modules/safeZoneEngine.js?v=47";
-import { drawPreview } from "./preview.js?v=47";
+} from "../modules/canvasEngine.js?v=48";
+import { computeCanvasDimensions, needsRiskWarning } from "../modules/bleedEngine.js?v=48";
+import { computeSafeZone } from "../modules/safeZoneEngine.js?v=48";
+import { drawPreview } from "./preview.js?v=48";
 
 const el = {
   trimGrid: document.getElementById("trim-size-options"),

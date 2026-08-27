@@ -1,17 +1,17 @@
 // Module: Stacked Live Preview Gallery + Live Preview Carousel
-import { state, setState, subscribe } from "../../state.js?v=47";
-import { getTrimSizeById } from "../../modules/canvasEngine.js?v=47";
-import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=47";
-import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=47";
-import { getSizesForSelection, buildCombinedPalette, applyCustomColorOrder } from "../../modules/colorKeyEngine.js?v=47";
-import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=47";
-import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=47";
-import { normalizeComposition } from "../../modules/layoutCompositionEngine.js?v=47";
-import { getPlaceholderSource, loadImageSource, drawSourceToCanvas, renderMosaicPreview } from "../mosaicRenderer.js?v=47";
-import { createCarouselController } from "../../modules/previewLoopEngine.js?v=47";
-import { downloadActiveItemPng, downloadActiveItemPdf } from "../pdfExport.js?v=47";
-import { isContentPageBlack } from "../../modules/bookThemeEngine.js?v=47";
-import { applySourceSmoothing } from "../../modules/sourceSmoothingEngine.js?v=47";
+import { state, setState, subscribe } from "../../state.js?v=48";
+import { getTrimSizeById } from "../../modules/canvasEngine.js?v=48";
+import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=48";
+import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=48";
+import { getSizesForSelection, buildCombinedPalette, applyCustomColorOrder } from "../../modules/colorKeyEngine.js?v=48";
+import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=48";
+import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=48";
+import { normalizeComposition } from "../../modules/layoutCompositionEngine.js?v=48";
+import { getPlaceholderSource, loadImageSource, drawSourceToCanvas, renderMosaicPreview } from "../mosaicRenderer.js?v=48";
+import { createCarouselController } from "../../modules/previewLoopEngine.js?v=48";
+import { downloadActiveItemPng, downloadActiveItemPdf } from "../pdfExport.js?v=48";
+import { isContentPageBlack } from "../../modules/bookThemeEngine.js?v=48";
+import { applySourceSmoothing } from "../../modules/sourceSmoothingEngine.js?v=48";
 
 const el = {
   printCanvas: document.getElementById("preview-canvas-print"),
@@ -27,11 +27,6 @@ const el = {
   downloadPrintPdf: document.getElementById("download-print-pdf"),
   downloadSolvedPng: document.getElementById("download-solved-png"),
   downloadSolvedPdf: document.getElementById("download-solved-pdf"),
-  sourcePreviewOriginal: document.getElementById("source-preview-original"),
-  sourcePreviewOriginalPlaceholder: document.getElementById("source-preview-original-placeholder"),
-  sourcePreviewProcessed: document.getElementById("source-preview-processed"),
-  sourcePreviewProcessedPlaceholder: document.getElementById("source-preview-processed-placeholder"),
-  sourcePreviewProcessedCaption: document.getElementById("source-preview-processed-caption"),
 };
 
 let carouselController;
@@ -171,25 +166,12 @@ async function render(current) {
     el.solvedCanvas.hidden = true;
     el.printPlaceholder.hidden = false;
     el.solvedPlaceholder.hidden = false;
-    el.sourcePreviewOriginal.hidden = true;
-    el.sourcePreviewProcessed.hidden = true;
-    el.sourcePreviewOriginalPlaceholder.hidden = false;
-    el.sourcePreviewProcessedPlaceholder.hidden = false;
     return;
   }
 
   const smoothingMode = activeItem.settings.sourceSmoothing ?? current.sourceSmoothing;
   const rawSourceCanvas = await resolveRawSourceCanvas(current);
   const sourceCanvas = applySourceSmoothing(rawSourceCanvas, smoothingMode);
-
-  drawFitted(el.sourcePreviewOriginal, rawSourceCanvas);
-  drawFitted(el.sourcePreviewProcessed, sourceCanvas);
-  el.sourcePreviewOriginal.hidden = false;
-  el.sourcePreviewProcessed.hidden = false;
-  el.sourcePreviewOriginalPlaceholder.hidden = true;
-  el.sourcePreviewProcessedPlaceholder.hidden = true;
-  el.sourcePreviewProcessedCaption.textContent =
-    smoothingMode === "off" ? "No changes applied — tune the controls above" : "After Smoothing";
 
   const trimSize = getTrimSizeById(current.trimSizeId);
   const canvasDims = computeCanvasDimensions(trimSize, current.dpi, current.bleedEnabled);
@@ -279,22 +261,4 @@ async function resolveRawSourceCanvas(current) {
   }
 
   return cachedRawCanvas;
-}
-
-// Scales `source` (a canvas or image) to fit inside `canvas`'s own pixel dimensions,
-// preserving aspect ratio and centering it — a simple letterbox, not a crop, so the
-// before/after preview always shows the whole frame the quantizer will actually see.
-function drawFitted(canvas, source) {
-  const ctx = canvas.getContext("2d");
-  const cw = canvas.width;
-  const ch = canvas.height;
-  ctx.clearRect(0, 0, cw, ch);
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, cw, ch);
-  const sw = source.width;
-  const sh = source.height;
-  const scale = Math.min(cw / sw, ch / sh);
-  const dw = sw * scale;
-  const dh = sh * scale;
-  ctx.drawImage(source, (cw - dw) / 2, (ch - dh) / 2, dw, dh);
 }

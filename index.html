@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>KDP Studio</title>
-  <link rel="stylesheet" href="css/styles.css?v=47" />
+  <link rel="stylesheet" href="css/styles.css?v=48" />
 </head>
 <body>
   <header class="app-header">
@@ -48,29 +48,6 @@
             <option value="4096">4096 px — Extreme (very slow)</option>
           </select>
           <p class="hint">Controls how much of your source photo's detail the color engine sees. Higher values preserve finer detail but take longer to process. A 4000 px photo at "1024 px" still beats a 600 px photo at "2048 px" — you can't add detail that isn't there.</p>
-        </div>
-
-        <div class="field-group">
-          <label>Source Preview <span class="lock-note">— live before/after of Source Smoothing on the active image</span></label>
-          <div class="dual-canvas-row">
-            <div class="canvas-stage canvas-stage-small">
-              <canvas id="source-preview-original" width="220" height="220" hidden></canvas>
-              <div class="preview-placeholder" id="source-preview-original-placeholder">
-                <span class="preview-placeholder-icon">🖼️</span>
-                <p>Upload artwork to see it here</p>
-              </div>
-              <p class="canvas-caption">Original</p>
-            </div>
-            <div class="canvas-stage canvas-stage-small">
-              <canvas id="source-preview-processed" width="220" height="220" hidden></canvas>
-              <div class="preview-placeholder" id="source-preview-processed-placeholder">
-                <span class="preview-placeholder-icon">🎛️</span>
-                <p>Upload artwork to see it here</p>
-              </div>
-              <p class="canvas-caption" id="source-preview-processed-caption">After Smoothing</p>
-            </div>
-          </div>
-          <p class="hint">Updates live as you tune Source Smoothing above — tune here until the image looks like clean, flat art before it ever reaches the grid.</p>
         </div>
 
         <div class="field-group">
@@ -535,6 +512,6 @@
        module scripts below — pdfExport.js needs window.fontkit already set when it
        calls doc.registerFontkit() to embed the custom fonts in js/vendor/fonts/. -->
   <script src="js/vendor/fontkit.umd.min.js"></script>
-  <script type="module" src="js/main.js?v=47"></script>
+  <script type="module" src="js/main.js?v=48"></script>
 </body>
 </html>
