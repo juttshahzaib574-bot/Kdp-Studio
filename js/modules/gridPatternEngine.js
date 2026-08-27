@@ -3,13 +3,6 @@
 
 const MM_PER_INCH = 25.4;
 
-// The only cell sizes this app ever prints at, matched to the Cell Size slider's own
-// min/max (index.html). Anything a caller derives a cell size FROM — like Native Pixel
-// Grid mode locking cols/rows to a source image's own block dimensions — must fall
-// inside this same range or it isn't a legibly-printable book page.
-export const CELL_SIZE_MM_MIN = 2.5;
-export const CELL_SIZE_MM_MAX = 6.0;
-
 export const GRID_PATTERNS = [
   { id: "square", label: "Standard Square", note: "The classic, traditional mosaic layout." },
   { id: "hexagon", label: "Hexagon (Honeycomb)", note: "Smooth, interlocking cells that eliminate sharp corners and hide grid rigidity." },

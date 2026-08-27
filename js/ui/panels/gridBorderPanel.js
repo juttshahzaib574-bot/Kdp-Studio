@@ -1,4 +1,4 @@
-import { state, setState, subscribe } from "../../state.js?v=43";
+import { state, setState, subscribe } from "../../state.js?v=42";
 import {
   GRID_PATTERNS,
   computeGridDimensions,
@@ -9,19 +9,17 @@ import {
   CORNER_TRIM_SIZE_MIN_PERCENT,
   CORNER_TRIM_SIZE_MAX_PERCENT,
   FRAME_MARGIN_OPTIONS,
-  CELL_SIZE_MM_MIN,
-  CELL_SIZE_MM_MAX,
-} from "../../modules/gridPatternEngine.js?v=43";
-import { recommendFont, recommendTextTint } from "../../modules/typographyEngine.js?v=43";
-import { applyPreset, clampBorderWeight } from "../../modules/borderStyleEngine.js?v=43";
-import { CORNER_RADIUS_MIN_PERCENT, CORNER_RADIUS_MAX_PERCENT } from "../../modules/cornerRadiusEngine.js?v=43";
-import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=43";
-import { getTrimSizeById } from "../../modules/canvasEngine.js?v=43";
-import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=43";
-import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=43";
-import { normalizeComposition, computeLayout } from "../../modules/layoutCompositionEngine.js?v=43";
-import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=43";
-import { PAGE_BACKGROUND_MODES } from "../../modules/bookThemeEngine.js?v=43";
+} from "../../modules/gridPatternEngine.js?v=42";
+import { recommendFont, recommendTextTint } from "../../modules/typographyEngine.js?v=42";
+import { applyPreset, clampBorderWeight } from "../../modules/borderStyleEngine.js?v=42";
+import { CORNER_RADIUS_MIN_PERCENT, CORNER_RADIUS_MAX_PERCENT } from "../../modules/cornerRadiusEngine.js?v=42";
+import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=42";
+import { getTrimSizeById } from "../../modules/canvasEngine.js?v=42";
+import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=42";
+import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=42";
+import { normalizeComposition, computeLayout } from "../../modules/layoutCompositionEngine.js?v=42";
+import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=42";
+import { PAGE_BACKGROUND_MODES } from "../../modules/bookThemeEngine.js?v=42";
 
 const el = {
   patternGrid: document.getElementById("grid-pattern-options"),
@@ -154,7 +152,7 @@ function bindCellSize() {
 }
 
 function clampCellSize(mm) {
-  return Math.min(CELL_SIZE_MM_MAX, Math.max(CELL_SIZE_MM_MIN, Number.isFinite(mm) ? mm : 4.0));
+  return Math.min(6.0, Math.max(2.5, Number.isFinite(mm) ? mm : 4.0));
 }
 
 function bindPresets() {

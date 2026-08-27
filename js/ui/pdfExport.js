@@ -4,25 +4,25 @@
 // (honoring each image's own granular overrides), auto-generated solution pages, and
 // back matter — entirely client-side via pdf-lib, no server round-trip.
 
-import { PDFDocument, rgb } from "../vendor/pdf-lib.esm.min.js?v=43";
-import { getTrimSizeById } from "../modules/canvasEngine.js?v=43";
-import { computeCanvasDimensions } from "../modules/bleedEngine.js?v=43";
-import { computeSafeZone } from "../modules/safeZoneEngine.js?v=43";
-import { getSizesForSelection, buildCombinedPalette } from "../modules/colorKeyEngine.js?v=43";
-import { computePagination } from "../modules/storyboardEngine.js?v=43";
-import { isPageEnabled, computeFrontMatterPageCount, orderedFrontMatterPages, orderedBackMatterPages } from "../modules/frontBackMatterEngine.js?v=43";
-import { buildSolutionPages } from "../modules/solutionGenerationEngine.js?v=43";
-import { BORDER_PRESETS } from "../modules/borderStyleEngine.js?v=43";
-import { migratedKeyStyle } from "../modules/layoutEngine.js?v=43";
-import { resolveEffectiveGrid } from "../modules/resolutionScalingEngine.js?v=43";
-import { computeKeyGridLayout, keyEntryPosition } from "../modules/colorKeyLayoutEngine.js?v=43";
-import { normalizeComposition, computeLayout } from "../modules/layoutCompositionEngine.js?v=43";
-import { resolveActiveAsset } from "../modules/assetGalleryEngine.js?v=43";
-import { renderFullMosaicGrid, getPlaceholderSource, loadImageSource, drawSourceToCanvas } from "./mosaicRenderer.js?v=43";
-import { isContentPageBlack, isFacingPageBlack, isBlackWhiteEdition, toGrayscaleRgb } from "../modules/bookThemeEngine.js?v=43";
-import { getFontById, fontAssetUrl } from "../modules/fontLibraryEngine.js?v=43";
-import { applySourceSmoothing } from "../modules/sourceSmoothingEngine.js?v=43";
-import { applyPosterize } from "../modules/posterizeEngine.js?v=43";
+import { PDFDocument, rgb } from "../vendor/pdf-lib.esm.min.js?v=42";
+import { getTrimSizeById } from "../modules/canvasEngine.js?v=42";
+import { computeCanvasDimensions } from "../modules/bleedEngine.js?v=42";
+import { computeSafeZone } from "../modules/safeZoneEngine.js?v=42";
+import { getSizesForSelection, buildCombinedPalette } from "../modules/colorKeyEngine.js?v=42";
+import { computePagination } from "../modules/storyboardEngine.js?v=42";
+import { isPageEnabled, computeFrontMatterPageCount, orderedFrontMatterPages, orderedBackMatterPages } from "../modules/frontBackMatterEngine.js?v=42";
+import { buildSolutionPages } from "../modules/solutionGenerationEngine.js?v=42";
+import { BORDER_PRESETS } from "../modules/borderStyleEngine.js?v=42";
+import { migratedKeyStyle } from "../modules/layoutEngine.js?v=42";
+import { resolveEffectiveGrid } from "../modules/resolutionScalingEngine.js?v=42";
+import { computeKeyGridLayout, keyEntryPosition } from "../modules/colorKeyLayoutEngine.js?v=42";
+import { normalizeComposition, computeLayout } from "../modules/layoutCompositionEngine.js?v=42";
+import { resolveActiveAsset } from "../modules/assetGalleryEngine.js?v=42";
+import { renderFullMosaicGrid, getPlaceholderSource, loadImageSource, drawSourceToCanvas } from "./mosaicRenderer.js?v=42";
+import { isContentPageBlack, isFacingPageBlack, isBlackWhiteEdition, toGrayscaleRgb } from "../modules/bookThemeEngine.js?v=42";
+import { getFontById, fontAssetUrl } from "../modules/fontLibraryEngine.js?v=42";
+import { applySourceSmoothing } from "../modules/sourceSmoothingEngine.js?v=42";
+import { applyPosterize } from "../modules/posterizeEngine.js?v=42";
 
 const PT_PER_IN = 72;
 const inToPt = (inches) => inches * PT_PER_IN;
@@ -131,14 +131,8 @@ function resolveItemEffectiveSettings(item, state, globalPalette) {
   const cornerTrimSizePercent = item.settings.cornerTrimSizePercent ?? state.gridCornerTrimSizePercent;
   const sourceSmoothing = item.settings.sourceSmoothing ?? state.sourceSmoothing;
   const posterizeLevels = item.settings.posterizeLevels ?? state.posterizeLevels;
-  // Native Pixel Grid is per-item only (see batchEngine.js) — both or neither, never
-  // just one axis, so a partial/inconsistent override can't reach resolveEffectiveGrid.
-  const nativeGrid =
-    item.settings.nativeGridCols && item.settings.nativeGridRows
-      ? { cols: item.settings.nativeGridCols, rows: item.settings.nativeGridRows }
-      : null;
 
-  return { gridPattern, borderWeightPt, gridTintPercent, cornerRadiusPercent, palette, cornerTrimCorners, cornerTrimShape, cornerTrimSizePercent, sourceSmoothing, posterizeLevels, nativeGrid };
+  return { gridPattern, borderWeightPt, gridTintPercent, cornerRadiusPercent, palette, cornerTrimCorners, cornerTrimShape, cornerTrimSizePercent, sourceSmoothing, posterizeLevels };
 }
 
 function resolveItemBackImage(item, backImagesByAssetId, globalBackImage) {
@@ -846,7 +840,7 @@ export async function exportInteriorPdf(state, { onProgress } = {}) {
     const fonts = fontsForComposition(comp);
     const layout = computeLayout(safeZone, comp);
     const sourceCanvas = await resolveItemSource(item, effective.sourceSmoothing, effective.posterizeLevels);
-    const { cellSizeMm: effectiveCellSizeMm, gridOverride } = resolveEffectiveGrid(safeZone, state.cellSizeMm, effective.gridPattern, comp, state.resolutionPriority, effective.nativeGrid);
+    const { cellSizeMm: effectiveCellSizeMm, gridOverride } = resolveEffectiveGrid(safeZone, state.cellSizeMm, effective.gridPattern, comp, state.resolutionPriority);
 
     const renderOpts = {
       dpi: state.dpi,
@@ -1041,11 +1035,10 @@ async function renderActiveItemFullPage(state, mode) {
         cornerTrimSizePercent: state.gridCornerTrimSizePercent,
         sourceSmoothing: state.sourceSmoothing,
         posterizeLevels: state.posterizeLevels,
-        nativeGrid: null,
       };
   const sourceCanvas = activeItem ? await resolveItemSource(activeItem, effective.sourceSmoothing, effective.posterizeLevels) : getPlaceholderSource();
   const comp = activeItem ? resolveItemComposition(activeItem, state) : normalizeComposition(state.globalComposition);
-  const { cellSizeMm: effectiveCellSizeMm, gridOverride } = resolveEffectiveGrid(safeZone, state.cellSizeMm, effective.gridPattern, comp, state.resolutionPriority, effective.nativeGrid);
+  const { cellSizeMm: effectiveCellSizeMm, gridOverride } = resolveEffectiveGrid(safeZone, state.cellSizeMm, effective.gridPattern, comp, state.resolutionPriority);
   const contentBlack = isContentPageBlack(state.pageBackgroundMode);
   const blackWhiteEdition = isBlackWhiteEdition(state.bookColorMode);
   // The "solved" render is a creator-facing proofing/reference image, not itself a page

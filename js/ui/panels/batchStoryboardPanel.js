@@ -1,20 +1,12 @@
-import { state, setState, subscribe } from "../../state.js?v=43";
-import { MAX_BATCH_SIZE, addToBatch, removeFromBatch, updateItemSettings } from "../../modules/batchEngine.js?v=43";
-import { reorder, computePagination, statusBadges } from "../../modules/storyboardEngine.js?v=43";
-import { computeSolutionPageCount } from "../../modules/solutionGenerationEngine.js?v=43";
-import {
-  GRID_PATTERNS,
-  CORNER_TRIM_CORNERS,
-  CORNER_TRIM_SHAPES,
-  CORNER_TRIM_SIZE_MIN_PERCENT,
-  CORNER_TRIM_SIZE_MAX_PERCENT,
-  CELL_SIZE_MM_MIN,
-  CELL_SIZE_MM_MAX,
-} from "../../modules/gridPatternEngine.js?v=43";
-import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=43";
-import { computeFrontMatterPageCount } from "../../modules/frontBackMatterEngine.js?v=43";
-import { SOURCE_SMOOTHING_OPTIONS } from "../../modules/sourceSmoothingEngine.js?v=43";
-import { POSTERIZE_LEVEL_MIN, POSTERIZE_LEVEL_MAX } from "../../modules/posterizeEngine.js?v=43";
+import { state, setState, subscribe } from "../../state.js?v=42";
+import { MAX_BATCH_SIZE, addToBatch, removeFromBatch, updateItemSettings } from "../../modules/batchEngine.js?v=42";
+import { reorder, computePagination, statusBadges } from "../../modules/storyboardEngine.js?v=42";
+import { computeSolutionPageCount } from "../../modules/solutionGenerationEngine.js?v=42";
+import { GRID_PATTERNS, CORNER_TRIM_CORNERS, CORNER_TRIM_SHAPES, CORNER_TRIM_SIZE_MIN_PERCENT, CORNER_TRIM_SIZE_MAX_PERCENT } from "../../modules/gridPatternEngine.js?v=42";
+import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=42";
+import { computeFrontMatterPageCount } from "../../modules/frontBackMatterEngine.js?v=42";
+import { SOURCE_SMOOTHING_OPTIONS } from "../../modules/sourceSmoothingEngine.js?v=42";
+import { POSTERIZE_LEVEL_MIN, POSTERIZE_LEVEL_MAX } from "../../modules/posterizeEngine.js?v=42";
 
 const CORNER_RADIUS_CHOICES = [0, 25, 50, 75, 100];
 const COLOR_SET_CHOICES = [12, 24, 36];
@@ -263,21 +255,6 @@ function buildSettingsDrawer(item, current) {
           .join("")}
       </select>
     </div>
-    <div class="drawer-field native-grid-drawer-field">
-      <label>Native Pixel Grid</label>
-      <label class="drawer-toggle-label">
-        <input type="checkbox" data-role="native-grid-override-toggle" />
-        This source is already exact pixel art — lock cells to its own grid
-      </label>
-      <div class="native-grid-drawer-detail" data-role="native-grid-detail" hidden>
-        <div class="dpi-control native-grid-dims">
-          <input type="number" data-role="native-grid-cols" min="4" max="400" step="1" placeholder="Cols" />
-          <span>×</span>
-          <input type="number" data-role="native-grid-rows" min="4" max="400" step="1" placeholder="Rows" />
-        </div>
-        <p class="hint">Enter the exact block dimensions your pixel art was generated at (e.g. 64 × 80). Every printed cell maps to exactly one source block — no resampling blur. Falls back to the normal cell-size grid if that block count can't fit a legible ${CELL_SIZE_MM_MIN}–${CELL_SIZE_MM_MAX}mm cell at this trim size.</p>
-      </div>
-    </div>
     <div class="drawer-field corner-trim-drawer-field">
       <label>Grid Corner Trim</label>
       <label class="drawer-toggle-label">
@@ -315,51 +292,10 @@ function buildSettingsDrawer(item, current) {
   });
 
   wireCornerTrimDrawerField(drawer, item, current);
-  wireNativeGridDrawerField(drawer, item);
 
   drawer.querySelector(".drawer-close").addEventListener("click", () => setState({ expandedSettingsItemId: null }));
 
   return drawer;
-}
-
-// Native Pixel Grid: like corner trim above, both fields (cols, rows) live behind one
-// "override for this image" checkbox and are always set or cleared together — a lone
-// cols-with-no-rows override could never resolve to a real grid, so the checkbox is the
-// only way in or out rather than letting the two number inputs drift independently.
-function wireNativeGridDrawerField(drawer, item) {
-  const toggle = drawer.querySelector('[data-role="native-grid-override-toggle"]');
-  const detail = drawer.querySelector('[data-role="native-grid-detail"]');
-  const colsInput = drawer.querySelector('[data-role="native-grid-cols"]');
-  const rowsInput = drawer.querySelector('[data-role="native-grid-rows"]');
-
-  const overriding = item.settings.nativeGridCols !== null && item.settings.nativeGridRows !== null;
-  toggle.checked = overriding;
-  detail.hidden = !overriding;
-  colsInput.value = item.settings.nativeGridCols ?? "";
-  rowsInput.value = item.settings.nativeGridRows ?? "";
-
-  const commitDims = () => {
-    const cols = Math.round(Number(colsInput.value));
-    const rows = Math.round(Number(rowsInput.value));
-    if (!Number.isFinite(cols) || !Number.isFinite(rows) || cols < 1 || rows < 1) return;
-    const batch = updateItemSettings(state.batchItems, item.id, { nativeGridCols: cols, nativeGridRows: rows });
-    setState({ batchItems: batch });
-  };
-  colsInput.addEventListener("change", commitDims);
-  rowsInput.addEventListener("change", commitDims);
-
-  toggle.addEventListener("change", () => {
-    // Commits a real (non-null) placeholder immediately, not just showing the detail
-    // fields — otherwise item.settings stays null until the user finishes typing, the
-    // next render() sees "not overriding" from that null, and un-checks/re-hides this
-    // right out from under them before they can type anything (same reasoning as
-    // cornerTrimCorners committing [] immediately in wireCornerTrimDrawerField above).
-    const batch = updateItemSettings(state.batchItems, item.id, {
-      nativeGridCols: toggle.checked ? 32 : null,
-      nativeGridRows: toggle.checked ? 32 : null,
-    });
-    setState({ batchItems: batch });
-  });
 }
 
 // The corner-trim override is 3 related fields at once (which corners, shape, size),
