@@ -6,14 +6,14 @@
 //   - renderFullMosaicGrid: the entire safe-zone grid at the real chosen print DPI,
 //     used to generate the actual page image embedded into the exported PDF.
 
-import { computeFrameGeometry, drawFrame } from "./preview.js?v=45";
-import { computeGridDimensions, cellCenterIn, cellPolygonIn, mmToIn, isCellInGridSilhouette, isCellInFrameMargin } from "../modules/gridPatternEngine.js?v=45";
-import { recommendFont, recommendTextTint, adjustForBorderWeight, centerOffsetIn, letterSpacingForLabel } from "../modules/typographyEngine.js?v=45";
-import { gridColorFromTint } from "../modules/borderStyleEngine.js?v=45";
-import { cornerRadiusIn, isFullCircle } from "../modules/cornerRadiusEngine.js?v=45";
-import { nearestPaletteColor, rgbToLabTriple, labTripleToRgb, deltaE2000Triple } from "../modules/shadeQuantizationEngine.js?v=45";
-import { computeLayout, LAYOUT_ELEMENTS } from "../modules/layoutCompositionEngine.js?v=45";
-import { toGrayscaleHex } from "../modules/bookThemeEngine.js?v=45";
+import { computeFrameGeometry, drawFrame } from "./preview.js?v=46";
+import { computeGridDimensions, cellCenterIn, cellPolygonIn, mmToIn, isCellInGridSilhouette, isCellInFrameMargin } from "../modules/gridPatternEngine.js?v=46";
+import { recommendFont, recommendTextTint, adjustForBorderWeight, centerOffsetIn, letterSpacingForLabel } from "../modules/typographyEngine.js?v=46";
+import { gridColorFromTint } from "../modules/borderStyleEngine.js?v=46";
+import { cornerRadiusIn, isFullCircle } from "../modules/cornerRadiusEngine.js?v=46";
+import { nearestPaletteColorLAB, rgbToLabTriple, deltaE2000Triple } from "../modules/shadeQuantizationEngine.js?v=46";
+import { computeLayout, LAYOUT_ELEMENTS } from "../modules/layoutCompositionEngine.js?v=46";
+import { toGrayscaleHex } from "../modules/bookThemeEngine.js?v=46";
 
 const PT_TO_IN = 1 / 72;
 
@@ -56,15 +56,16 @@ export function loadImageSource(url) {
 // even reached the grid (a portrait dog squashed into a square, then re-stretched onto a
 // wide grid), which is a real cause of "wrong-looking" color-by-number results. The real
 // aspect-ratio fit against the grid's own shape happens later, in quantizeGridCells.
-export function drawSourceToCanvas(source, maxSize = 512) {
+export function drawSourceToCanvas(source, maxSize = 1024) {
   const naturalW = source.naturalWidth || source.width;
   const naturalH = source.naturalHeight || source.height;
-  const aspect = naturalW / naturalH || 1;
-  const w = aspect >= 1 ? maxSize : Math.round(maxSize * aspect);
-  const h = aspect >= 1 ? Math.round(maxSize / aspect) : maxSize;
+  const maxDim = Math.max(naturalW, naturalH);
+  const scale = Math.min(1, maxSize / maxDim);
+  const w = Math.max(1, Math.round(naturalW * scale));
+  const h = Math.max(1, Math.round(naturalH * scale));
   const c = document.createElement("canvas");
-  c.width = Math.max(1, w);
-  c.height = Math.max(1, h);
+  c.width = w;
+  c.height = h;
   const ctx = c.getContext("2d");
   // Flatten transparency onto a solid white matte before any pixel is ever sampled —
   // an un-composited transparent pixel's RGB channels are meaningless (browsers store
@@ -106,10 +107,10 @@ const euclidean3 = (a, b) => Math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 +
 
 // Perceptually-close clusters merge into one before the final palette snap, now
 // measured by CIEDE2000 (not CIE76) for accuracy in the blue and saturated regions.
-// Threshold 8 in CIEDE2000 units ≈ the old CIE76 threshold of 15 — well above
-// the ~1.0 JND — collapsing genuinely redundant near-duplicate clusters without
-// merging visually distinct shades.
-const CLUSTER_MERGE_DELTA_E = 8;
+// Threshold 5 is well above the ~1.0 JND — collapses genuinely redundant near-
+// duplicate clusters while preserving visually distinct shades that the old higher
+// threshold would have incorrectly merged.
+const CLUSTER_MERGE_DELTA_E = 5;
 
 // kmeansSeeded's Lloyd iterations cost O(n * clusters * iters) — at a small cell size
 // (more grid cells) combined with a wide color set (more clusters), n (every non-outline
@@ -141,8 +142,9 @@ function strideSample(points, cap) {
 }
 
 // Crop to the grid's own aspect ratio (never a stretch), then downscale directly to
-// cols*8 x rows*8 with NEAREST-NEIGHBOR (no smoothing) — matches the reference tool
-// exactly, keeping every source pixel sharp all the way to the per-cell sample.
+// cols*10 x rows*10 with NEAREST-NEIGHBOR (no smoothing), keeping every source pixel
+// sharp all the way to the per-cell sample. 10x10 = 100 sub-pixels per cell gives
+// a 56% denser majority vote than the old 8x8 = 64, improving cell-level accuracy.
 function sampleGridCellsNearestNeighbor(sourceCanvas, cols, rows, targetAspect) {
   const sw = sourceCanvas.width;
   const sh = sourceCanvas.height;
@@ -160,7 +162,7 @@ function sampleGridCellsNearestNeighbor(sourceCanvas, cols, rows, targetAspect) 
     cropY = (sh - cropH) / 2;
   }
 
-  const S = 8;
+  const S = 10;
   const sampleW = cols * S;
   const sampleH = rows * S;
   const sampleCanvas = document.createElement("canvas");
@@ -327,31 +329,13 @@ function quantizeGridCells(sourceCanvas, cols, rows, targetAspect, palette) {
 // rgbToLabTriple), not raw RGB — RGB-space Euclidean distance weighs R/G/B as
 // equally salient to the eye and can group a golden-brown region into a numerically-
 // closer-but-wrong teal/violet cluster; LAB matches human perception, so "nearest
-// cluster" actually means "closest-looking." cellMode (below) is the one exception —
-// it picks the actual, authentic RGB value to display for a cluster, not a distance
-// comparison, so it stays in RGB on purpose.
+// cluster" actually means "closest-looking." Palette snap also stays in LAB — each
+// cluster's centroid is compared directly to palette entries via CIEDE2000, never
+// converted to an intermediate RGB representation (which would lose precision).
 function computeQuantization(sourceCanvas, cols, rows, targetAspect, palette) {
   const colorCount = palette.length;
   const cells = sampleGridCellsNearestNeighbor(sourceCanvas, cols, rows, targetAspect);
   const edges = detectOutlineCells(cells, cols, rows);
-
-  const cellMode = cells.map((px) => {
-    const counts = new Map();
-    for (let i = 0; i < px.length; i += 1) {
-      const p = px[i];
-      const key = ((p[0] >> 3) << 10) | ((p[1] >> 3) << 5) | (p[2] >> 3);
-      counts.set(key, (counts.get(key) || 0) + 1);
-    }
-    let bestKey = 0;
-    let bestCount = 0;
-    counts.forEach((count, key) => {
-      if (count > bestCount) {
-        bestCount = count;
-        bestKey = key;
-      }
-    });
-    return [((bestKey >> 10) & 31) * 8 + 4, ((bestKey >> 5) & 31) * 8 + 4, (bestKey & 31) * 8 + 4];
-  });
 
   // Converted once per sub-pixel and reused for both clustering and the vote below —
   // not re-converted per k-means iteration or per candidate cluster.
@@ -370,7 +354,7 @@ function computeQuantization(sourceCanvas, cols, rows, targetAspect, palette) {
     cellsLab[i] = labPx;
   }
 
-  const { cents } = kmeansSeeded(nonEdgePixels, Math.min(Math.max(1, colorCount - 1), nonEdgePixels.length), 20);
+  const { cents } = kmeansSeeded(nonEdgePixels, Math.min(Math.max(1, colorCount - 1), nonEdgePixels.length), 40);
 
   let merged = true;
   while (merged && cents.length > 2) {
@@ -395,7 +379,7 @@ function computeQuantization(sourceCanvas, cols, rows, targetAspect, palette) {
   // Outline (label 0) is the default for any sub-pixel not clearly closer to a real
   // cluster than it already is to pure black (LAB (0,0,0), same origin as RGB black),
   // so ambiguous dark pixels bias toward the unified outline instead of an arbitrary
-  // nearby cluster. This is the hottest loop in the whole engine (cells × 64 sub-
+  // nearby cluster. This is the hottest loop in the whole engine (cells × 100 sub-
   // pixels × cluster count), so it's written with plain indexed loops and squared
   // distance (no sqrt, no per-iteration closures) rather than the more idiomatic
   // .forEach — the closure/callback dispatch and the sqrt call are both pure overhead
@@ -406,7 +390,7 @@ function computeQuantization(sourceCanvas, cols, rows, targetAspect, palette) {
   // EXACT same 8-bit RGB value — flat regions, repeated JPEG blocks, flat pixel-art
   // fills — so caching each RGB value's nearest cluster the first time it's seen (keyed
   // on the source RGB, not the derived LAB triple, since rgbToLabTriple is a pure
-  // function and equal RGB always yields bit-identical LAB) turns most of the 64
+  // function and equal RGB always yields bit-identical LAB) turns most of the 100
   // subpixels-per-cell below into map lookups instead of full distance scans, with zero
   // change to the result — this is pure memoization of a deterministic computation, not
   // an approximation.
@@ -451,37 +435,19 @@ function computeQuantization(sourceCanvas, cols, rows, targetAspect, palette) {
     cellLabels[i] = bestLabel;
   }
 
-  const finalColors = [[0, 0, 0]];
+  // Each cluster's centroid is already the true perceptual center of its member
+  // pixels in CIELAB — snapping it directly to the palette in LAB space avoids the
+  // old lossy path (centroid LAB → RGB (gamut clip + 8-bit round) → LAB again for
+  // comparison), which was the primary source of wrong color identification.
+  const finalLABColors = [{ l: 0, a: 0, b: 0 }];
   const keptIndexes = [0];
   for (let c = 0; c < cents.length; c += 1) {
-    const counts = new Map();
-    let total = 0;
+    let hasCells = false;
     for (let i = 0; i < cells.length; i += 1) {
-      if (cellLabels[i] === c + 1) {
-        total += 1;
-        const mode = cellMode[i];
-        const key = ((mode[0] >> 2) << 12) | ((mode[1] >> 2) << 6) | (mode[2] >> 2);
-        counts.set(key, (counts.get(key) || 0) + 1);
-      }
+      if (cellLabels[i] === c + 1) { hasCells = true; break; }
     }
-    if (!total) continue;
-    let bestKey = 0;
-    let bestCount = 0;
-    counts.forEach((count, key) => {
-      if (count > bestCount) {
-        bestCount = count;
-        bestKey = key;
-      }
-    });
-    finalColors.push(
-      bestCount / total > 0.4
-        ? [((bestKey >> 12) & 63) * 4 + 2, ((bestKey >> 6) & 63) * 4 + 2, (bestKey & 63) * 4 + 2]
-        // No single RGB mode clearly wins this cluster — fall back to the cluster's own
-        // centroid, which is a LAB value (an average of LAB sub-pixels, see kmeansSeeded
-        // above) and needs converting back to RGB before it can be displayed or matched
-        // against the palette below.
-        : labTripleToRgb(cents[c][0], cents[c][1], cents[c][2])
-    );
+    if (!hasCells) continue;
+    finalLABColors.push({ l: cents[c][0], a: cents[c][1], b: cents[c][2] });
     keptIndexes.push(c + 1);
   }
 
@@ -489,15 +455,11 @@ function computeQuantization(sourceCanvas, cols, rows, targetAspect, palette) {
   keptIndexes.forEach((oldIndex, newIndex) => remap.set(oldIndex, newIndex));
   const remappedLabels = cellLabels.map((l) => remap.get(l) ?? 0);
 
-  // The K-means/edge-detection above decides WHICH pixels group together and how
-  // much real detail survives — that's the technique being reused. What each group
-  // is actually CALLED and PRINTED comes only from our own fixed Universal palette:
-  // every discovered color (including the outline black) gets snapped to its nearest
-  // entry by true perceptual distance (LAB Delta E), never left as a raw discovered
-  // RGB or a generic reference name. Two discovered clusters that snap to the SAME
-  // palette entry are merged onto one shared legend slot — the same real color never
-  // gets printed under two different numbers.
-  const paletteIndexForColor = finalColors.map((color) => nearestPaletteColor({ r: color[0], g: color[1], b: color[2] }, palette));
+  // Snap each discovered LAB centroid directly to the nearest Universal Palette
+  // entry by CIEDE2000 — no RGB intermediate, no quantization, no gamut clipping.
+  // Two clusters that snap to the SAME palette entry merge onto one shared legend
+  // slot, so the same color never prints under two different numbers.
+  const paletteIndexForColor = finalLABColors.map((lab) => nearestPaletteColorLAB(lab, palette));
   const uniquePaletteIndexes = [...new Set(paletteIndexForColor)].sort((a, b) => a - b);
   const legendSlotForPaletteIndex = new Map(uniquePaletteIndexes.map((paletteIndex, slot) => [paletteIndex, slot]));
 
