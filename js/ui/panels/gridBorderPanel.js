@@ -1,4 +1,4 @@
-import { state, setState, subscribe } from "../../state.js?v=36";
+import { state, setState, subscribe } from "../../state.js?v=37";
 import {
   GRID_PATTERNS,
   computeGridDimensions,
@@ -9,17 +9,17 @@ import {
   CORNER_TRIM_SIZE_MIN_PERCENT,
   CORNER_TRIM_SIZE_MAX_PERCENT,
   FRAME_MARGIN_OPTIONS,
-} from "../../modules/gridPatternEngine.js?v=36";
-import { recommendFont, recommendTextTint } from "../../modules/typographyEngine.js?v=36";
-import { applyPreset, clampBorderWeight } from "../../modules/borderStyleEngine.js?v=36";
-import { CORNER_RADIUS_MIN_PERCENT, CORNER_RADIUS_MAX_PERCENT } from "../../modules/cornerRadiusEngine.js?v=36";
-import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=36";
-import { getTrimSizeById } from "../../modules/canvasEngine.js?v=36";
-import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=36";
-import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=36";
-import { normalizeComposition, computeLayout } from "../../modules/layoutCompositionEngine.js?v=36";
-import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=36";
-import { PAGE_BACKGROUND_MODES } from "../../modules/bookThemeEngine.js?v=36";
+} from "../../modules/gridPatternEngine.js?v=37";
+import { recommendFont, recommendTextTint } from "../../modules/typographyEngine.js?v=37";
+import { applyPreset, clampBorderWeight } from "../../modules/borderStyleEngine.js?v=37";
+import { CORNER_RADIUS_MIN_PERCENT, CORNER_RADIUS_MAX_PERCENT } from "../../modules/cornerRadiusEngine.js?v=37";
+import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=37";
+import { getTrimSizeById } from "../../modules/canvasEngine.js?v=37";
+import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=37";
+import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=37";
+import { normalizeComposition, computeLayout } from "../../modules/layoutCompositionEngine.js?v=37";
+import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=37";
+import { PAGE_BACKGROUND_MODES } from "../../modules/bookThemeEngine.js?v=37";
 
 const el = {
   patternGrid: document.getElementById("grid-pattern-options"),
@@ -33,6 +33,8 @@ const el = {
   borderInput: document.getElementById("border-weight-input"),
   tintSlider: document.getElementById("grid-tint-slider"),
   tintInput: document.getElementById("grid-tint-input"),
+  numberTintSlider: document.getElementById("number-tint-slider"),
+  numberTintInput: document.getElementById("number-tint-input"),
   radiusSlider: document.getElementById("corner-radius-slider"),
   radiusInput: document.getElementById("corner-radius-input"),
   cornerTrimPicker: document.getElementById("corner-trim-picker"),
@@ -57,6 +59,7 @@ export function initGridBorderPanel() {
   bindPresets();
   bindBorderWeight();
   bindGridTint();
+  bindNumberTint();
   bindCornerRadius();
   bindCornerTrimSize();
 
@@ -176,6 +179,11 @@ function clampTint(pct) {
   return Math.min(100, Math.max(0, Number.isFinite(pct) ? pct : 35));
 }
 
+function bindNumberTint() {
+  el.numberTintSlider.addEventListener("input", () => setState({ numberTintPercent: Number(el.numberTintSlider.value) }));
+  el.numberTintInput.addEventListener("change", () => setState({ numberTintPercent: clampTint(Number(el.numberTintInput.value)) }));
+}
+
 function bindCornerRadius() {
   el.radiusSlider.addEventListener("input", () => setState({ cornerRadiusPercent: Number(el.radiusSlider.value) }));
   el.radiusInput.addEventListener("change", () => setState({ cornerRadiusPercent: clampRadius(Number(el.radiusInput.value)) }));
@@ -197,6 +205,7 @@ function render(current) {
   syncPair(el.cellSlider, el.cellInput, current.cellSizeMm);
   syncPair(el.borderSlider, el.borderInput, current.borderWeightPt);
   syncPair(el.tintSlider, el.tintInput, current.gridTintPercent);
+  syncPair(el.numberTintSlider, el.numberTintInput, current.numberTintPercent);
   syncPair(el.radiusSlider, el.radiusInput, current.cornerRadiusPercent);
   syncPair(el.cornerTrimSizeSlider, el.cornerTrimSizeInput, current.gridCornerTrimSizePercent);
 
@@ -219,7 +228,7 @@ function render(current) {
   const sizes = getSizesForSelection(current.colorSetOptionId, current.colorSetCustomPair);
   const colorCount = buildCombinedPalette(sizes).length;
   const font = recommendFont(current.cellSizeMm, colorCount);
-  const tint = recommendTextTint(current.cellSizeMm, current.gridTintPercent);
+  const tint = recommendTextTint(current.cellSizeMm, current.numberTintPercent);
 
   // Grid tint only ever controls the darkness of the grid LINES — cells always stay
   // white and the page background is its own separate choice (Black Book, above).

@@ -17,6 +17,12 @@ export const state = {
   cellSizeMm: 4.0,
   borderWeightPt: 0.9,
   gridTintPercent: 35,
+
+  // Number Tint: deliberately independent of Grid Line Tint above — a creator may
+  // want faint grid lines with dark, legible numbers (or vice versa), so the two
+  // never derive from each other. Same default (35) as Grid Line Tint purely so a
+  // book that never touches this slider renders identically to before it existed.
+  numberTintPercent: 35,
   cornerRadiusPercent: 0,
 
   // Grid Silhouette Trim: complete control over which corners are cut (any subset of
