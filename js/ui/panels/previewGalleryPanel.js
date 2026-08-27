@@ -1,18 +1,18 @@
 // Module: Stacked Live Preview Gallery + Live Preview Carousel
-import { state, setState, subscribe } from "../../state.js?v=43";
-import { getTrimSizeById } from "../../modules/canvasEngine.js?v=43";
-import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=43";
-import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=43";
-import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=43";
-import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=43";
-import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=43";
-import { normalizeComposition } from "../../modules/layoutCompositionEngine.js?v=43";
-import { getPlaceholderSource, loadImageSource, drawSourceToCanvas, renderMosaicPreview } from "../mosaicRenderer.js?v=43";
-import { createCarouselController } from "../../modules/previewLoopEngine.js?v=43";
-import { downloadActiveItemPng, downloadActiveItemPdf } from "../pdfExport.js?v=43";
-import { isContentPageBlack } from "../../modules/bookThemeEngine.js?v=43";
-import { applySourceSmoothing } from "../../modules/sourceSmoothingEngine.js?v=43";
-import { applyPosterize } from "../../modules/posterizeEngine.js?v=43";
+import { state, setState, subscribe } from "../../state.js?v=42";
+import { getTrimSizeById } from "../../modules/canvasEngine.js?v=42";
+import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=42";
+import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=42";
+import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=42";
+import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=42";
+import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=42";
+import { normalizeComposition } from "../../modules/layoutCompositionEngine.js?v=42";
+import { getPlaceholderSource, loadImageSource, drawSourceToCanvas, renderMosaicPreview } from "../mosaicRenderer.js?v=42";
+import { createCarouselController } from "../../modules/previewLoopEngine.js?v=42";
+import { downloadActiveItemPng, downloadActiveItemPdf } from "../pdfExport.js?v=42";
+import { isContentPageBlack } from "../../modules/bookThemeEngine.js?v=42";
+import { applySourceSmoothing } from "../../modules/sourceSmoothingEngine.js?v=42";
+import { applyPosterize } from "../../modules/posterizeEngine.js?v=42";
 
 const el = {
   printCanvas: document.getElementById("preview-canvas-print"),
@@ -33,7 +33,6 @@ const el = {
   sourcePreviewProcessed: document.getElementById("source-preview-processed"),
   sourcePreviewProcessedPlaceholder: document.getElementById("source-preview-processed-placeholder"),
   sourcePreviewProcessedCaption: document.getElementById("source-preview-processed-caption"),
-  nativeGridWarning: document.getElementById("native-grid-warning"),
 };
 
 let carouselController;
@@ -141,7 +140,6 @@ function resolveActiveSettings(current, globalPalette) {
       cornerTrimCorners: current.gridCornerTrimCorners,
       cornerTrimShape: current.gridCornerTrimShape,
       cornerTrimSizePercent: current.gridCornerTrimSizePercent,
-      nativeGrid: null,
     };
   }
 
@@ -158,12 +156,8 @@ function resolveActiveSettings(current, globalPalette) {
   const cornerTrimCorners = activeItem.settings.cornerTrimCorners ?? current.gridCornerTrimCorners;
   const cornerTrimShape = activeItem.settings.cornerTrimShape ?? current.gridCornerTrimShape;
   const cornerTrimSizePercent = activeItem.settings.cornerTrimSizePercent ?? current.gridCornerTrimSizePercent;
-  const nativeGrid =
-    activeItem.settings.nativeGridCols && activeItem.settings.nativeGridRows
-      ? { cols: activeItem.settings.nativeGridCols, rows: activeItem.settings.nativeGridRows }
-      : null;
 
-  return { gridPattern, borderWeightPt, gridTintPercent, cornerRadiusPercent, palette, cornerTrimCorners, cornerTrimShape, cornerTrimSizePercent, nativeGrid };
+  return { gridPattern, borderWeightPt, gridTintPercent, cornerRadiusPercent, palette, cornerTrimCorners, cornerTrimShape, cornerTrimSizePercent };
 }
 
 // Renders automatically for whatever's currently active — no manual step. With nothing
@@ -207,18 +201,7 @@ async function render(current) {
   const composition = current.layoutScope === "page-specific" && activeItem.settings.composition
     ? normalizeComposition(activeItem.settings.composition)
     : normalizeComposition(current.globalComposition);
-  const { cellSizeMm: effectiveCellSizeMm, gridOverride, nativeGridWarning } = resolveEffectiveGrid(
-    safeZone,
-    current.cellSizeMm,
-    effective.gridPattern,
-    composition,
-    current.resolutionPriority,
-    effective.nativeGrid
-  );
-  if (el.nativeGridWarning) {
-    el.nativeGridWarning.textContent = nativeGridWarning ?? "";
-    el.nativeGridWarning.hidden = !nativeGridWarning;
-  }
+  const { cellSizeMm: effectiveCellSizeMm, gridOverride } = resolveEffectiveGrid(safeZone, current.cellSizeMm, effective.gridPattern, composition, current.resolutionPriority);
 
   const baseOpts = {
     trimSize,
