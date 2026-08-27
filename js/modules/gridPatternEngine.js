@@ -37,10 +37,16 @@ export function computeGridDimensions(safeZoneWidthIn, safeZoneHeightIn, cellSiz
   }
 
   if (patternId === "diamond") {
-    // Diamonds are squares rotated 45°; their bounding footprint is cellSize * sqrt(2).
-    const footprint = cellSizeIn * Math.SQRT2;
-    const cols = Math.max(1, Math.floor(safeZoneWidthIn / footprint));
-    const rows = Math.max(1, Math.floor(safeZoneHeightIn / footprint));
+    // Diamonds are squares rotated 45°; cellPolygonIn draws each one with a
+    // point-to-point width/height of exactly cellSizeIn (half = cellSizeIn / 2).
+    // A true edge-to-edge argyle tessellation — every diamond sharing an edge with
+    // its 4 neighbors, no dead gaps — needs the same staggered-row trick Hexagon
+    // already uses below: full cellSizeIn horizontal pitch, HALF that vertical
+    // pitch (rows interlock at their half-height), each row offset by half a step.
+    const xStep = cellSizeIn;
+    const yStep = cellSizeIn / 2;
+    const cols = Math.max(1, Math.floor(safeZoneWidthIn / xStep - 0.5));
+    const rows = Math.max(1, Math.floor(safeZoneHeightIn / yStep));
     return { cols, rows, cellSizeIn };
   }
 
@@ -60,8 +66,10 @@ export function cellCenterIn(patternId, col, row, cellSizeIn) {
   }
 
   if (patternId === "diamond") {
-    const step = cellSizeIn * Math.SQRT2;
-    return { x: col * step + step / 2, y: row * step + step / 2 };
+    const xStep = cellSizeIn;
+    const yStep = cellSizeIn / 2;
+    const xOffset = row % 2 === 1 ? xStep / 2 : 0;
+    return { x: col * xStep + xOffset + xStep / 2, y: row * yStep + cellSizeIn / 2 };
   }
 
   return { x: col * cellSizeIn + cellSizeIn / 2, y: row * cellSizeIn + cellSizeIn / 2 };
