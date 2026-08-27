@@ -1,5 +1,5 @@
 // Section 4: Color Key Standards for Mosaic Color-by-Number Books
-import { UNIVERSAL_PALETTE_36 } from "./data/universalPalette.js?v=43";
+import { UNIVERSAL_PALETTE_36 } from "./data/universalPalette.js?v=45";
 
 // The 5 selectable color-COUNT configurations described in the blueprint. There is
 // only one color source now (see universalPalette.js) — every hex value is exact and
@@ -52,4 +52,32 @@ export function buildCombinedPalette(sizes) {
     });
   });
   return combined;
+}
+
+// Custom Color-to-Number Order: the printed number for a color has always come purely
+// from its position in the palette array handed to the quantization engine (see
+// mosaicRenderer.js's computeQuantization — the first surviving palette position becomes
+// "1", the next becomes "2", and so on) — the SAME fixed order for every image using
+// that palette, book-wide. This reorders that array per image, so a creator can decide
+// e.g. Black prints as "1" on one puzzle and "2" on another, entirely independent of the
+// book's default numbering. `customOrder` is an array of swatch ids in the desired
+// display order; any palette entries it doesn't mention (a stale override after the
+// book's color set changed, say) keep their original relative order, appended at the
+// end, so a color already colored-in under some number never silently vanishes.
+export function applyCustomColorOrder(palette, customOrder) {
+  if (!customOrder || !customOrder.length) return palette;
+  const byId = new Map(palette.map((swatch) => [swatch.id, swatch]));
+  const seen = new Set();
+  const ordered = [];
+  customOrder.forEach((id) => {
+    const swatch = byId.get(id);
+    if (swatch && !seen.has(id)) {
+      ordered.push(swatch);
+      seen.add(id);
+    }
+  });
+  palette.forEach((swatch) => {
+    if (!seen.has(swatch.id)) ordered.push(swatch);
+  });
+  return ordered;
 }

@@ -1,12 +1,13 @@
-import { state, setState, subscribe } from "../../state.js?v=43";
-import { MAX_BATCH_SIZE, addToBatch, removeFromBatch, updateItemSettings } from "../../modules/batchEngine.js?v=43";
-import { reorder, computePagination, statusBadges } from "../../modules/storyboardEngine.js?v=43";
-import { computeSolutionPageCount } from "../../modules/solutionGenerationEngine.js?v=43";
-import { GRID_PATTERNS, CORNER_TRIM_CORNERS, CORNER_TRIM_SHAPES, CORNER_TRIM_SIZE_MIN_PERCENT, CORNER_TRIM_SIZE_MAX_PERCENT } from "../../modules/gridPatternEngine.js?v=43";
-import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=43";
-import { computeFrontMatterPageCount } from "../../modules/frontBackMatterEngine.js?v=43";
-import { SOURCE_SMOOTHING_OPTIONS } from "../../modules/sourceSmoothingEngine.js?v=43";
-import { POSTERIZE_LEVEL_MIN, POSTERIZE_LEVEL_MAX } from "../../modules/posterizeEngine.js?v=43";
+import { state, setState, subscribe } from "../../state.js?v=45";
+import { MAX_BATCH_SIZE, addToBatch, removeFromBatch, updateItemSettings } from "../../modules/batchEngine.js?v=45";
+import { reorder, computePagination, statusBadges } from "../../modules/storyboardEngine.js?v=45";
+import { computeSolutionPageCount } from "../../modules/solutionGenerationEngine.js?v=45";
+import { GRID_PATTERNS, CORNER_TRIM_CORNERS, CORNER_TRIM_SHAPES, CORNER_TRIM_SIZE_MIN_PERCENT, CORNER_TRIM_SIZE_MAX_PERCENT } from "../../modules/gridPatternEngine.js?v=45";
+import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=45";
+import { computeFrontMatterPageCount } from "../../modules/frontBackMatterEngine.js?v=45";
+import { SOURCE_SMOOTHING_OPTIONS } from "../../modules/sourceSmoothingEngine.js?v=45";
+import { getSizesForSelection, buildCombinedPalette, applyCustomColorOrder } from "../../modules/colorKeyEngine.js?v=45";
+import { DRAG_HANDLE_ICON, attachDragHandle } from "../dragReorderList.js?v=45";
 
 const CORNER_RADIUS_CHOICES = [0, 25, 50, 75, 100];
 const COLOR_SET_CHOICES = [12, 24, 36];
@@ -27,11 +28,7 @@ const el = {
   perPageSelect: document.getElementById("solution-per-page-select"),
   summaryHint: document.getElementById("solution-summary-hint"),
   cellShapeSequenceOptions: document.getElementById("cell-shape-sequence-options"),
-  randomizeColorSetsBtn: document.getElementById("randomize-color-sets-btn"),
   sourceSmoothingOptions: document.getElementById("source-smoothing-options"),
-  posterizeSlider: document.getElementById("posterize-slider"),
-  posterizeInput: document.getElementById("posterize-input"),
-  posterizeHint: document.getElementById("posterize-hint"),
 };
 
 // Manual mouse-based drag (not native HTML5 draggable, and not Pointer Events +
@@ -49,21 +46,9 @@ export function initBatchStoryboardPanel() {
   el.perPageSelect.addEventListener("change", () => setState({ solutionThumbsPerPage: Number(el.perPageSelect.value) }));
   renderCellShapeSequenceOptions();
   renderSourceSmoothingOptions();
-  bindPosterizeLevels();
-  el.randomizeColorSetsBtn.addEventListener("click", randomizeColorSetsForEveryImage);
 
   subscribe(render);
   render(state);
-}
-
-function bindPosterizeLevels() {
-  el.posterizeSlider.addEventListener("input", () => setState({ posterizeLevels: Number(el.posterizeSlider.value) }));
-  el.posterizeInput.addEventListener("change", () => setState({ posterizeLevels: clampPosterizeLevels(Number(el.posterizeInput.value)) }));
-}
-
-function clampPosterizeLevels(n) {
-  if (!Number.isFinite(n) || n < POSTERIZE_LEVEL_MIN) return 0;
-  return Math.min(POSTERIZE_LEVEL_MAX, n);
 }
 
 function renderCellShapeSequenceOptions() {
@@ -103,14 +88,6 @@ function applyCellShapeSequence(seq) {
   setState({ batchItems: batch });
 }
 
-function randomizeColorSetsForEveryImage() {
-  const batch = state.batchItems.map((item) => ({
-    ...item,
-    settings: { ...item.settings, colorSetOverride: COLOR_SET_CHOICES[Math.floor(Math.random() * COLOR_SET_CHOICES.length)] },
-  }));
-  setState({ batchItems: batch });
-}
-
 function handleFileInput() {
   const { accepted, rejectedCount, batch } = addToBatch(state.batchItems, el.fileInput.files);
   setState({ batchItems: batch, activeBatchItemId: state.activeBatchItemId ?? accepted[0]?.id ?? null });
@@ -139,13 +116,6 @@ function render(current) {
   el.sourceSmoothingOptions.querySelectorAll(".option-item").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.smoothingId === current.sourceSmoothing);
   });
-
-  if (Number(el.posterizeSlider.value) !== current.posterizeLevels) el.posterizeSlider.value = String(current.posterizeLevels);
-  if (Number(el.posterizeInput.value) !== current.posterizeLevels) el.posterizeInput.value = String(current.posterizeLevels);
-  el.posterizeHint.textContent =
-    current.posterizeLevels === 0
-      ? "0 = Off. Collapses each color channel to a small number of flat steps before quantization — turns a smooth photo gradient into clean bands, the same effect as a Posterize filter in Photoshop/GIMP. Runs after Source Smoothing above. Lower = bolder/flatter, higher = subtler."
-      : `${current.posterizeLevels} levels per channel — ${current.posterizeLevels <= 3 ? "bold, flat" : current.posterizeLevels <= 5 ? "moderate" : "subtle"} banding. Runs after Source Smoothing above.`;
 
   el.countHint.textContent = `${current.batchItems.length} / ${MAX_BATCH_SIZE} images queued.`;
   el.perPageSelect.value = String(current.solutionThumbsPerPage);
@@ -231,6 +201,17 @@ function buildSettingsDrawer(item, current) {
         ${COLOR_SET_CHOICES.map((v) => `<option value="${v}">${v}-Color</option>`).join("")}
       </select>
     </div>
+    <div class="drawer-field color-order-drawer-field">
+      <label>Color-to-Number Order</label>
+      <label class="drawer-toggle-label">
+        <input type="checkbox" data-role="color-order-override-toggle" />
+        Customize numbering for this image
+      </label>
+      <div class="color-order-drawer-detail" data-role="color-order-detail" hidden>
+        <div class="color-order-list" data-role="color-order-list"></div>
+        <p class="hint">Drag to reorder — the position each color ends up in is the number it prints as on this image's puzzle page and legend, independent of every other image's numbering.</p>
+      </div>
+    </div>
     <div class="drawer-field">
       <label>Back Page Background</label>
       <select data-key="backBackgroundAssetId">
@@ -243,16 +224,6 @@ function buildSettingsDrawer(item, current) {
       <select data-key="sourceSmoothing">
         <option value="">Inherit (${SOURCE_SMOOTHING_OPTIONS.find((o) => o.id === current.sourceSmoothing)?.label ?? "Off"})</option>
         ${SOURCE_SMOOTHING_OPTIONS.map((o) => `<option value="${o.id}">${o.label}</option>`).join("")}
-      </select>
-    </div>
-    <div class="drawer-field">
-      <label>Posterize Levels</label>
-      <select data-key="posterizeLevels">
-        <option value="">Inherit (${current.posterizeLevels === 0 ? "Off" : `${current.posterizeLevels} Levels`})</option>
-        <option value="0">Off</option>
-        ${Array.from({ length: POSTERIZE_LEVEL_MAX - POSTERIZE_LEVEL_MIN + 1 }, (_, i) => i + POSTERIZE_LEVEL_MIN)
-          .map((n) => `<option value="${n}">${n} Levels</option>`)
-          .join("")}
       </select>
     </div>
     <div class="drawer-field corner-trim-drawer-field">
@@ -283,7 +254,7 @@ function buildSettingsDrawer(item, current) {
     select.addEventListener("change", () => {
       const raw = select.value;
       let value = raw === "" ? null : raw;
-      if (key === "cornerRadiusPercent" || key === "colorSetOverride" || key === "posterizeLevels") {
+      if (key === "cornerRadiusPercent" || key === "colorSetOverride") {
         value = raw === "" ? null : Number(raw);
       }
       const batch = updateItemSettings(state.batchItems, item.id, { [key]: value });
@@ -292,6 +263,7 @@ function buildSettingsDrawer(item, current) {
   });
 
   wireCornerTrimDrawerField(drawer, item, current);
+  wireColorOrderDrawerField(drawer, item, current);
 
   drawer.querySelector(".drawer-close").addEventListener("click", () => setState({ expandedSettingsItemId: null }));
 
@@ -359,6 +331,67 @@ function wireCornerTrimDrawerField(drawer, item, current) {
       cornerTrimSizePercent: toggle.checked ? current.gridCornerTrimSizePercent : null,
     });
     setState({ batchItems: batch });
+  });
+}
+
+// The palette this specific item will actually quantize against — its own Color Set
+// override if it has one, otherwise the book-wide default — is what the drag list
+// needs to show, since that's exactly what a reorder here re-numbers.
+function effectivePaletteForItem(item, current) {
+  const sizes = item.settings.colorSetOverride ? [item.settings.colorSetOverride] : getSizesForSelection(current.colorSetOptionId, current.colorSetCustomPair);
+  return buildCombinedPalette(sizes);
+}
+
+// Custom Color-to-Number Order: like Grid Corner Trim above, gated behind one
+// "customize for this image" checkbox so the drag list only takes up drawer space when
+// actually in use. Unlike Grid Corner Trim's 3 fields, this is a single array — but the
+// same footgun applies (see wireCornerTrimDrawerField/wireNativeGridDrawerField from
+// past sessions): checking the box must commit a REAL order immediately, not leave
+// settings null until the user drags something, or the very next render sees "not
+// customized" from that null and un-checks/re-hides this out from under them.
+function wireColorOrderDrawerField(drawer, item, current) {
+  const toggle = drawer.querySelector('[data-role="color-order-override-toggle"]');
+  const detail = drawer.querySelector('[data-role="color-order-detail"]');
+  const list = drawer.querySelector('[data-role="color-order-list"]');
+
+  const overriding = !!(item.settings.customColorOrder && item.settings.customColorOrder.length);
+  toggle.checked = overriding;
+  detail.hidden = !overriding;
+
+  const palette = applyCustomColorOrder(effectivePaletteForItem(item, current), item.settings.customColorOrder);
+  renderColorOrderList(list, item, palette);
+
+  toggle.addEventListener("change", () => {
+    const batch = updateItemSettings(state.batchItems, item.id, {
+      customColorOrder: toggle.checked ? palette.map((swatch) => swatch.id) : null,
+    });
+    setState({ batchItems: batch });
+  });
+}
+
+function renderColorOrderList(list, item, palette) {
+  list.innerHTML = "";
+  const ids = palette.map((swatch) => swatch.id);
+  palette.forEach((swatch, index) => {
+    const row = document.createElement("div");
+    row.className = "color-order-item";
+    row.dataset.colorId = String(swatch.id);
+    row.innerHTML = `
+      <span class="color-order-drag-handle" title="Drag to reorder">${DRAG_HANDLE_ICON}</span>
+      <span class="color-order-index">${index + 1}</span>
+      <span class="swatch-chip" style="background:${swatch.hex}"></span>
+      <span class="color-order-name">${swatch.name}</span>
+    `;
+    attachDragHandle(row.querySelector(".color-order-drag-handle"), {
+      container: list,
+      row,
+      ids,
+      onReorder: (nextOrder) => {
+        const batch = updateItemSettings(state.batchItems, item.id, { customColorOrder: nextOrder });
+        setState({ batchItems: batch });
+      },
+    });
+    list.appendChild(row);
   });
 }
 

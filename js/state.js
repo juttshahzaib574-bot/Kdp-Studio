@@ -80,12 +80,6 @@ export const state = {
   // Each image can also override this individually via its own ⚙ drawer.
   sourceSmoothing: "off",
 
-  // Posterize: book-wide default for the optional pre-quantization level reduction
-  // (see modules/posterizeEngine.js) — 0 = off, 2-8 = active. Runs AFTER Source
-  // Smoothing (denoise first, then flatten what's left into bands) — same
-  // global-default-plus-per-image-override shape as Source Smoothing above.
-  posterizeLevels: 0,
-
   // Automated Solution Generation Engine
   solutionThumbsPerPage: 4,
 
