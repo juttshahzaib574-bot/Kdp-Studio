@@ -1,4 +1,4 @@
-import { state, setState, subscribe } from "../../state.js?v=41";
+import { state, setState, subscribe } from "../../state.js?v=42";
 import {
   GRID_PATTERNS,
   computeGridDimensions,
@@ -9,17 +9,17 @@ import {
   CORNER_TRIM_SIZE_MIN_PERCENT,
   CORNER_TRIM_SIZE_MAX_PERCENT,
   FRAME_MARGIN_OPTIONS,
-} from "../../modules/gridPatternEngine.js?v=41";
-import { recommendFont, recommendTextTint } from "../../modules/typographyEngine.js?v=41";
-import { applyPreset, clampBorderWeight } from "../../modules/borderStyleEngine.js?v=41";
-import { CORNER_RADIUS_MIN_PERCENT, CORNER_RADIUS_MAX_PERCENT } from "../../modules/cornerRadiusEngine.js?v=41";
-import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=41";
-import { getTrimSizeById } from "../../modules/canvasEngine.js?v=41";
-import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=41";
-import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=41";
-import { normalizeComposition, computeLayout } from "../../modules/layoutCompositionEngine.js?v=41";
-import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=41";
-import { PAGE_BACKGROUND_MODES } from "../../modules/bookThemeEngine.js?v=41";
+} from "../../modules/gridPatternEngine.js?v=42";
+import { recommendFont, recommendTextTint } from "../../modules/typographyEngine.js?v=42";
+import { applyPreset, clampBorderWeight } from "../../modules/borderStyleEngine.js?v=42";
+import { CORNER_RADIUS_MIN_PERCENT, CORNER_RADIUS_MAX_PERCENT } from "../../modules/cornerRadiusEngine.js?v=42";
+import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=42";
+import { getTrimSizeById } from "../../modules/canvasEngine.js?v=42";
+import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=42";
+import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=42";
+import { normalizeComposition, computeLayout } from "../../modules/layoutCompositionEngine.js?v=42";
+import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=42";
+import { PAGE_BACKGROUND_MODES } from "../../modules/bookThemeEngine.js?v=42";
 
 const el = {
   patternGrid: document.getElementById("grid-pattern-options"),

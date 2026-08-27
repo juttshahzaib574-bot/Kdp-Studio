@@ -1,12 +1,12 @@
-import { state, setState, subscribe } from "../../state.js?v=41";
-import { MAX_BATCH_SIZE, addToBatch, removeFromBatch, updateItemSettings } from "../../modules/batchEngine.js?v=41";
-import { reorder, computePagination, statusBadges } from "../../modules/storyboardEngine.js?v=41";
-import { computeSolutionPageCount } from "../../modules/solutionGenerationEngine.js?v=41";
-import { GRID_PATTERNS, CORNER_TRIM_CORNERS, CORNER_TRIM_SHAPES, CORNER_TRIM_SIZE_MIN_PERCENT, CORNER_TRIM_SIZE_MAX_PERCENT } from "../../modules/gridPatternEngine.js?v=41";
-import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=41";
-import { computeFrontMatterPageCount } from "../../modules/frontBackMatterEngine.js?v=41";
-import { SOURCE_SMOOTHING_OPTIONS } from "../../modules/sourceSmoothingEngine.js?v=41";
-import { POSTERIZE_LEVEL_MIN, POSTERIZE_LEVEL_MAX } from "../../modules/posterizeEngine.js?v=41";
+import { state, setState, subscribe } from "../../state.js?v=42";
+import { MAX_BATCH_SIZE, addToBatch, removeFromBatch, updateItemSettings } from "../../modules/batchEngine.js?v=42";
+import { reorder, computePagination, statusBadges } from "../../modules/storyboardEngine.js?v=42";
+import { computeSolutionPageCount } from "../../modules/solutionGenerationEngine.js?v=42";
+import { GRID_PATTERNS, CORNER_TRIM_CORNERS, CORNER_TRIM_SHAPES, CORNER_TRIM_SIZE_MIN_PERCENT, CORNER_TRIM_SIZE_MAX_PERCENT } from "../../modules/gridPatternEngine.js?v=42";
+import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=42";
+import { computeFrontMatterPageCount } from "../../modules/frontBackMatterEngine.js?v=42";
+import { SOURCE_SMOOTHING_OPTIONS } from "../../modules/sourceSmoothingEngine.js?v=42";
+import { POSTERIZE_LEVEL_MIN, POSTERIZE_LEVEL_MAX } from "../../modules/posterizeEngine.js?v=42";
 
 const CORNER_RADIUS_CHOICES = [0, 25, 50, 75, 100];
 const COLOR_SET_CHOICES = [12, 24, 36];

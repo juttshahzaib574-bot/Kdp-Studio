@@ -1,7 +1,7 @@
-import { state, setState, subscribe } from "../../state.js?v=41";
-import { COLOR_SET_OPTIONS, getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=41";
-import { BOOK_COLOR_MODES } from "../../modules/bookThemeEngine.js?v=41";
-import { COLOR_KEY_ORIENTATIONS, MAX_ENTRIES_PER_LINE } from "../../modules/colorKeyLayoutEngine.js?v=41";
+import { state, setState, subscribe } from "../../state.js?v=42";
+import { COLOR_SET_OPTIONS, getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=42";
+import { BOOK_COLOR_MODES } from "../../modules/bookThemeEngine.js?v=42";
+import { COLOR_KEY_ORIENTATIONS, MAX_ENTRIES_PER_LINE } from "../../modules/colorKeyLayoutEngine.js?v=42";
 
 const PAIR_CHOICES = [
   { id: "12-24", sizes: [12, 24], label: "12 & 24" },
