@@ -1,18 +1,17 @@
 // Module: Stacked Live Preview Gallery + Live Preview Carousel
-import { state, setState, subscribe } from "../../state.js?v=43";
-import { getTrimSizeById } from "../../modules/canvasEngine.js?v=43";
-import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=43";
-import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=43";
-import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=43";
-import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=43";
-import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=43";
-import { normalizeComposition } from "../../modules/layoutCompositionEngine.js?v=43";
-import { getPlaceholderSource, loadImageSource, drawSourceToCanvas, renderMosaicPreview } from "../mosaicRenderer.js?v=43";
-import { createCarouselController } from "../../modules/previewLoopEngine.js?v=43";
-import { downloadActiveItemPng, downloadActiveItemPdf } from "../pdfExport.js?v=43";
-import { isContentPageBlack } from "../../modules/bookThemeEngine.js?v=43";
-import { applySourceSmoothing } from "../../modules/sourceSmoothingEngine.js?v=43";
-import { applyPosterize } from "../../modules/posterizeEngine.js?v=43";
+import { state, setState, subscribe } from "../../state.js?v=44";
+import { getTrimSizeById } from "../../modules/canvasEngine.js?v=44";
+import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=44";
+import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=44";
+import { getSizesForSelection, buildCombinedPalette, applyCustomColorOrder } from "../../modules/colorKeyEngine.js?v=44";
+import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=44";
+import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=44";
+import { normalizeComposition } from "../../modules/layoutCompositionEngine.js?v=44";
+import { getPlaceholderSource, loadImageSource, drawSourceToCanvas, renderMosaicPreview } from "../mosaicRenderer.js?v=44";
+import { createCarouselController } from "../../modules/previewLoopEngine.js?v=44";
+import { downloadActiveItemPng, downloadActiveItemPdf } from "../pdfExport.js?v=44";
+import { isContentPageBlack } from "../../modules/bookThemeEngine.js?v=44";
+import { applySourceSmoothing } from "../../modules/sourceSmoothingEngine.js?v=44";
 
 const el = {
   printCanvas: document.getElementById("preview-canvas-print"),
@@ -152,7 +151,8 @@ function resolveActiveSettings(current, globalPalette) {
     gridTintPercent = preset.gridTintPercent;
   }
   const cornerRadiusPercent = activeItem.settings.cornerRadiusPercent ?? current.cornerRadiusPercent;
-  const palette = activeItem.settings.colorSetOverride ? buildCombinedPalette([activeItem.settings.colorSetOverride]) : globalPalette;
+  const basePalette = activeItem.settings.colorSetOverride ? buildCombinedPalette([activeItem.settings.colorSetOverride]) : globalPalette;
+  const palette = applyCustomColorOrder(basePalette, activeItem.settings.customColorOrder);
   const cornerTrimCorners = activeItem.settings.cornerTrimCorners ?? current.gridCornerTrimCorners;
   const cornerTrimShape = activeItem.settings.cornerTrimShape ?? current.gridCornerTrimShape;
   const cornerTrimSizePercent = activeItem.settings.cornerTrimSizePercent ?? current.gridCornerTrimSizePercent;
@@ -179,9 +179,8 @@ async function render(current) {
   }
 
   const smoothingMode = activeItem.settings.sourceSmoothing ?? current.sourceSmoothing;
-  const posterizeLevels = activeItem.settings.posterizeLevels ?? current.posterizeLevels;
   const rawSourceCanvas = await resolveRawSourceCanvas(current);
-  const sourceCanvas = applyPosterize(applySourceSmoothing(rawSourceCanvas, smoothingMode), posterizeLevels);
+  const sourceCanvas = applySourceSmoothing(rawSourceCanvas, smoothingMode);
 
   drawFitted(el.sourcePreviewOriginal, rawSourceCanvas);
   drawFitted(el.sourcePreviewProcessed, sourceCanvas);
@@ -190,7 +189,7 @@ async function render(current) {
   el.sourcePreviewOriginalPlaceholder.hidden = true;
   el.sourcePreviewProcessedPlaceholder.hidden = true;
   el.sourcePreviewProcessedCaption.textContent =
-    smoothingMode === "off" && posterizeLevels === 0 ? "No changes applied — tune the controls above" : "After Smoothing + Posterize";
+    smoothingMode === "off" ? "No changes applied — tune the controls above" : "After Smoothing";
 
   const trimSize = getTrimSizeById(current.trimSizeId);
   const canvasDims = computeCanvasDimensions(trimSize, current.dpi, current.bleedEnabled);
@@ -254,9 +253,9 @@ function updateCarouselNav(current) {
 }
 
 // Caches only the RAW drawn source (keyed purely by image identity) — Source
-// Smoothing and Posterize are applied on top of this every render via their own
-// single-slot memos (sourceSmoothingEngine.js / posterizeEngine.js), so switching
-// either setting never re-decodes or re-draws the image itself, only re-filters it.
+// Smoothing is applied on top of this every render via its own single-slot memo
+// (sourceSmoothingEngine.js), so switching it never re-decodes or re-draws the image
+// itself, only re-filters it.
 async function resolveRawSourceCanvas(current) {
   const activeItem = current.batchItems.find((item) => item.id === current.activeBatchItemId);
   const key = activeItem ? activeItem.objectUrl : "placeholder";

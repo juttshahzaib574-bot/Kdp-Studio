@@ -6,14 +6,14 @@
 //   - renderFullMosaicGrid: the entire safe-zone grid at the real chosen print DPI,
 //     used to generate the actual page image embedded into the exported PDF.
 
-import { computeFrameGeometry, drawFrame } from "./preview.js?v=43";
-import { computeGridDimensions, cellCenterIn, cellPolygonIn, mmToIn, isCellInGridSilhouette, isCellInFrameMargin } from "../modules/gridPatternEngine.js?v=43";
-import { recommendFont, recommendTextTint, adjustForBorderWeight, centerOffsetIn, letterSpacingForLabel } from "../modules/typographyEngine.js?v=43";
-import { gridColorFromTint } from "../modules/borderStyleEngine.js?v=43";
-import { cornerRadiusIn, isFullCircle } from "../modules/cornerRadiusEngine.js?v=43";
-import { nearestPaletteColor, rgbToLabTriple, labTripleToRgb } from "../modules/shadeQuantizationEngine.js?v=43";
-import { computeLayout, LAYOUT_ELEMENTS } from "../modules/layoutCompositionEngine.js?v=43";
-import { toGrayscaleHex } from "../modules/bookThemeEngine.js?v=43";
+import { computeFrameGeometry, drawFrame } from "./preview.js?v=44";
+import { computeGridDimensions, cellCenterIn, cellPolygonIn, mmToIn, isCellInGridSilhouette, isCellInFrameMargin } from "../modules/gridPatternEngine.js?v=44";
+import { recommendFont, recommendTextTint, adjustForBorderWeight, centerOffsetIn, letterSpacingForLabel } from "../modules/typographyEngine.js?v=44";
+import { gridColorFromTint } from "../modules/borderStyleEngine.js?v=44";
+import { cornerRadiusIn, isFullCircle } from "../modules/cornerRadiusEngine.js?v=44";
+import { nearestPaletteColor, rgbToLabTriple, labTripleToRgb } from "../modules/shadeQuantizationEngine.js?v=44";
+import { computeLayout, LAYOUT_ELEMENTS } from "../modules/layoutCompositionEngine.js?v=44";
+import { toGrayscaleHex } from "../modules/bookThemeEngine.js?v=44";
 
 const PT_TO_IN = 1 / 72;
 
