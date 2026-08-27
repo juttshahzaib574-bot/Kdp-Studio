@@ -4,7 +4,7 @@
 // page) and free-form user-created "albums" for organizing reference images before they're
 // assigned a role. Drag a thumbnail onto any bucket in the sidebar to move it there.
 
-import { state, setState, subscribe } from "../../state.js?v=36";
+import { state, setState, subscribe } from "../../state.js?v=37";
 import {
   ASSET_CATEGORIES,
   loadGallery,
@@ -18,8 +18,8 @@ import {
   createAlbum,
   renameAlbum,
   deleteAlbum,
-} from "../../modules/assetGalleryEngine.js?v=36";
-import { showAlert } from "../alertDialog.js?v=36";
+} from "../../modules/assetGalleryEngine.js?v=37";
+import { showAlert } from "../alertDialog.js?v=37";
 
 // KDP interiors only ever need raster photos/scans — these three cover essentially
 // every real image a creator would have on hand (phone photos, exports from Procreate/

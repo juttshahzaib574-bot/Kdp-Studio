@@ -6,14 +6,14 @@
 //   - renderFullMosaicGrid: the entire safe-zone grid at the real chosen print DPI,
 //     used to generate the actual page image embedded into the exported PDF.
 
-import { computeFrameGeometry, drawFrame } from "./preview.js?v=36";
-import { computeGridDimensions, cellCenterIn, cellPolygonIn, mmToIn, isCellInGridSilhouette, isCellInFrameMargin } from "../modules/gridPatternEngine.js?v=36";
-import { recommendFont, recommendTextTint, adjustForBorderWeight, centerOffsetIn, letterSpacingForLabel } from "../modules/typographyEngine.js?v=36";
-import { gridColorFromTint } from "../modules/borderStyleEngine.js?v=36";
-import { cornerRadiusIn, isFullCircle } from "../modules/cornerRadiusEngine.js?v=36";
-import { nearestPaletteColor, rgbToLabTriple, labTripleToRgb } from "../modules/shadeQuantizationEngine.js?v=36";
-import { computeLayout, LAYOUT_ELEMENTS } from "../modules/layoutCompositionEngine.js?v=36";
-import { toGrayscaleHex } from "../modules/bookThemeEngine.js?v=36";
+import { computeFrameGeometry, drawFrame } from "./preview.js?v=37";
+import { computeGridDimensions, cellCenterIn, cellPolygonIn, mmToIn, isCellInGridSilhouette, isCellInFrameMargin } from "../modules/gridPatternEngine.js?v=37";
+import { recommendFont, recommendTextTint, adjustForBorderWeight, centerOffsetIn, letterSpacingForLabel } from "../modules/typographyEngine.js?v=37";
+import { gridColorFromTint } from "../modules/borderStyleEngine.js?v=37";
+import { cornerRadiusIn, isFullCircle } from "../modules/cornerRadiusEngine.js?v=37";
+import { nearestPaletteColor, rgbToLabTriple, labTripleToRgb } from "../modules/shadeQuantizationEngine.js?v=37";
+import { computeLayout, LAYOUT_ELEMENTS } from "../modules/layoutCompositionEngine.js?v=37";
+import { toGrayscaleHex } from "../modules/bookThemeEngine.js?v=37";
 
 const PT_TO_IN = 1 / 72;
 
@@ -510,14 +510,16 @@ function resolveGrid(gridZone, cellSizeMm, gridPattern, gridOverride) {
 // preview and the exported PDF page always agree on point sizes and weights.
 // `pageBlack` is an explicit flag resolved by the caller from the Black Book page-
 // background setting (see modules/bookThemeEngine.js) — never inferred from grid tint,
-// which only ever controls grid LINE darkness.
-function computeCellStyle({ cellSizeMm, cellSizeIn, borderWeightPt, gridTintPercent, cornerRadiusPercent, palette, ppi, pageBlack = false }) {
+// which only ever controls grid LINE darkness. Grid Line Tint and Number Tint are two
+// independent creator controls (never derived from each other) — the border stroke
+// color comes only from gridTintPercent, the number color only from numberTintPercent.
+function computeCellStyle({ cellSizeMm, cellSizeIn, borderWeightPt, gridTintPercent, numberTintPercent, cornerRadiusPercent, palette, ppi, pageBlack = false }) {
   const baseFont = recommendFont(cellSizeMm, palette.length);
   // Dynamic Typography Syncing: a thick border encroaching on the cell interior drops
   // the font half a point so the glyph never clips into the line.
   const sizePt = adjustForBorderWeight(baseFont.sizePt, borderWeightPt, cellSizeMm);
   const font = { ...baseFont, sizePt };
-  const textTint = recommendTextTint(cellSizeMm, gridTintPercent);
+  const textTint = recommendTextTint(cellSizeMm, numberTintPercent);
 
   return {
     blackoutMode: pageBlack,
@@ -645,8 +647,8 @@ export function renderMosaicPreview(canvas, opts) {
   const {
     mode, // 'print' | 'solved'
     trimSize, dpi, bleedEnabled, canvasDims, safeZone, pageSide, composition,
-    gridPattern, cellSizeMm, gridOverride = null, borderWeightPt, gridTintPercent, cornerRadiusPercent,
-    palette, sourceCanvas, cornerTrimCorners = [], cornerTrimShape = "rounded", cornerTrimSizePercent = 12, frameMarginCells = 0, gridPageBlack = false, blackWhiteEdition = false, blankColorIds = [],
+    gridPattern, cellSizeMm, gridOverride = null, borderWeightPt, gridTintPercent, numberTintPercent = 35,
+    cornerRadiusPercent, palette, sourceCanvas, cornerTrimCorners = [], cornerTrimShape = "rounded", cornerTrimSizePercent = 12, frameMarginCells = 0, gridPageBlack = false, blackWhiteEdition = false, blankColorIds = [],
   } = opts;
 
   const ctx = canvas.getContext("2d");
@@ -665,7 +667,7 @@ export function renderMosaicPreview(canvas, opts) {
   // exportInteriorPdf will actually produce, not a zoomed-in fragment of a few cells.
   const ppi = geometry.scale;
   const fullGrid = resolveGrid(gridZone, cellSizeMm, gridPattern, gridOverride);
-  const style = computeCellStyle({ cellSizeMm, cellSizeIn: fullGrid.cellSizeIn, borderWeightPt, gridTintPercent, cornerRadiusPercent, palette, ppi, pageBlack: gridPageBlack });
+  const style = computeCellStyle({ cellSizeMm, cellSizeIn: fullGrid.cellSizeIn, borderWeightPt, gridTintPercent, numberTintPercent, cornerRadiusPercent, palette, ppi, pageBlack: gridPageBlack });
 
   // Paint the trim box with the real page background (white, or rich black in
   // Blackout mode) before the element-band overlays — otherwise the app's dark UI
@@ -732,15 +734,15 @@ export function renderFullMosaicGrid(canvas, opts) {
   const {
     mode, // 'print' | 'solved'
     dpi, canvasDims, safeZone, pageSide, composition,
-    gridPattern, cellSizeMm, gridOverride = null, borderWeightPt, gridTintPercent, cornerRadiusPercent,
-    palette, sourceCanvas, cornerTrimCorners = [], cornerTrimShape = "rounded", cornerTrimSizePercent = 12, frameMarginCells = 0, gridPageBlack = false, blackWhiteEdition = false, blankColorIds = [],
+    gridPattern, cellSizeMm, gridOverride = null, borderWeightPt, gridTintPercent, numberTintPercent = 35,
+    cornerRadiusPercent, palette, sourceCanvas, cornerTrimCorners = [], cornerTrimShape = "rounded", cornerTrimSizePercent = 12, frameMarginCells = 0, gridPageBlack = false, blackWhiteEdition = false, blankColorIds = [],
   } = opts;
 
   const ctx = canvas.getContext("2d");
   const layout = computeLayout(safeZone, composition);
   const gridZone = layout.gridZone;
   const fullGrid = resolveGrid(gridZone, cellSizeMm, gridPattern, gridOverride);
-  const style = computeCellStyle({ cellSizeMm, cellSizeIn: fullGrid.cellSizeIn, borderWeightPt, gridTintPercent, cornerRadiusPercent, palette, ppi: dpi, pageBlack: gridPageBlack });
+  const style = computeCellStyle({ cellSizeMm, cellSizeIn: fullGrid.cellSizeIn, borderWeightPt, gridTintPercent, numberTintPercent, cornerRadiusPercent, palette, ppi: dpi, pageBlack: gridPageBlack });
 
   // True K:100% solid Rich Black canvas background per the Midnight/Blackout standard.
   ctx.fillStyle = mode === "solved" ? "#ffffff" : style.blackoutMode ? "#000000" : "#ffffff";
