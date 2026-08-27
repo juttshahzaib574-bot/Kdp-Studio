@@ -1,16 +1,16 @@
 // Module: Stacked Live Preview Gallery + Live Preview Carousel
-import { state, setState, subscribe } from "../../state.js?v=37";
-import { getTrimSizeById } from "../../modules/canvasEngine.js?v=37";
-import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=37";
-import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=37";
-import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=37";
-import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=37";
-import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=37";
-import { normalizeComposition } from "../../modules/layoutCompositionEngine.js?v=37";
-import { getPlaceholderSource, loadImageSource, drawSourceToCanvas, renderMosaicPreview } from "../mosaicRenderer.js?v=37";
-import { createCarouselController } from "../../modules/previewLoopEngine.js?v=37";
-import { downloadActiveItemPng, downloadActiveItemPdf } from "../pdfExport.js?v=37";
-import { isContentPageBlack } from "../../modules/bookThemeEngine.js?v=37";
+import { state, setState, subscribe } from "../../state.js?v=38";
+import { getTrimSizeById } from "../../modules/canvasEngine.js?v=38";
+import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=38";
+import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=38";
+import { getSizesForSelection, buildCombinedPalette } from "../../modules/colorKeyEngine.js?v=38";
+import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=38";
+import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=38";
+import { normalizeComposition } from "../../modules/layoutCompositionEngine.js?v=38";
+import { getPlaceholderSource, loadImageSource, drawSourceToCanvas, renderMosaicPreview } from "../mosaicRenderer.js?v=38";
+import { createCarouselController } from "../../modules/previewLoopEngine.js?v=38";
+import { downloadActiveItemPng, downloadActiveItemPdf } from "../pdfExport.js?v=38";
+import { isContentPageBlack } from "../../modules/bookThemeEngine.js?v=38";
 
 const el = {
   printCanvas: document.getElementById("preview-canvas-print"),
