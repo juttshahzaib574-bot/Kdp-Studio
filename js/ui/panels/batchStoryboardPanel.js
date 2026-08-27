@@ -1,16 +1,17 @@
-import { state, setState, subscribe } from "../../state.js?v=46";
-import { MAX_BATCH_SIZE, addToBatch, removeFromBatch, updateItemSettings } from "../../modules/batchEngine.js?v=46";
-import { reorder, computePagination, statusBadges } from "../../modules/storyboardEngine.js?v=46";
-import { computeSolutionPageCount } from "../../modules/solutionGenerationEngine.js?v=46";
-import { GRID_PATTERNS, CORNER_TRIM_CORNERS, CORNER_TRIM_SHAPES, CORNER_TRIM_SIZE_MIN_PERCENT, CORNER_TRIM_SIZE_MAX_PERCENT } from "../../modules/gridPatternEngine.js?v=46";
-import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=46";
-import { computeFrontMatterPageCount } from "../../modules/frontBackMatterEngine.js?v=46";
-import { SOURCE_SMOOTHING_OPTIONS } from "../../modules/sourceSmoothingEngine.js?v=46";
-import { getSizesForSelection, buildCombinedPalette, applyCustomColorOrder } from "../../modules/colorKeyEngine.js?v=46";
-import { DRAG_HANDLE_ICON, attachDragHandle } from "../dragReorderList.js?v=46";
+import { state, setState, subscribe } from "../../state.js?v=47";
+import { MAX_BATCH_SIZE, addToBatch, removeFromBatch, updateItemSettings } from "../../modules/batchEngine.js?v=47";
+import { reorder, computePagination, statusBadges } from "../../modules/storyboardEngine.js?v=47";
+import { computeSolutionPageCount } from "../../modules/solutionGenerationEngine.js?v=47";
+import { GRID_PATTERNS, CORNER_TRIM_CORNERS, CORNER_TRIM_SHAPES, CORNER_TRIM_SIZE_MIN_PERCENT, CORNER_TRIM_SIZE_MAX_PERCENT } from "../../modules/gridPatternEngine.js?v=47";
+import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=47";
+import { computeFrontMatterPageCount } from "../../modules/frontBackMatterEngine.js?v=47";
+import { SOURCE_SMOOTHING_OPTIONS } from "../../modules/sourceSmoothingEngine.js?v=47";
+import { getSizesForSelection, buildCombinedPalette, applyCustomColorOrder } from "../../modules/colorKeyEngine.js?v=47";
+import { DRAG_HANDLE_ICON, attachDragHandle } from "../dragReorderList.js?v=47";
 
 const CORNER_RADIUS_CHOICES = [0, 25, 50, 75, 100];
 const COLOR_SET_CHOICES = [12, 24, 36];
+const SOURCE_RESOLUTION_CHOICES = [512, 1024, 1536, 2048, 3072, 4096];
 
 // Bulk-apply presets for Cell Shape Sequence: assigns every queued image a gridPattern
 // override by cycling this list in storyboard order (index % pattern.length) — "one
@@ -29,6 +30,7 @@ const el = {
   summaryHint: document.getElementById("solution-summary-hint"),
   cellShapeSequenceOptions: document.getElementById("cell-shape-sequence-options"),
   sourceSmoothingOptions: document.getElementById("source-smoothing-options"),
+  sourceResolutionSelect: document.getElementById("source-resolution-select"),
 };
 
 // Manual mouse-based drag (not native HTML5 draggable, and not Pointer Events +
@@ -44,6 +46,7 @@ let dragState = null; // { fromId, hoverId }
 export function initBatchStoryboardPanel() {
   el.fileInput.addEventListener("change", handleFileInput);
   el.perPageSelect.addEventListener("change", () => setState({ solutionThumbsPerPage: Number(el.perPageSelect.value) }));
+  el.sourceResolutionSelect.addEventListener("change", () => setState({ sourceResolution: Number(el.sourceResolutionSelect.value) }));
   renderCellShapeSequenceOptions();
   renderSourceSmoothingOptions();
 
@@ -119,6 +122,7 @@ function render(current) {
 
   el.countHint.textContent = `${current.batchItems.length} / ${MAX_BATCH_SIZE} images queued.`;
   el.perPageSelect.value = String(current.solutionThumbsPerPage);
+  el.sourceResolutionSelect.value = String(current.sourceResolution);
 
   const pageCount = computeSolutionPageCount(current.batchItems.length, current.solutionThumbsPerPage);
   el.summaryHint.textContent =
@@ -226,6 +230,13 @@ function buildSettingsDrawer(item, current) {
         ${SOURCE_SMOOTHING_OPTIONS.map((o) => `<option value="${o.id}">${o.label}</option>`).join("")}
       </select>
     </div>
+    <div class="drawer-field">
+      <label>Source Resolution</label>
+      <select data-key="sourceResolution">
+        <option value="">Inherit (${current.sourceResolution} px)</option>
+        ${SOURCE_RESOLUTION_CHOICES.map((v) => `<option value="${v}">${v} px</option>`).join("")}
+      </select>
+    </div>
     <div class="drawer-field corner-trim-drawer-field">
       <label>Grid Corner Trim</label>
       <label class="drawer-toggle-label">
@@ -254,7 +265,7 @@ function buildSettingsDrawer(item, current) {
     select.addEventListener("change", () => {
       const raw = select.value;
       let value = raw === "" ? null : raw;
-      if (key === "cornerRadiusPercent" || key === "colorSetOverride") {
+      if (key === "cornerRadiusPercent" || key === "colorSetOverride" || key === "sourceResolution") {
         value = raw === "" ? null : Number(raw);
       }
       const batch = updateItemSettings(state.batchItems, item.id, { [key]: value });

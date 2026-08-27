@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>KDP Studio</title>
-  <link rel="stylesheet" href="css/styles.css?v=46" />
+  <link rel="stylesheet" href="css/styles.css?v=47" />
 </head>
 <body>
   <header class="app-header">
@@ -35,6 +35,19 @@
           <label>Source Smoothing <span class="lock-note">— book-wide default; each image can override this in its own ⚙ drawer</span></label>
           <div class="option-list" id="source-smoothing-options"></div>
           <p class="hint">Runs a small edge-preserving median denoise on a photo before it's quantized — cleans up sensor grain/noise that can otherwise split one region's color vote across two or three near-identical picks, especially at larger 5-6mm cells. Off by default; leave off for already-clean flat-color art.</p>
+        </div>
+
+        <div class="field-group">
+          <label>Source Resolution <span class="lock-note">— book-wide default; each image can override this in its own ⚙ drawer</span></label>
+          <select id="source-resolution-select">
+            <option value="512">512 px — Fast, lower detail</option>
+            <option value="1024" selected>1024 px — Balanced (default)</option>
+            <option value="1536">1536 px — High detail</option>
+            <option value="2048">2048 px — Maximum detail</option>
+            <option value="3072">3072 px — Ultra (slow)</option>
+            <option value="4096">4096 px — Extreme (very slow)</option>
+          </select>
+          <p class="hint">Controls how much of your source photo's detail the color engine sees. Higher values preserve finer detail but take longer to process. A 4000 px photo at "1024 px" still beats a 600 px photo at "2048 px" — you can't add detail that isn't there.</p>
         </div>
 
         <div class="field-group">
@@ -522,6 +535,6 @@
        module scripts below — pdfExport.js needs window.fontkit already set when it
        calls doc.registerFontkit() to embed the custom fonts in js/vendor/fonts/. -->
   <script src="js/vendor/fontkit.umd.min.js"></script>
-  <script type="module" src="js/main.js?v=46"></script>
+  <script type="module" src="js/main.js?v=47"></script>
 </body>
 </html>

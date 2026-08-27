@@ -1,17 +1,17 @@
 // Module: Stacked Live Preview Gallery + Live Preview Carousel
-import { state, setState, subscribe } from "../../state.js?v=46";
-import { getTrimSizeById } from "../../modules/canvasEngine.js?v=46";
-import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=46";
-import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=46";
-import { getSizesForSelection, buildCombinedPalette, applyCustomColorOrder } from "../../modules/colorKeyEngine.js?v=46";
-import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=46";
-import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=46";
-import { normalizeComposition } from "../../modules/layoutCompositionEngine.js?v=46";
-import { getPlaceholderSource, loadImageSource, drawSourceToCanvas, renderMosaicPreview } from "../mosaicRenderer.js?v=46";
-import { createCarouselController } from "../../modules/previewLoopEngine.js?v=46";
-import { downloadActiveItemPng, downloadActiveItemPdf } from "../pdfExport.js?v=46";
-import { isContentPageBlack } from "../../modules/bookThemeEngine.js?v=46";
-import { applySourceSmoothing } from "../../modules/sourceSmoothingEngine.js?v=46";
+import { state, setState, subscribe } from "../../state.js?v=47";
+import { getTrimSizeById } from "../../modules/canvasEngine.js?v=47";
+import { computeCanvasDimensions } from "../../modules/bleedEngine.js?v=47";
+import { computeSafeZone } from "../../modules/safeZoneEngine.js?v=47";
+import { getSizesForSelection, buildCombinedPalette, applyCustomColorOrder } from "../../modules/colorKeyEngine.js?v=47";
+import { resolveEffectiveGrid } from "../../modules/resolutionScalingEngine.js?v=47";
+import { BORDER_PRESETS } from "../../modules/borderStyleEngine.js?v=47";
+import { normalizeComposition } from "../../modules/layoutCompositionEngine.js?v=47";
+import { getPlaceholderSource, loadImageSource, drawSourceToCanvas, renderMosaicPreview } from "../mosaicRenderer.js?v=47";
+import { createCarouselController } from "../../modules/previewLoopEngine.js?v=47";
+import { downloadActiveItemPng, downloadActiveItemPdf } from "../pdfExport.js?v=47";
+import { isContentPageBlack } from "../../modules/bookThemeEngine.js?v=47";
+import { applySourceSmoothing } from "../../modules/sourceSmoothingEngine.js?v=47";
 
 const el = {
   printCanvas: document.getElementById("preview-canvas-print"),
@@ -258,7 +258,8 @@ function updateCarouselNav(current) {
 // itself, only re-filters it.
 async function resolveRawSourceCanvas(current) {
   const activeItem = current.batchItems.find((item) => item.id === current.activeBatchItemId);
-  const key = activeItem ? activeItem.objectUrl : "placeholder";
+  const maxSize = activeItem ? (activeItem.settings.sourceResolution ?? current.sourceResolution) : 1024;
+  const key = activeItem ? `${activeItem.objectUrl}@${maxSize}` : "placeholder";
 
   if (cachedRawCanvas && cachedRawKey === key) return cachedRawCanvas;
 
@@ -270,7 +271,7 @@ async function resolveRawSourceCanvas(current) {
 
   try {
     const img = await loadImageSource(activeItem.objectUrl);
-    cachedRawCanvas = drawSourceToCanvas(img);
+    cachedRawCanvas = drawSourceToCanvas(img, maxSize);
     cachedRawKey = key;
   } catch {
     cachedRawCanvas = getPlaceholderSource();
