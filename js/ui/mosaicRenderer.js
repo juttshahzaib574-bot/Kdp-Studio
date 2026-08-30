@@ -6,14 +6,14 @@
 //   - renderFullMosaicGrid: the entire safe-zone grid at the real chosen print DPI,
 //     used to generate the actual page image embedded into the exported PDF.
 
-import { computeFrameGeometry, drawFrame } from "./preview.js?v=48";
-import { computeGridDimensions, cellCenterIn, cellPolygonIn, mmToIn, isCellInGridSilhouette, isCellInFrameMargin } from "../modules/gridPatternEngine.js?v=48";
-import { recommendFont, recommendTextTint, adjustForBorderWeight, centerOffsetIn, letterSpacingForLabel } from "../modules/typographyEngine.js?v=48";
-import { gridColorFromTint } from "../modules/borderStyleEngine.js?v=48";
-import { cornerRadiusIn, isFullCircle } from "../modules/cornerRadiusEngine.js?v=48";
-import { nearestPaletteColorLAB, rgbToLabTriple, deltaE2000Triple } from "../modules/shadeQuantizationEngine.js?v=48";
-import { computeLayout, LAYOUT_ELEMENTS } from "../modules/layoutCompositionEngine.js?v=48";
-import { toGrayscaleHex } from "../modules/bookThemeEngine.js?v=48";
+import { computeFrameGeometry, drawFrame } from "./preview.js?v=49";
+import { computeGridDimensions, cellCenterIn, cellPolygonIn, mmToIn, isCellInGridSilhouette, isCellInFrameMargin } from "../modules/gridPatternEngine.js?v=49";
+import { recommendFont, recommendTextTint, adjustForBorderWeight, centerOffsetIn, letterSpacingForLabel } from "../modules/typographyEngine.js?v=49";
+import { gridColorFromTint } from "../modules/borderStyleEngine.js?v=49";
+import { cornerRadiusIn, isFullCircle } from "../modules/cornerRadiusEngine.js?v=49";
+import { nearestPaletteColorLAB, rgbToLabTriple, deltaE2000Triple } from "../modules/shadeQuantizationEngine.js?v=49";
+import { computeLayout, LAYOUT_ELEMENTS } from "../modules/layoutCompositionEngine.js?v=49";
+import { toGrayscaleHex } from "../modules/bookThemeEngine.js?v=49";
 
 const PT_TO_IN = 1 / 72;
 
@@ -107,10 +107,10 @@ const euclidean3 = (a, b) => Math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 +
 
 // Perceptually-close clusters merge into one before the final palette snap, now
 // measured by CIEDE2000 (not CIE76) for accuracy in the blue and saturated regions.
-// Threshold 5 is well above the ~1.0 JND — collapses genuinely redundant near-
-// duplicate clusters while preserving visually distinct shades that the old higher
-// threshold would have incorrectly merged.
-const CLUSTER_MERGE_DELTA_E = 5;
+// Threshold 3 is above the ~1.0 JND — collapses genuinely indistinguishable near-
+// duplicate clusters while preserving subtly distinct shades (e.g. two close browns
+// that map to different palette entries) that a higher threshold would merge.
+const CLUSTER_MERGE_DELTA_E = 3;
 
 // kmeansSeeded's Lloyd iterations cost O(n * clusters * iters) — at a small cell size
 // (more grid cells) combined with a wide color set (more clusters), n (every non-outline
@@ -190,7 +190,11 @@ function sampleGridCellsNearestNeighbor(sourceCanvas, cols, rows, targetAspect) 
 }
 
 // A cell is a true outline stroke if it's darker than its brightest neighbor by a
-// real margin AND dark overall — spatial context, not an absolute color threshold.
+// real margin AND very dark overall — spatial context, not an absolute color threshold.
+// The thresholds are deliberately conservative (high contrast jump, low luminance cap)
+// so dark-but-legitimate image content (brown feathers, dark eyes, shadows in photos)
+// stays as real colored cells rather than being swallowed into the outline layer. Only
+// thin, ink-black strokes against a substantially lighter background trigger this.
 function detectOutlineCells(cells, cols, rows) {
   const edges = new Array(cols * rows).fill(false);
   const lums = cells.map((px) => {
@@ -209,7 +213,7 @@ function detectOutlineCells(cells, cols, rows) {
       if (row < rows - 1) jump = Math.max(jump, Math.abs(lums[i] - lums[i + cols]));
       if (col > 0) jump = Math.max(jump, Math.abs(lums[i] - lums[i - 1]));
       if (col < cols - 1) jump = Math.max(jump, Math.abs(lums[i] - lums[i + 1]));
-      if (jump > 40 && lums[i] < 100) edges[i] = true;
+      if (jump > 55 && lums[i] < 65) edges[i] = true;
     }
   }
   return edges;

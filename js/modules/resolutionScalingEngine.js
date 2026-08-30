@@ -1,6 +1,6 @@
 // Module 7: Adaptive Resolution & Cell Scaling Engine
-import { computeGridDimensions, inToMm } from "./gridPatternEngine.js?v=48";
-import { computeLayout, isColorKeyOffloaded, normalizeComposition } from "./layoutCompositionEngine.js?v=48";
+import { computeGridDimensions, inToMm } from "./gridPatternEngine.js?v=49";
+import { computeLayout, isColorKeyOffloaded, normalizeComposition } from "./layoutCompositionEngine.js?v=49";
 
 export const SCALING_PRIORITIES = [
   {

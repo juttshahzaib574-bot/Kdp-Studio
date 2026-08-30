@@ -1,4 +1,4 @@
-// Module: The Universal 36-Color Palette
+// Module: The Universal Color Palette
 // The tool's single, exact source of truth for every color used to label and paint
 // mosaic color-by-number pages — every hex value here is a real, exact code, never
 // an approximated or brand-guessed one. Delta E quantization (shadeQuantizationEngine.js)
@@ -52,6 +52,11 @@ const RAW = [
   { id: 34, name: "Forest Green", hex: "#228B22" },
   { id: 35, name: "Olive Green", hex: "#556B2F" },
   { id: 36, name: "Teal Turquoise", hex: "#008080" },
+  { id: 37, name: "Camel", hex: "#C19A6B" },
+  { id: 38, name: "Copper Brown", hex: "#B87333" },
+  { id: 39, name: "Sienna", hex: "#A0522D" },
+  { id: 40, name: "Steel Blue", hex: "#4682B4" },
+  { id: 41, name: "Taupe", hex: "#8B7D6B" },
 ];
 
 export const UNIVERSAL_PALETTE_36 = RAW.map((entry) => ({ ...entry, rgb: hexToRgb(entry.hex) }));
